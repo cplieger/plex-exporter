@@ -314,7 +314,7 @@ Issues, suggestions, and pull requests are welcome.
 
 ## Credits
 
-This is an original tool that integrates with [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter). Thanks to the prometheus-plex-exporter maintainers for building the platform this tool extends.
+This is an original tool that builds upon [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter).
 - Grafana Hackathon 2022
   — the original hackathon project that started it all
 - [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter)
