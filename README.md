@@ -39,21 +39,7 @@ This is a distroless, rootless container running on
 Only two direct Go dependencies: `gorilla/websocket` for the Plex
 notification stream and `prometheus/client_golang` for metrics.
 
-### Limitations
-
-- **Plex Pass features degrade gracefully.** CPU/memory utilization
-  and bandwidth statistics require Plex Pass. Without it, those
-  metrics are simply absent — the exporter still works for all
-  other metrics.
-- **WebSocket is required.** The exporter uses the Plex WebSocket
-  notification stream for real-time session tracking. If your Plex
-  server is behind a reverse proxy, ensure WebSocket connections
-  are forwarded correctly.
-- **Library item counts are cached.** Episode, track, and item
-  counts are refreshed every 15 minutes to avoid hammering the
-  Plex API. Counts may lag slightly after large library scans.
-
-### How It Differs From prometheus-plex-exporter
+### Comparison With Upstream
 
 This is a complete rewrite — no code is shared with the upstream
 projects. The architecture and dependency choices are fundamentally
@@ -79,6 +65,21 @@ Additional metrics not in upstream:
 - `plex_session_bandwidth_kbps` — actual bandwidth per session
 - `plex_server_info` includes `plex_pass` label
 - Play metrics include `location` (lan/wan) and `local` (true/false)
+
+### Limitations
+
+- **Plex Pass features degrade gracefully.** CPU/memory utilization
+  and bandwidth statistics require Plex Pass. Without it, those
+  metrics are simply absent — the exporter still works for all
+  other metrics.
+- **WebSocket is required.** The exporter uses the Plex WebSocket
+  notification stream for real-time session tracking. If your Plex
+  server is behind a reverse proxy, ensure WebSocket connections
+  are forwarded correctly.
+- **Library item counts are cached.** Episode, track, and item
+  counts are refreshed every 15 minutes to avoid hammering the
+  Plex API. Counts may lag slightly after large library scans.
+
 
 ## Container Registries
 
@@ -144,7 +145,6 @@ services:
 5. For Grafana integration, see the
    [Grafana Dashboard](#grafana-dashboard) section below.
 
-For additional configuration options not covered by this image's environment variables, refer to the [prometheus-plex-exporter documentation](https://developer.plex.tv/pms/).
 
 ## Environment Variables
 
@@ -314,7 +314,7 @@ Issues, suggestions, and pull requests are welcome.
 
 ## Credits
 
-This project packages [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) into a container image. All credit for the core functionality goes to the upstream maintainers.
+This is an original tool that integrates with [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter). Thanks to the prometheus-plex-exporter maintainers for building the platform this tool extends.
 - Grafana Hackathon 2022
   — the original hackathon project that started it all
 - [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter)
