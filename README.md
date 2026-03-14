@@ -296,7 +296,7 @@ alerting.
 | Tests | 160 |
 | [Cyclomatic Complexity](https://en.wikipedia.org/wiki/Cyclomatic_complexity) (avg) | 4.0 |
 | [Cognitive Complexity](https://www.sonarsource.com/docs/CognitiveComplexity.pdf) (avg) | 4.0 |
-| [Mutation Efficacy](https://en.wikipedia.org/wiki/Mutation_testing) | 86.8% (29 runs) |
+| [Mutation Efficacy](https://en.wikipedia.org/wiki/Mutation_testing) | 87.3% (59 runs) |
 | Test Framework | Property-based ([rapid](https://github.com/flyingmutant/rapid)) + table-driven |
 
 Tests cover Prometheus metric collection (all 13 metric descriptors,
