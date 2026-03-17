@@ -184,7 +184,7 @@ func newPlexClient(serverURL, token string) *plexClient {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	if v := os.Getenv("SKIP_TLS_VERIFICATION"); v == "1" || v == valTrue {
 		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // G402: user-requested via env var
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, // G402: user-requested via env var
 		}
 	}
 	return &plexClient{baseURL: parsed, token: token, httpClient: httpClient}

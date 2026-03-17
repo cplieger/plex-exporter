@@ -313,6 +313,35 @@ and ticker-based refresh scheduling — these are I/O-bound runtime
 paths. WebSocket health is monitored via the
 `plex_websocket_connected` Prometheus metric.
 
+## Security Review
+
+**No vulnerabilities found.** All scans clean across 7 tools.
+
+| Tool | Result |
+|------|--------|
+| [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) | No vulnerabilities in call graph |
+| [golangci-lint](https://golangci-lint.run/) (gosec, gocritic) | 0 issues |
+| [trivy](https://trivy.dev/) | 0 vulnerabilities (distroless base) |
+| [grype](https://github.com/anchore/grype) | 0 vulnerabilities |
+| [gitleaks](https://github.com/gitleaks/gitleaks) | No secrets detected |
+| [semgrep](https://semgrep.dev/) | 2 info (false positives) |
+| [hadolint](https://github.com/hadolint/hadolint) | Clean |
+
+Connects outbound to Plex only. The `/metrics` endpoint serves
+read-only Prometheus data (standard for internal exporters).
+`PLEX_TOKEN` is never logged or exposed in metrics. Runs as
+`nonroot` on a distroless base image with no shell.
+
+**Details for advanced users:** Plex response bodies capped at
+10 MB via `io.LimitReader`. WebSocket messages capped at 1 MB.
+All HTTP clients use explicit 10s timeouts; the metrics server
+sets all five timeouts (`ReadHeaderTimeout`, `ReadTimeout`,
+`WriteTimeout`, `IdleTimeout`, `MaxHeaderBytes`). Rating keys
+validated via `strconv.Atoi` before URL construction. Explicit
+`MinVersion: tls.VersionTLS12` set on TLS config. Semgrep flags
+the `/tmp/.healthy` marker and the opt-in TLS skip (both
+intentional).
+
 ## Dependencies
 
 All dependencies are updated automatically via [Renovate](https://github.com/renovatebot/renovate) and pinned by digest or version for reproducibility.

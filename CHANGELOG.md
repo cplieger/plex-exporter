@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.03.17-edc187a (2026-03-17)
+
+### Fixed
+
+- Enforce minimum TLS version for secure connections
+
 ## 2026.03.15-866f9fa (2026-03-16)
 
 ### Dependencies
