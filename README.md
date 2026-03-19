@@ -1,8 +1,8 @@
-# docker-plex-exporter
+# plex-exporter
 
 ![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)
-[![GitHub release](https://img.shields.io/github/v/release/cplieger/docker-plex-exporter)](https://github.com/cplieger/docker-plex-exporter/releases)
-[![Image Size](https://ghcr-badge.egpl.dev/cplieger/plex-exporter/size)](https://github.com/cplieger/docker-plex-exporter/pkgs/container/plex-exporter)
+[![GitHub release](https://img.shields.io/github/v/release/cplieger/plex-exporter)](https://github.com/cplieger/plex-exporter/releases)
+[![Image Size](https://ghcr-badge.egpl.dev/cplieger/plex-exporter/size)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter)
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
 
