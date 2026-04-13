@@ -18,6 +18,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coder/websocket"
 	"github.com/prometheus/client_golang/prometheus"
@@ -95,6 +96,9 @@ func run() int {
 		slog.Error("cannot connect to plex server", "error", err)
 		return 1
 	}
+	slog.Info("connected to plex server",
+		"name", server.name, "version", server.version,
+		"libraries", len(server.libraries))
 
 	prometheus.MustRegister(server)
 	go server.runRefreshLoop(ctx)
@@ -160,6 +164,8 @@ func setHealthy(ok bool) {
 	if ok {
 		if f, err := os.Create(healthFile); err == nil {
 			f.Close()
+		} else {
+			slog.Warn("failed to create health file", "error", err)
 		}
 	} else {
 		os.Remove(healthFile)
@@ -225,6 +231,9 @@ func (c *plexClient) getWithHeaders(ctx context.Context, path string, result any
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return err
+	}
+	if len(body) == 0 {
+		return nil
 	}
 	return json.Unmarshal(body, result)
 }
@@ -477,6 +486,33 @@ func contentTypeLabel(libType string) string {
 	}
 }
 
+// buildLibraries extracts library entries from the media providers response,
+// preserving existing item counts from prevItems.
+func buildLibraries(providers mediaProviderResponse, prevItems map[string]int64) []library {
+	var libs []library
+	for _, p := range providers.MediaProviders {
+		if p.Identifier != "com.plexapp.plugins.library" {
+			continue
+		}
+		for _, f := range p.Features {
+			if f.Type != "content" {
+				continue
+			}
+			for _, d := range f.Directories {
+				if !isLibraryType(d.Type) {
+					continue
+				}
+				libs = append(libs, library{
+					ID: d.ID, Name: d.Title, Type: d.Type,
+					DurationTotal: d.DurationTotal, StorageTotal: d.StorageTotal,
+					ItemsCount: prevItems[d.ID],
+				})
+			}
+		}
+	}
+	return libs
+}
+
 // ---------------------------------------------------------------------------
 // Session tracking
 // ---------------------------------------------------------------------------
@@ -526,11 +562,13 @@ func (t *sessionTracker) update(id string, newState sessionState, meta, mediaMet
 		s.mediaMeta = *mediaMeta
 	}
 
+	// Accumulate play time and estimated bandwidth on playing→non-playing transition.
 	if s.state == statePlaying && newState != statePlaying && len(s.meta.Media) > 0 {
 		elapsed := time.Since(s.playStarted)
 		s.prevPlayedTime += elapsed
 		t.totalEstimatedKBits += elapsed.Seconds() * float64(s.meta.Media[0].Bitrate)
 	}
+	// Reset play timer on non-playing→playing transition.
 	if s.state != statePlaying && newState == statePlaying {
 		s.playStarted = time.Now()
 	}
@@ -543,11 +581,16 @@ func (t *sessionTracker) update(id string, newState sessionState, meta, mediaMet
 func (t *sessionTracker) prune() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	var pruned int
 	for k := range t.sessions {
 		s := t.sessions[k]
 		if s.state == stateStopped && time.Since(s.lastUpdate) > sessionTimeout {
 			delete(t.sessions, k)
+			pruned++
 		}
+	}
+	if pruned > 0 {
+		slog.Debug("pruned expired sessions", "count", pruned, "remaining", len(t.sessions))
 	}
 }
 
@@ -569,23 +612,34 @@ func (t *sessionTracker) runPruneLoop(ctx context.Context) {
 // ---------------------------------------------------------------------------
 
 type plexServer struct {
+	// Refresh state
 	lastItemsRefresh time.Time
-	client           *plexClient
-	sessions         *sessionTracker
-	id               string
-	name             string
-	version          string
-	platform         string
-	platformVersion  string
+
+	// Dependencies
+	client   *plexClient
+	sessions *sessionTracker
+
+	// Server identity
+	id              string
+	name            string
+	version         string
+	platform        string
+	platformVersion string
+
+	// Metrics state
 	libraries        []library
 	hostMem          float64
 	transmitBytes    float64
 	hostCPU          float64
 	lastBandwidthAt  int
 	activeTranscodes int
-	mu               sync.Mutex
-	plexPass         bool
-	wsConnected      bool
+
+	// Concurrency
+	mu sync.Mutex
+
+	// Flags
+	plexPass    bool
+	wsConnected bool
 }
 
 func newPlexServer(client *plexClient) *plexServer {
@@ -619,27 +673,7 @@ func (s *plexServer) refresh(parent context.Context) error {
 		}
 	}
 
-	s.libraries = nil
-	for _, p := range providers.MediaContainer.MediaProviders {
-		if p.Identifier != "com.plexapp.plugins.library" {
-			continue
-		}
-		for _, f := range p.Features {
-			if f.Type != "content" {
-				continue
-			}
-			for _, d := range f.Directories {
-				if !isLibraryType(d.Type) {
-					continue
-				}
-				s.libraries = append(s.libraries, library{
-					ID: d.ID, Name: d.Title, Type: d.Type,
-					DurationTotal: d.DurationTotal, StorageTotal: d.StorageTotal,
-					ItemsCount: prevItems[d.ID],
-				})
-			}
-		}
-	}
+	s.libraries = buildLibraries(providers.MediaContainer, prevItems)
 	needItemsRefresh := time.Since(s.lastItemsRefresh) > 15*time.Minute
 	s.mu.Unlock()
 
@@ -701,6 +735,9 @@ func (s *plexServer) refreshLibraryItems(ctx context.Context) {
 		count, err := s.client.getContainerSize(ctx, path)
 		if err == nil {
 			lib.ItemsCount = count
+		} else {
+			slog.Debug("library item count unavailable",
+				"library", lib.Name, "id", lib.ID, "error", err)
 		}
 	}
 
@@ -718,6 +755,7 @@ func (s *plexServer) refreshResources(ctx context.Context) {
 		StatisticsResources []statisticsResource `json:"StatisticsResources"`
 	}]
 	if err := s.client.get(ctx, "/statistics/resources?timespan=6", &resp); err != nil {
+		slog.Debug("resources unavailable", "error", err)
 		return
 	}
 	stats := resp.MediaContainer.StatisticsResources
@@ -736,6 +774,7 @@ func (s *plexServer) refreshBandwidth(ctx context.Context) {
 		StatisticsBandwidth []statisticsBandwidth `json:"StatisticsBandwidth"`
 	}]
 	if err := s.client.get(ctx, "/statistics/bandwidth?timespan=6", &resp); err != nil {
+		slog.Debug("bandwidth unavailable", "error", err)
 		return
 	}
 	updates := resp.MediaContainer.StatisticsBandwidth
@@ -840,57 +879,20 @@ func (s *plexServer) collectSessions(ch chan<- prometheus.Metric, srvName, srvID
 		libByID[l.ID] = l
 	}
 
+	estTotal := s.sessions.totalEstimatedKBits
 	for sessID := range s.sessions.sessions {
 		sess := s.sessions.sessions[sessID]
+
+		// Accumulate estimated transmit for playing sessions.
+		if sess.state == statePlaying && len(sess.meta.Media) > 0 {
+			estTotal += time.Since(sess.playStarted).Seconds() * float64(sess.meta.Media[0].Bitrate)
+		}
+
 		if sess.playStarted.IsZero() {
 			continue
 		}
 
-		streamType, streamRes, bitrate := valUnknown, "", "0"
-		if len(sess.meta.Media) > 0 {
-			m := sess.meta.Media[0]
-			if len(m.Part) > 0 && m.Part[0].Decision != "" {
-				streamType = m.Part[0].Decision
-			}
-			streamRes = m.VideoResolution
-			if m.Bitrate != 0 {
-				bitrate = strconv.Itoa(m.Bitrate)
-			}
-		}
-		fileRes := ""
-		if len(sess.mediaMeta.Media) > 0 {
-			fileRes = sess.mediaMeta.Media[0].VideoResolution
-		}
-
-		libName, libID, libType := sess.libName, sess.libID, sess.libType
-		if libName == "" {
-			if lib, ok := libByID[sess.mediaMeta.LibrarySectionID.String()]; ok {
-				libName, libID, libType = lib.Name, lib.ID, lib.Type
-			} else {
-				libName, libID, libType = valUnknown, "0", valUnknown
-			}
-		}
-
-		title, childTitle, grandchildTitle := sessionLabels(&sess.mediaMeta)
-		ttype := orDefault(sess.transcodeType, valNone)
-		if ttype == valPending {
-			ttype = valNone
-		}
-		subtitle := orDefault(sess.subtitleAction, valNone)
-		location := orDefault(sess.meta.Session.Location, valUnknown)
-		local := valFalse
-		if sess.meta.Player.Local {
-			local = valTrue
-		}
-
-		labelVals := []string{
-			srvName, srvID, libName, libID, libType,
-			sess.mediaMeta.Type, title, childTitle, grandchildTitle,
-			streamType, streamRes, fileRes, bitrate,
-			sess.meta.Player.Device, sess.meta.Player.Product,
-			sess.meta.User.Title, sessID,
-			ttype, subtitle, location, local,
-		}
+		labelVals := sessionLabelValues(srvName, srvID, &sess, sessID, libByID)
 
 		ch <- prometheus.MustNewConstMetric(descPlayCount, prometheus.CounterValue, 1, labelVals...)
 
@@ -905,20 +907,89 @@ func (s *plexServer) collectSessions(ch chan<- prometheus.Metric, srvName, srvID
 		if sess.meta.Session.Bandwidth > 0 {
 			ch <- prometheus.MustNewConstMetric(descSessionBandwidth, prometheus.GaugeValue,
 				float64(sess.meta.Session.Bandwidth),
-				srvName, srvID, sessID, sess.meta.User.Title, location)
+				srvName, srvID, sessID, sess.meta.User.Title,
+				orDefault(sess.meta.Session.Location, valUnknown))
 		}
 	}
 
 	// Estimated transmit bytes.
-	total := s.sessions.totalEstimatedKBits
-	for sessID := range s.sessions.sessions {
-		sess := s.sessions.sessions[sessID]
-		if sess.state == statePlaying && len(sess.meta.Media) > 0 {
-			total += time.Since(sess.playStarted).Seconds() * float64(sess.meta.Media[0].Bitrate)
+	ch <- prometheus.MustNewConstMetric(descEstTransmitBytes, prometheus.CounterValue,
+		estTotal*128, srvName, srvID)
+}
+
+// maxLabelLen is the maximum byte length for user-controlled Prometheus label values.
+const maxLabelLen = 128
+
+// truncLabel truncates a label value to maxLabelLen bytes to prevent
+// high-cardinality label sets from user-controlled Plex API data.
+// It respects UTF-8 boundaries to avoid splitting multi-byte codepoints.
+func truncLabel(s string) string {
+	if len(s) <= maxLabelLen {
+		return s
+	}
+	// Walk backward from the byte limit to find a valid UTF-8 boundary.
+	i := maxLabelLen
+	for i > 0 && !utf8.RuneStart(s[i]) {
+		i--
+	}
+	return s[:i]
+}
+
+// sessionLabelValues builds the Prometheus label value slice for a session.
+func sessionLabelValues(
+	srvName, srvID string,
+	sess *session, sessID string,
+	libByID map[string]library,
+) []string {
+	streamType, streamRes, bitrate := valUnknown, "", "0"
+	if len(sess.meta.Media) > 0 {
+		m := sess.meta.Media[0]
+		if len(m.Part) > 0 && m.Part[0].Decision != "" {
+			streamType = m.Part[0].Decision
+		}
+		streamRes = m.VideoResolution
+		if m.Bitrate != 0 {
+			bitrate = strconv.Itoa(m.Bitrate)
 		}
 	}
-	ch <- prometheus.MustNewConstMetric(descEstTransmitBytes, prometheus.CounterValue,
-		total*128, srvName, srvID)
+	fileRes := ""
+	if len(sess.mediaMeta.Media) > 0 {
+		fileRes = sess.mediaMeta.Media[0].VideoResolution
+	}
+
+	libName, libID, libType := sess.libName, sess.libID, sess.libType
+	if libName == "" {
+		if lib, ok := libByID[sess.mediaMeta.LibrarySectionID.String()]; ok {
+			libName, libID, libType = lib.Name, lib.ID, lib.Type
+		} else {
+			libName, libID, libType = valUnknown, "0", valUnknown
+		}
+	}
+
+	title, childTitle, grandchildTitle := sessionLabels(&sess.mediaMeta)
+	title = truncLabel(title)
+	childTitle = truncLabel(childTitle)
+	grandchildTitle = truncLabel(grandchildTitle)
+
+	ttype := orDefault(sess.transcodeType, valNone)
+	if ttype == valPending {
+		ttype = valNone
+	}
+	subtitle := orDefault(sess.subtitleAction, valNone)
+	location := orDefault(sess.meta.Session.Location, valUnknown)
+	local := valFalse
+	if sess.meta.Player.Local {
+		local = valTrue
+	}
+
+	return []string{
+		srvName, srvID, libName, libID, libType,
+		sess.mediaMeta.Type, title, childTitle, grandchildTitle,
+		streamType, streamRes, fileRes, bitrate,
+		sess.meta.Player.Device, sess.meta.Player.Product,
+		truncLabel(sess.meta.User.Title), sessID,
+		ttype, subtitle, location, local,
+	}
 }
 
 func sessionLabels(m *sessionMetadata) (title, child, grandchild string) {
@@ -1074,6 +1145,7 @@ func (s *plexServer) handlePlaying(ctx context.Context, notif wsNotification) {
 			continue
 		}
 		if len(metaResp.MediaContainer.Metadata) == 0 {
+			slog.Debug("empty metadata response", "key", n.RatingKey)
 			continue
 		}
 		media := &metaResp.MediaContainer.Metadata[0]
@@ -1096,25 +1168,30 @@ func (s *plexServer) handlePlaying(ctx context.Context, notif wsNotification) {
 
 		s.sessions.mu.Lock()
 		if ss, ok := s.sessions.sessions[n.SessionKey]; ok {
-			// Resolve library labels from the library list.
-			if ss.libName == "" {
-				for _, lib := range libs {
-					if lib.ID != media.LibrarySectionID.String() {
-						continue
-					}
-					ss.libName = lib.Name
-					ss.libID = lib.ID
-					ss.libType = lib.Type
-					break
-				}
-			}
-			// Mark transcode pending if the notification includes a transcode session.
-			if n.TranscodeSession != "" && ss.transcodeType == "" {
-				ss.transcodeType = valPending
-			}
+			resolveSessionLibrary(&ss, media, libs, n.TranscodeSession)
 			s.sessions.sessions[n.SessionKey] = ss
 		}
 		s.sessions.mu.Unlock()
+	}
+}
+
+// resolveSessionLibrary fills in library labels from the library list
+// if the session doesn't already have them, and marks transcode pending
+// if the notification includes a transcode session key.
+func resolveSessionLibrary(ss *session, media *sessionMetadata, libs []library, transcodeSession string) {
+	if ss.libName == "" {
+		for _, lib := range libs {
+			if lib.ID != media.LibrarySectionID.String() {
+				continue
+			}
+			ss.libName = lib.Name
+			ss.libID = lib.ID
+			ss.libType = lib.Type
+			break
+		}
+	}
+	if transcodeSession != "" && ss.transcodeType == "" {
+		ss.transcodeType = valPending
 	}
 }
 
@@ -1146,6 +1223,10 @@ func (s *plexServer) handleTranscodeUpdate(notif wsNotification) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Transcode and subtitle classification
+// ---------------------------------------------------------------------------
 
 func matchesTranscode(ss *session, transcodeKey string) bool {
 	if ss.transcodeType == valPending {
