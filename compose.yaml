@@ -1,6 +1,6 @@
 services:
   plex-exporter:
-    image: ghcr.io/cplieger/plex-exporter:latest
+    image: ghcr.io/cplieger/plex-exporter:latest@sha256:7e14bcdcc4732bff7e1b477658a30bb720194752db53bd397665cb69fd19b536
     container_name: plex-exporter
     restart: unless-stopped
     user: "1000:1000"  # match your host user
