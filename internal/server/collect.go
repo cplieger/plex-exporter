@@ -235,7 +235,7 @@ func sessionLabelValues(
 // is used.
 func sessionLabels(m *plexapi.SessionMetadata) (title, child, grandchild string) {
 	switch m.Type {
-	case "episode", "track":
+	case library.TypeEpisode, library.TypeTrack:
 		return m.GrandparentTitle, m.ParentTitle, m.Title
 	default:
 		return m.Title, "", ""

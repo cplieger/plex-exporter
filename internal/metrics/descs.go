@@ -9,10 +9,10 @@ import (
 // Label slice vars shared across descriptors. Order matters for the
 // Prometheus wire contract (inviolate contract #6/#7); do not re-order.
 var (
-	SrvLabels  = []string{"server", "server_id"}
-	LibLabels  = []string{"server", "server_id", "library_type", "library", "library_id"}
+	SrvLabels  = []string{LabelServer, LabelServerID}
+	LibLabels  = []string{LabelServer, LabelServerID, "library_type", "library", "library_id"}
 	PlayLabels = []string{
-		"server", "server_id",
+		LabelServer, LabelServerID,
 		"library", "library_id", "library_type",
 		"media_type", "title", "child_title", "grandchild_title",
 		"stream_type", "stream_resolution", "stream_file_resolution",
@@ -35,6 +35,10 @@ const (
 	ValBoth      = "both"
 	ValVideo     = "video"
 	ValAudio     = "audio"
+
+	LabelServer   = "server"
+	LabelServerID = "server_id"
+	FallbackOther = "other"
 )
 
 // Prometheus descriptors emitted by the collector. Names, help text, and
@@ -137,16 +141,16 @@ var (
 	StreamTypeAllowlist = &LabelAllowlist{
 		Name:     "stream_type",
 		Allowed:  map[string]bool{"copy": true, "transcode": true, "directplay": true, ValUnknown: true},
-		Fallback: "other",
+		Fallback: FallbackOther,
 	}
 	MediaTypeAllowlist = &LabelAllowlist{
 		Name:     "media_type",
 		Allowed:  map[string]bool{"movie": true, "episode": true, "track": true, "clip": true, "photo": true},
-		Fallback: "other",
+		Fallback: FallbackOther,
 	}
 	ResolutionAllowlist = &LabelAllowlist{
 		Name:     "resolution",
 		Allowed:  map[string]bool{"": true, "sd": true, "480": true, "576": true, "720": true, "1080": true, "4k": true, "2160": true},
-		Fallback: "other",
+		Fallback: FallbackOther,
 	}
 )

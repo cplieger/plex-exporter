@@ -20,6 +20,13 @@ const (
 	TypeClip    = "clip"
 )
 
+// Plex API identifiers and feature types.
+const (
+	PluginIdentifier = "com.plexapp.plugins.library"
+	FeatureContent   = "content"
+	CountLabelItems  = "items"
+)
+
 // KnownSessionMediaTypes is the set of media types valid as Prometheus
 // label values for session metrics. Unknown values are normalised to
 // "other" by the collector.
@@ -59,7 +66,7 @@ func ContentTypeLabel(libType string) string {
 	case TypePhoto:
 		return "photos"
 	default:
-		return "items"
+		return CountLabelItems
 	}
 }
 
@@ -68,11 +75,11 @@ func ContentTypeLabel(libType string) string {
 func Build(providers plexapi.MediaProviderResponse, prevItems map[string]int64) []Library {
 	var libs []Library
 	for _, p := range providers.MediaProviders {
-		if p.Identifier != "com.plexapp.plugins.library" {
+		if p.Identifier != PluginIdentifier {
 			continue
 		}
 		for _, f := range p.Features {
-			if f.Type != "content" {
+			if f.Type != FeatureContent {
 				continue
 			}
 			for _, d := range f.Directories {

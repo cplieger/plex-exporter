@@ -76,7 +76,7 @@ func NewClient(serverURL, token string, skipTLS bool) (*Client, error) {
 	}
 	if skipTLS {
 		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, // G402: user-requested via env var
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, //nolint:gosec // G402: user-requested via env var
 		}
 	}
 	return &Client{BaseURL: parsed, Token: token, HTTPClient: httpClient}, nil

@@ -206,13 +206,19 @@ func TranscodeKind(ts *plexapi.WSTranscodeSession) string {
 
 // subtitleDecisionMap maps Plex wire-protocol subtitle decision strings
 // to canonical Prometheus label values.
+const (
+	wireSubBurnIn      = "burn-in"
+	wireSubCopying     = "copying"
+	wireSubTranscoding = "transcoding"
+)
+
 var subtitleDecisionMap = map[string]string{
 	metrics.ValBurn:      metrics.ValBurn,
-	"burn-in":            metrics.ValBurn,
+	wireSubBurnIn:        metrics.ValBurn,
 	metrics.ValCopy:      metrics.ValCopy,
-	"copying":            metrics.ValCopy,
+	wireSubCopying:       metrics.ValCopy,
 	metrics.ValTranscode: metrics.ValTranscode,
-	"transcoding":        metrics.ValTranscode,
+	wireSubTranscoding:   metrics.ValTranscode,
 }
 
 // SubtitleAction classifies a transcode session's subtitle handling.
@@ -233,5 +239,5 @@ func SubtitleAction(ts *plexapi.WSTranscodeSession) string {
 		}
 		return metrics.ValNone
 	}
-	return "other"
+	return metrics.FallbackOther
 }
