@@ -114,7 +114,7 @@ jobs:
       - name: Generate release notes
         run: |
           # renovate: datasource=github-releases depName=orhun/git-cliff
-          VERSION=v2.8.0
+          VERSION=v2.13.1
           curl -fsSL "https://github.com/orhun/git-cliff/releases/download/${VERSION}/git-cliff-${VERSION#v}-x86_64-unknown-linux-gnu.tar.gz" \
             | tar xz -C /usr/local/bin --strip-components=1 "git-cliff-${VERSION#v}/git-cliff"
           git-cliff --latest --strip header > RELEASE_NOTES.md
