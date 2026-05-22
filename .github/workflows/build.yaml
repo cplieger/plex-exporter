@@ -123,3 +123,12 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             sbom.spdx.json
+
+      - name: Notify homelab
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -fsSL -X POST \
+            -H "Authorization: token ${{ secrets.HOMELAB_DISPATCH_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/cplieger/homelab/dispatches" \
+            -d "{\"event_type\":\"image-update\",\"client_payload\":{\"image\":\"${{ env.IMAGE_NAME }}\",\"tag\":\"${{ steps.prep.outputs.tag }}\",\"digest\":\"${{ steps.push.outputs.digest }}\"}}"
