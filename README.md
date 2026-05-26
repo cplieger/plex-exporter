@@ -6,23 +6,11 @@
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
 
-Plex Media Server Prometheus exporter with real-time session tracking
+See what your Plex server is doing in Grafana — sessions, libraries, bandwidth, transcoding.
 
-## Overview
+## What it does
 
-A ground-up rewrite of the
-[prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter)
-project (originally a Grafana hackathon project), rebuilt for
-reliability, minimal dependencies, and distroless deployment.
-Connects to Plex over HTTP and WebSocket to collect metrics in
-real time and serve them in Prometheus format.
-
-**Example use case:** You run a Plex Media Server and want to
-track library sizes, active sessions, transcode load, bandwidth,
-and host resource utilization in Grafana. Point this exporter at
-your Plex server, scrape `/metrics` with Prometheus or Alloy, and
-get dashboards covering everything from per-session transcode
-details to WebSocket connection health.
+Connects to your Plex Media Server and exposes metrics (active sessions, library sizes, bandwidth, transcoding status) in a format that Prometheus can scrape and Grafana can visualize.
 
 **Key metrics exposed:**
 - Library duration, storage, and item counts (movies, episodes, tracks)
@@ -34,37 +22,12 @@ details to WebSocket connection health.
 - WebSocket connection health
 - Active transcode session count
 
-This is a distroless, rootless container running on
-`gcr.io/distroless/static` with no shell or package manager.
-Only two direct Go dependencies: `coder/websocket` for the Plex
-notification stream and `prometheus/client_golang` for metrics.
+### Why this design
 
-### Comparison With Upstream
-
-This is a complete rewrite — no code is shared with the upstream
-projects. The architecture and dependency choices are fundamentally
-different. The comparison below is against the
-[timothystewart6](https://github.com/timothystewart6/prometheus-plex-exporter)
-fork (the actively maintained upstream):
-
-| | Upstream | This Project |
-|---|---|---|
-| **Dependencies** | 5 direct (go-plex-client, zap, multierr, prometheus client, prometheus model) | 2 (coder/websocket, prometheus client) |
-| **Logging** | uber-go/zap | stdlib `log/slog` (zero dep) |
-| **Plex client** | Vendored fork of go-plex-client (~900+ lines in plex.go alone) | Built-in minimal client (~80 lines) |
-| **Image user** | root | nonroot (UID 65534) |
-| **WebSocket reconnect** | Delegated to go-plex-client (no built-in reconnect) | Automatic with exponential backoff (1s→30s) |
-| **Health check** | None | CLI probe (`/plex-exporter health`) + HTTP `/api/health` |
-| **Transcode tracking** | Via vendored client events | Direct WebSocket JSON parsing |
-| **Session bandwidth** | Estimated from bitrates only | Real bandwidth from Plex Session API + estimates |
-| **Go version** | 1.23 | 1.26 |
-
-Additional metrics not in upstream:
-- `plex_websocket_connected` — monitor exporter↔Plex connection
-- `plex_active_transcode_sessions` — from root endpoint, no Plex Pass needed
-- `plex_session_bandwidth_kbps` — actual bandwidth per session
-- `plex_server_info` includes `plex_pass` label
-- Play metrics include `location` (lan/wan) and `local` (true/false)
+- **WebSocket for real-time session tracking** — listens to the Plex notification stream for instant session updates instead of polling on an interval
+- **Single binary with no runtime dependencies** — only two direct Go dependencies (`coder/websocket` and `prometheus/client_golang`), everything else is stdlib
+- **Distroless and rootless** — runs on `gcr.io/distroless/static` as UID 65534 with no shell or package manager, minimizing attack surface
+- **Prometheus-native** — exposes a standard `/metrics` endpoint that works with any Prometheus-compatible scraper and any Grafana dashboard, no custom visualization layer
 
 ### Limitations
 
@@ -80,27 +43,9 @@ Additional metrics not in upstream:
   counts are refreshed every 15 minutes to avoid hammering the
   Plex API. Counts may lag slightly after large library scans.
 
+## Quick start
 
-## Container Registries
-
-This image is published to both GHCR and Docker Hub:
-
-| Registry | Image |
-|----------|-------|
-| GHCR | `ghcr.io/cplieger/plex-exporter` |
-| Docker Hub | `docker.io/cplieger/plex-exporter` |
-
-```bash
-# Pull from GHCR
-docker pull ghcr.io/cplieger/plex-exporter:latest
-
-# Pull from Docker Hub
-docker pull cplieger/plex-exporter:latest
-```
-
-Both registries receive identical images and tags. Use whichever you prefer.
-
-## Quick Start
+Available from both `ghcr.io/cplieger/plex-exporter` and `docker.io/cplieger/plex-exporter` — identical images and tags.
 
 ```yaml
 services:
@@ -119,47 +64,25 @@ services:
       - "9594:9594"
 ```
 
-## Deployment
+## Configuration reference
 
-1. Set `PLEX_SERVER` to the full URL of your Plex server
-   (e.g. `http://192.0.2.100:32400` or `https://plex.local:32400`).
-2. Set `PLEX_TOKEN` to a Plex authentication token belonging to the
-   server administrator. See
-   [Finding an authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/).
-3. The exporter connects immediately, performs an initial metadata
-   refresh, and starts listening for WebSocket events. Metrics are
-   available at `/metrics` within seconds.
-4. If your Plex server uses a self-signed TLS certificate, set
-   `SKIP_TLS_VERIFICATION=true`.
-5. For Grafana integration, see the
-   [Grafana Dashboard](#grafana-dashboard) section below.
-
-
-## Environment Variables
+### Environment variables
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `TZ` | Container timezone | `Europe/Paris` | No |
 | `PLEX_SERVER` | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`) | `http://plex:32400` | Yes |
 | `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken | - | Yes |
+| `TZ` | Container timezone | `Europe/Paris` | No |
+| `LISTEN_ADDRESS` | Address and port for the metrics HTTP server | `:9594` | No |
+| `SKIP_TLS_VERIFICATION` | Skip TLS certificate verification for Plex connections. Set to `1` or `true` only when pointing at a Plex server with a self-signed cert on a trusted network. | `false` | No |
 
-### Additional Environment Variables
-
-The following optional environment variables are also supported but not included in the compose example above. Add them to your `environment:` block as needed.
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LISTEN_ADDRESS` | Address and port for the metrics HTTP server. | `:9594` |
-| `SKIP_TLS_VERIFICATION` | Skip TLS certificate verification for Plex connections. Set to `1` or `true` only when pointing at a Plex server with a self-signed cert on a trusted network. | `false` |
-
-
-## Ports
+### Ports
 
 | Port | Description |
 |------|-------------|
 | `9594` | Prometheus metrics endpoint (`/metrics`) and health check (`/api/health`) |
 
-## API Reference
+## Metrics reference
 
 ### HTTP Endpoints
 
@@ -168,13 +91,7 @@ The following optional environment variables are also supported but not included
 | `/metrics` | GET | Prometheus metrics (see below) |
 | `/api/health` | GET | Returns `{"status":"ok"}` when ready, 503 when starting/stopping |
 
-The CLI health probe (`/plex-exporter health`) checks for a marker
-file and does not require HTTP — it works in distroless containers
-with no shell or curl.
-
-### Prometheus Metrics
-
-#### Server Metrics
+### Server Metrics
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
@@ -188,7 +105,7 @@ with no shell or curl.
 | `plex_http_reachable` | Gauge | `server`, `server_id` | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed |
 | `plex_exporter_errors_total` | Counter | `server`, `server_id`, `type` | Exporter error count by type. Types: `refresh`, `websocket_dial`, `websocket_read`, `invalid_message`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
 
-#### Library Metrics
+### Library Metrics
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
@@ -196,7 +113,7 @@ with no shell or curl.
 | `plex_library_storage_bytes` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total storage used by the library (bytes) |
 | `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Number of items in the library. `content_type` is `movies`, `episodes`, `tracks`, `photos`, or `items`. Refreshed every 15 minutes. |
 
-#### Session Metrics
+### Session Metrics
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
@@ -205,7 +122,7 @@ with no shell or curl.
 | `plex_session_bandwidth_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Real-time session bandwidth from the Plex Sessions API (kbps) |
 | `plex_session_bitrate_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Live stream bitrate per session (kbps). Replaces the former `stream_bitrate` label on `plex_plays_active`/`plex_play_seconds_total`, which caused unbounded cardinality as Plex reports changing bitrates during adaptive streaming. |
 
-#### Session Label Reference
+### Session Label Reference
 
 | Label | Values | Description |
 |---|---|---|
@@ -220,76 +137,11 @@ For episodes: `title` = show name, `child_title` = season,
 `grandchild_title` = episode title. For movies: `title` = movie
 name, others are empty.
 
-## Grafana Integration
+## Healthcheck
 
-A ready-to-import Grafana dashboard is included in the repository.
-It works with Prometheus as the datasource — no special plugins
-required.
+The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container becomes unhealthy only if the initial Plex connection fails or the metrics server fails to start; WebSocket disconnects do not trigger unhealthy status because the exporter reconnects automatically with exponential backoff (monitor via `plex_websocket_connected`).
 
-### Prerequisites
-
-The exporter exposes a standard `/metrics` endpoint. You need a
-Prometheus-compatible scraper to collect the metrics and store them
-in a time-series database. Common setups:
-
-- **Grafana Alloy** → scrapes `/metrics` → pushes to **Mimir** or
-  **Prometheus** → Grafana queries the TSDB
-- **Prometheus** → scrapes `/metrics` directly → Grafana queries
-  Prometheus
-
-Add a scrape target for the exporter in your Alloy config or
-Prometheus config:
-
-```yaml
-# Alloy example
-prometheus.scrape "plex_exporter" {
-  targets    = [{"__address__" = "plex-exporter:9594"}]
-  forward_to = [prometheus.remote_write.mimir.receiver]
-}
-```
-
-```yaml
-# Prometheus example
-scrape_configs:
-  - job_name: plex-exporter
-    static_configs:
-      - targets: ['plex-exporter:9594']
-```
-
-### Import the Dashboard
-
-1. In Grafana, go to **Dashboards → Import**
-2. Upload `grafana-dashboard.json` from this repository
-3. Select your Prometheus datasource when prompted
-
-The dashboard includes panels for server info, library sizes and
-item counts, active sessions with transcode details, bandwidth
-usage, host resource utilization, and WebSocket connection status.
-
-## Docker Healthcheck
-
-The container includes both an HTTP health endpoint and a CLI
-health probe for distroless Docker healthchecks.
-
-The main process writes a marker file at `/tmp/.healthy` once the
-HTTP server is listening. The `health` subcommand checks for this
-file — it requires no shell, HTTP client, or open port.
-
-**When it becomes unhealthy:**
-- The initial connection to Plex fails (bad URL, invalid token)
-- The HTTP metrics server fails to start
-
-**WebSocket disconnects do not cause unhealthy status.** The
-exporter automatically reconnects with exponential backoff. The
-`plex_websocket_connected` metric tracks connection state for
-alerting.
-
-| Type | Command | Meaning |
-|------|---------|---------|
-| Docker | `/plex-exporter health` | Exit 0 = metrics server running |
-
-
-## Code Quality
+## Code quality
 
 | Metric | Value |
 |--------|-------|
@@ -314,7 +166,7 @@ and ticker-based refresh scheduling — these are I/O-bound runtime
 paths. WebSocket health is monitored via the
 `plex_websocket_connected` Prometheus metric.
 
-## Security Review
+## Security
 
 **No vulnerabilities found.** All scans clean across 7 tools.
 
@@ -353,18 +205,9 @@ All dependencies are updated automatically via [Renovate](https://github.com/ren
 | gcr.io/distroless/static-debian13 | `nonroot` | [Distroless](https://github.com/GoogleContainerTools/distroless) |
 | github.com/coder/websocket | `v1.8.14` | [GitHub](https://github.com/coder/websocket) |
 | github.com/prometheus/client_golang | `v1.23.2` | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/prometheus/client_model | `v0.6.2` | [GitHub](https://github.com/prometheus/client_model) |
+| github.com/prometheus/client_model | `v0.6.2` | [GitHub](https://github.com/prometheus/client_golang) |
 | golang.org/x/sync | `v0.20.0` | [Go stdlib](https://pkg.go.dev/golang.org/x/sync) |
 | pgregory.net/rapid | `v1.3.0` | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |
-
-## Design Principles
-
-- **Always up to date**: Base images, packages, and libraries are updated automatically via Renovate. Unlike many community Docker images that ship outdated or abandoned dependencies, these images receive continuous updates.
-- **Minimal attack surface**: When possible, pure Go apps use `gcr.io/distroless/static:nonroot` (no shell, no package manager, runs as non-root). Apps requiring system packages use Alpine with the minimum necessary privileges.
-- **Digest-pinned**: Every `FROM` instruction pins a SHA256 digest. All GitHub Actions are digest-pinned.
-- **Multi-platform**: Built for `linux/amd64` and `linux/arm64`.
-- **Healthchecks**: Every container includes a Docker healthcheck.
-- **Provenance**: Build provenance is attested via GitHub Actions, verifiable with `gh attestation verify`.
 
 ## Credits
 
@@ -384,6 +227,11 @@ This is an original tool that builds upon [prometheus-plex-exporter](https://git
   WebSocket implementation
 - [prometheus/client_golang](https://github.com/prometheus/client_golang)
   — Prometheus instrumentation library for Go
+
+## Contributing
+
+Issues and pull requests are welcome. Please open an issue first for
+larger changes so the approach can be discussed before implementation.
 
 ## Disclaimer
 
