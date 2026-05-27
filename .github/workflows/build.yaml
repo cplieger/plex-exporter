@@ -19,6 +19,7 @@ permissions:
   packages: write
   id-token: write
   attestations: write
+  security-events: write
 
 env:
   IMAGE_NAME: ${{ github.repository_owner }}/${{ github.event.repository.name }}
@@ -79,6 +80,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Trivy scan published image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@9ab158e8597f3b310480b9a69402b419bc03dbd5 # v0.34.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}
+          format: 'sarif'
+          output: 'trivy-image.sarif'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
+        with:
+          sarif_file: 'trivy-image.sarif'
+          category: 'trivy-image-build'
+
       - name: Generate SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
@@ -132,7 +151,6 @@ jobs:
           VERSION: ${{ steps.prep.outputs.tag }}
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           TAG="${VERSION}"
           gh release create "$TAG" \
             --title "$TAG" \
