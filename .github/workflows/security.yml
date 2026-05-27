@@ -1,0 +1,77 @@
+name: Security
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '**/Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - '**/go.mod'
+      - '**/go.sum'
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trivy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@4d8a0b4c4c5c5b8b0c6f1e2c4d8a4d4c5c5b8b0c # v6.18.0
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ci-scan:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@9ab158e8597f3b310480b9a69402b419bc03dbd5 # v0.34.0
+        with:
+          scan-type: fs
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: 'sarif'
+          output: 'trivy-fs.sarif'
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@9ab158e8597f3b310480b9a69402b419bc03dbd5 # v0.34.0
+        with:
+          image-ref: 'ci-scan:latest'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: 'sarif'
+          output: 'trivy-image.sarif'
+
+      - name: Upload SARIF — filesystem
+        if: always() && hashFiles('trivy-fs.sarif') != ''
+        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
+        with:
+          sarif_file: 'trivy-fs.sarif'
+          category: 'trivy-fs'
+
+      - name: Upload SARIF — image
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
+        with:
+          sarif_file: 'trivy-image.sarif'
+          category: 'trivy-image'

@@ -1,0 +1,45 @@
+name: CodeQL
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
+        with:
+          languages: go
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
+        with:
+          category: "/language:go"
