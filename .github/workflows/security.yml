@@ -35,7 +35,7 @@ jobs:
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
       - name: Build image (no push)
-        uses: docker/build-push-action@4d8a0b4c4c5c5b8b0c6f1e2c4d8a4d4c5c5b8b0c # v6.18.0
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           push: false
