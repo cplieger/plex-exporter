@@ -74,7 +74,17 @@ services:
 | `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken | - | Yes |
 | `TZ` | Container timezone | `Europe/Paris` | No |
 | `LISTEN_ADDRESS` | Address and port for the metrics HTTP server | `:9594` | No |
-| `SKIP_TLS_VERIFICATION` | Skip TLS certificate verification for Plex connections. Set to `1` or `true` only when pointing at a Plex server with a self-signed cert on a trusted network. | `false` | No |
+| `PLEX_CA_CERT_PATH` | Path to a PEM file containing your Plex server's CA certificate. When set, that CA is added to the TLS RootCAs pool — TLS verification stays **on**, pinned to your CA. Required only when (a) your `PLEX_SERVER` uses `https://` and (b) the cert isn't trusted by the OS bundle (i.e. you signed it yourself or with a private CA). Plain `http://` URLs and Plex's official `*.plex.direct` HTTPS URLs need **no** TLS env var. | unset | No |
+
+### TLS / certificate setup
+
+Pick the configuration that matches your Plex server:
+
+| Your `PLEX_SERVER` looks like | What to do |
+|---|---|
+| `http://plex:32400` (Docker network, LAN, etc.) | nothing — TLS isn't in use |
+| `https://<hash>.plex.direct:32400` (Plex's official cert) | nothing — Let's Encrypt is trusted by default |
+| `https://192.0.2.100:32400` or `https://plex.local` (self-signed / private CA) | set `PLEX_CA_CERT_PATH` to the PEM file of the CA that signed your Plex cert |
 
 ### Ports
 

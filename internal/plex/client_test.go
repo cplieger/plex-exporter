@@ -2,18 +2,57 @@ package plex
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"plex-exporter/internal/plexapi"
 )
+
+// writeSelfSignedPEM generates an in-memory self-signed CA cert and writes
+// it as PEM to a tempfile under t.TempDir(). Returns the path. Used by the
+// CA-pool tests; the cert is never actually validated against, just parsed.
+func writeSelfSignedPEM(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("ecdsa.GenerateKey: %v", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "test-plex-ca"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		IsCA:         true,
+		KeyUsage:     x509.KeyUsageCertSign,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("x509.CreateCertificate: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "ca.pem")
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	if err := os.WriteFile(path, pemBytes, 0o600); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+	return path
+}
 
 // newTestClient wires a test Client against the given httptest.Server.
 // Delegates to the exported NewTestClientFromServer and overrides Retry
@@ -465,7 +504,7 @@ func TestGetWithRetry_cancellation_during_backoff(t *testing.T) {
 }
 
 func TestNewPlexClient_default_no_tls_skip(t *testing.T) {
-	c, err := NewClient("http://plex.example:32400", "tok", false)
+	c, err := NewClient("http://plex.example:32400", "tok", "")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -486,8 +525,11 @@ func TestNewPlexClient_default_no_tls_skip(t *testing.T) {
 	}
 }
 
-func TestNewPlexClient_skip_tls_sets_insecure_transport(t *testing.T) {
-	c, err := NewClient("https://plex.example:32400", "tok", true)
+func TestNewPlexClient_ca_cert_path_sets_root_cas(t *testing.T) {
+	// Generate an in-memory self-signed CA cert + write to a temp file.
+	caPath := writeSelfSignedPEM(t)
+
+	c, err := NewClient("https://plex.example:32400", "tok", caPath)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -496,10 +538,13 @@ func TestNewPlexClient_skip_tls_sets_insecure_transport(t *testing.T) {
 		t.Fatalf("Transport = %T, want *http.Transport", c.HTTPClient.Transport)
 	}
 	if tr.TLSClientConfig == nil {
-		t.Fatal("TLSClientConfig must be set when skipTLS is true")
+		t.Fatal("TLSClientConfig must be set when caCertPath is provided")
 	}
-	if !tr.TLSClientConfig.InsecureSkipVerify {
-		t.Error("InsecureSkipVerify must be true when skipTLS is true")
+	if tr.TLSClientConfig.RootCAs == nil {
+		t.Error("RootCAs must be populated from caCertPath")
+	}
+	if tr.TLSClientConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify must remain false; caCertPath is the SECURE path")
 	}
 	if tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Errorf("MinVersion = %d, want tls.VersionTLS12 (%d)",
@@ -507,13 +552,35 @@ func TestNewPlexClient_skip_tls_sets_insecure_transport(t *testing.T) {
 	}
 }
 
-func TestNewPlexClient_other_env_values_do_not_skip_tls(t *testing.T) {
-	c, err := NewClient("https://plex.example:32400", "tok", false)
+func TestNewPlexClient_no_ca_cert_uses_default_transport(t *testing.T) {
+	c, err := NewClient("https://plex.example:32400", "tok", "")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
 	if c.HTTPClient.Transport != nil {
-		t.Error("skipTLS=false must not enable insecure transport")
+		t.Error("default-transport path must leave Transport nil so the OS trust store is used")
+	}
+}
+
+func TestNewPlexClient_ca_cert_path_missing_file_errors(t *testing.T) {
+	_, err := NewClient("https://plex.example:32400", "tok", "/nonexistent/ca.pem")
+	if err == nil {
+		t.Fatal("NewClient should error when caCertPath points to a missing file")
+	}
+	if !strings.Contains(err.Error(), "PLEX_CA_CERT_PATH") {
+		t.Errorf("error should mention PLEX_CA_CERT_PATH for diagnosability; got %v", err)
+	}
+}
+
+func TestNewPlexClient_ca_cert_path_invalid_pem_errors(t *testing.T) {
+	tmp := t.TempDir()
+	bogus := filepath.Join(tmp, "bogus.pem")
+	if err := os.WriteFile(bogus, []byte("not a pem file"), 0o600); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	_, err := NewClient("https://plex.example:32400", "tok", bogus)
+	if err == nil {
+		t.Fatal("NewClient should error when caCertPath has no PEM-encoded certs")
 	}
 }
 
@@ -527,7 +594,7 @@ func TestNewPlexClient_refuses_redirects(t *testing.T) {
 	}))
 	defer redirectSrv.Close()
 
-	c, err := NewClient(redirectSrv.URL, "tok", false)
+	c, err := NewClient(redirectSrv.URL, "tok", "")
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -546,7 +613,7 @@ func TestNewPlexClient_refuses_redirects(t *testing.T) {
 }
 
 func TestNewPlexClient_invalid_url_returns_error(t *testing.T) {
-	_, err := NewClient("://missing-scheme", "tok", false)
+	_, err := NewClient("://missing-scheme", "tok", "")
 	if err == nil {
 		t.Fatal("NewClient with invalid URL should return error")
 	}
