@@ -63,12 +63,12 @@ func run() int {
 	}
 	listenAddr := envOr("LISTEN_ADDRESS", ":9594")
 
-	skipTLS := os.Getenv("SKIP_TLS_VERIFICATION")
+	caCertPath := os.Getenv("PLEX_CA_CERT_PATH")
 	slog.Info("starting plex-exporter",
 		"server", serverAddr, "listen", listenAddr,
-		"skip_tls", skipTLS == "1" || skipTLS == "true")
+		"ca_cert_path", caCertPath)
 
-	client, err := plex.NewClient(serverAddr, plexToken, skipTLS == "1" || skipTLS == "true")
+	client, err := plex.NewClient(serverAddr, plexToken, caCertPath)
 	if err != nil {
 		slog.Error("invalid PLEX_SERVER URL", "error", err)
 		return 1

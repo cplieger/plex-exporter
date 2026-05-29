@@ -3,12 +3,14 @@ package plex
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"plex-exporter/internal/plexapi"
@@ -55,11 +57,20 @@ type Client struct {
 }
 
 // NewClient parses serverURL and returns a Client configured with a safe
-// default HTTP transport. When skipTLS is true, the client's Transport
-// skips certificate verification (user-requested, e.g. for self-signed
-// Plex deployments). The caller reads SKIP_TLS_VERIFICATION from the
-// environment and passes the parsed boolean here.
-func NewClient(serverURL, token string, skipTLS bool) (*Client, error) {
+// default HTTP transport. When caCertPath is non-empty, the PEM file at
+// that path is loaded into the TLS RootCAs pool — TLS verification stays
+// ENABLED, pinned to that CA. This is the recommended setup for users
+// running Plex with a self-signed certificate.
+//
+// When caCertPath is empty:
+//   - For "https://hash.plex.direct:32400" URLs, Plex's public Let's
+//     Encrypt cert validates against the OS trust store. No env var needed.
+//   - For "https://<self-signed-host>:32400" URLs, the connection will
+//     FAIL on cert verification. Set PLEX_CA_CERT_PATH to the server's
+//     CA cert.
+//   - For "http://..." URLs, TLS isn't in play; this transport config is
+//     a no-op.
+func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing PLEX_SERVER URL: %w", err)
@@ -74,9 +85,20 @@ func NewClient(serverURL, token string, skipTLS bool) (*Client, error) {
 			return http.ErrUseLastResponse
 		},
 	}
-	if skipTLS {
+	if caCertPath != "" {
+		pemBytes, readErr := os.ReadFile(caCertPath)
+		if readErr != nil {
+			return nil, fmt.Errorf("reading PLEX_CA_CERT_PATH=%q: %w", caCertPath, readErr)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pemBytes) {
+			return nil, fmt.Errorf("PLEX_CA_CERT_PATH=%q: no PEM-encoded certificates found", caCertPath)
+		}
 		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}, //nolint:gosec // G402: user-requested via env var
+			TLSClientConfig: &tls.Config{
+				RootCAs:    pool,
+				MinVersion: tls.VersionTLS12,
+			},
 		}
 	}
 	return &Client{BaseURL: parsed, Token: token, HTTPClient: httpClient}, nil
