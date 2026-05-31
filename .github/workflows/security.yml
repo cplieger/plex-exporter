@@ -1,79 +1,20 @@
 name: Security
+
 on:
   pull_request:
-    branches: [main]
     paths:
-      - 'go.mod'
-      - 'go.sum'
-      - '**/go.mod'
-      - '**/go.sum'
-      - 'package.json'
-      - 'package-lock.json'
-      - '**/package.json'
-      - '**/package-lock.json'
+      - go.mod
+      - go.sum
+      - Dockerfile
+      - .github/workflows/security.yml
   schedule:
-    - cron: '17 5 * * 1'
+    - cron: "17 5 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write
 
-concurrency:
-  group: security-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  trivy:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
-
-      - name: Build image (no push)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
-        with:
-          context: .
-          push: false
-          load: true
-          tags: ci-scan:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: fs
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-          format: 'sarif'
-          output: 'trivy-fs.sarif'
-
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: 'ci-scan:latest'
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-          format: 'sarif'
-          output: 'trivy-image.sarif'
-
-      - name: Upload SARIF — filesystem
-        if: always() && hashFiles('trivy-fs.sarif') != ''
-        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-        with:
-          sarif_file: 'trivy-fs.sarif'
-          category: 'trivy-fs'
-
-      - name: Upload SARIF — image
-        if: always() && hashFiles('trivy-image.sarif') != ''
-        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-        with:
-          sarif_file: 'trivy-image.sarif'
-          category: 'trivy-image'
+  scan:
+    uses: cplieger/ci/.github/workflows/security-scan.yaml@v1
