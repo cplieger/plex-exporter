@@ -41,6 +41,8 @@ linters:
         - performance
     gocyclo:
       min-complexity: 18
+    goconst:
+      ignore-tests: true
     perfsprint:
       strconcat: false
     sloglint:
@@ -54,6 +56,8 @@ linters:
       - std-error-handling
       - common-false-positives
       - legacy
+    paths:
+      - node_modules
     rules:
       - path: _test\.go
         linters:
@@ -71,3 +75,7 @@ linters:
           - usetesting
           - noctx
           - revive
+      - path: _test\.go
+        text: "string .* has .* occurrences"
+        linters:
+          - goconst
