@@ -7,8 +7,6 @@ on:
       - go.sum
       - Dockerfile
       - .github/workflows/security.yml
-  schedule:
-    - cron: "17 5 * * 1"
   workflow_dispatch:
 
 permissions:
