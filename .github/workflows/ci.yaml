@@ -18,6 +18,3 @@ on:
 jobs:
   ci:
     uses: cplieger/ci/.github/workflows/go-ci.yaml@v1
-    with:
-      app: true
-      dockerfile-lint: true
