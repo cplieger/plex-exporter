@@ -17,4 +17,4 @@ on:
 
 jobs:
   ci:
-    uses: cplieger/ci/.github/workflows/go-ci.yaml@e69f2cbaa1ee46d48cbabf7d0858ae46720152ef # v1
+    uses: cplieger/ci/.github/workflows/go-ci.yaml@98c2f685fa19abbbc43735b1108bfd53d30e65e0 # v1
