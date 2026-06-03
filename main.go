@@ -7,7 +7,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,10 +14,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/cplieger/health"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -28,16 +27,10 @@ import (
 )
 
 func main() {
-	if isHealthSubcommand() {
-		runProbe(healthMarkerPath)
+	if len(os.Args) > 1 && os.Args[1] == "health" {
+		health.RunProbe(healthMarkerPath)
 	}
 	os.Exit(run())
-}
-
-// isHealthSubcommand returns true when invoked as `plex-exporter health`
-// (the Docker healthcheck form).
-func isHealthSubcommand() bool {
-	return len(os.Args) > 1 && os.Args[1] == "health"
 }
 
 func run() int {
@@ -47,7 +40,7 @@ func run() int {
 	// Remove stale health file from a previous run that may have crashed
 	// before its defer ran. Without this, the health probe would report
 	// healthy before the initial Plex connection succeeds.
-	marker := newHealthMarker(healthMarkerPath)
+	marker := health.NewMarker(healthMarkerPath)
 	marker.Set(false)
 	defer marker.Cleanup()
 
@@ -88,27 +81,9 @@ func run() int {
 	prometheus.MustRegister(ps)
 	go ps.RunRefreshLoop(ctx)
 
-	// ready flips to true once the listener binds and the HTTP server
-	// is serving; false on shutdown drain. Drives /api/health so any
-	// external probe (Keepalived, Uptime Kuma) sees red during start
-	// and during shutdown drain. Same semantic as subflux's ready
-	// flag — homelab Go apps share this pattern.
-	var ready atomic.Bool
-
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if !ready.Load() {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{ //nolint:errcheck // best-effort response write
-				"status": "unready",
-				"reason": "starting up or shutting down",
-			})
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"}) //nolint:errcheck // best-effort response write
-	})
+	mux.Handle("/api/health", health.Handler(marker))
 
 	httpServer := &http.Server{
 		Handler:           mux,
@@ -136,7 +111,6 @@ func run() int {
 		}
 	}()
 
-	ready.Store(true)
 	marker.Set(true)
 
 	wsListener := &wsclient.Listener{
@@ -150,7 +124,6 @@ func run() int {
 	wsListener.Listen(ctx)
 
 	// Flip to unready before Shutdown drains so probes see red during drain.
-	ready.Store(false)
 	marker.Set(false)
 	slog.Info("shutting down", "cause", context.Cause(ctx))
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
