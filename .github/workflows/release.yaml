@@ -23,5 +23,5 @@ permissions:
 
 jobs:
   release:
-    uses: cplieger/ci/.github/workflows/release.yaml@d3a1daa04ed240e986549a404d4995ad90ebef95 # v1
+    uses: cplieger/ci/.github/workflows/release.yaml@2c6289a7dee062be6411c1cd0d3ab4f784d75f1e # v1
     secrets: inherit
