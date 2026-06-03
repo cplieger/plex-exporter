@@ -1,5 +1,5 @@
 # check=error=true
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:376f4a381b112a7cfef541ecee0263ece432119fbbdad8d75f2f51fc197287f4 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f AS builder
 ENV GOTOOLCHAIN=auto
 
 WORKDIR /src
