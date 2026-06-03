@@ -1,0 +1,27 @@
+name: Release
+
+# Auto-publishes on merge to main following the cliff scheme:
+# - git-cliff computes the next version from conventional commits since the last tag
+# - if no bump is warranted (chore/ci/docs/style/test only), the run exits early
+# - otherwise: build, publish (Docker / npm+JSR / Go tag), tag, GitHub Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permissions must include everything the called reusable workflow declares,
+# since GitHub takes the intersection of caller and callee permissions.
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+  security-events: write
+
+# Note: concurrency is set at the reusable workflow level (cplieger/ci) — adding
+# another concurrency block here causes a startup_failure due to the duplicate.
+
+jobs:
+  release:
+    uses: cplieger/ci/.github/workflows/release.yaml@d3a1daa04ed240e986549a404d4995ad90ebef95 # v1
+    secrets: inherit
