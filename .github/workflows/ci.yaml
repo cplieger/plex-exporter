@@ -1,22 +1,13 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - LICENSE
-      - .gitignore
   push:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - LICENSE
-      - .gitignore
+    paths-ignore: ["**/*.md", "LICENSE", ".gitignore"]
+  pull_request:
+    branches: [main]
+    paths-ignore: ["**/*.md", "LICENSE", ".gitignore"]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   ci:

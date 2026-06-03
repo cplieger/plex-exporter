@@ -5,6 +5,8 @@ on:
     paths:
       - go.mod
       - go.sum
+      - package.json
+      - package-lock.json
       - Dockerfile
       - .github/workflows/security.yml
   workflow_dispatch:
