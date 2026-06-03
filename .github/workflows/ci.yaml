@@ -15,6 +15,9 @@ on:
       - .gitignore
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     uses: cplieger/ci/.github/workflows/go-ci.yaml@c3d6df9d783f0d70aea92c8c1fdba1cfb821a483 # v1
