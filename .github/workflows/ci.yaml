@@ -1,3 +1,9 @@
+# Synced from cplieger/ci/.github/workflow-templates/ci.yml — DO NOT EDIT.
+# Single CI template for all releaseable repos. The central ci.yaml reusable
+# workflow auto-detects repo surfaces (go.mod / jsr.json / Dockerfile / nested
+# web frontend) and dispatches to the appropriate reusable workflow. Hybrid
+# repos (Go + TS web frontend) run multiple jobs in parallel automatically —
+# no per-repo configuration needed.
 name: CI
 
 on:
@@ -14,4 +20,4 @@ permissions:
 
 jobs:
   ci:
-    uses: cplieger/ci/.github/workflows/go-ci.yaml@2c6289a7dee062be6411c1cd0d3ab4f784d75f1e # v1
+    uses: cplieger/ci/.github/workflows/ci.yaml@f3c6ca3fb6cc5e12a8a4e91c6e8aa22538a4765d # main
