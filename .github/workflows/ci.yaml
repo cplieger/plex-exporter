@@ -17,7 +17,8 @@ on:
 
 permissions:
   contents: read
+  issues: write   # forwarded to go-ci.yaml's weekly fuzz-finding issue creator
 
 jobs:
   ci:
-    uses: cplieger/ci/.github/workflows/ci.yaml@17fb4d1766cb4978799fe006bc70b4806e0bd0e9 # main
+    uses: cplieger/ci/.github/workflows/ci.yaml@e823e5ead5e153d67bfb19fb148b6989d339a33a # main
