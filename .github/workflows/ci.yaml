@@ -14,4 +14,4 @@ permissions:
 
 jobs:
   ci:
-    uses: cplieger/ci/.github/workflows/go-ci.yaml@2c6289a7dee062be6411c1cd0d3ab4f784d75f1e # v1
+    uses: cplieger/ci/.github/workflows/go-ci.yaml@0d9cebdb8545442b913bc2a1e571e0b97050a24f # v1
