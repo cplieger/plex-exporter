@@ -1,0 +1,128 @@
+# Central Gremlins (Go mutation testing) config — synced into every Go-having
+# consumer repo as `.gremlins.yaml`. Edit this file in cplieger/ci to change
+# the policy fleet-wide.
+#
+# Source: distilled from per-repo analysis (cplieger/ci subagent research,
+# 2026-06-04). Patterns capture the common "unkillable without integration"
+# code paths across pure-Go libs, Go-binary-in-Docker services, Go+TS
+# hybrids, and the vterm hybrid module:
+#   - lifecycle/signal handling (main.go, signal handlers, graceful shutdown)
+#   - health-marker filesystem ops (health.go)
+#   - struct-only / interface-only declaration files
+#   - test helper packages imported only from _test.go (testsupport, authtest,
+#     testcerts) — they ship in the module but their mutations don't affect
+#     production behavior
+#   - build-time codegen tools (cmd/wire-codegen)
+#   - platform-specific stubs (login_proc_*, *_signal_*)
+#   - retry/backoff loops with time.Sleep — mutations to timing constants are
+#     unkillable without integration tests
+#
+# Per-repo bespoke exclusions (e.g., vibekit's hub/sse subsystem) live in this
+# config too — append to exclude-files. Resist the urge to make this per-repo;
+# centralization is the point.
+#
+# Documented at: https://gremlins.dev/usage/configuration/
+
+silent: false
+
+unleash:
+  # Test-suite quality thresholds for the weekly central runner. Set to 0 here
+  # so the runner reports the actual measured score and the tracker issue
+  # surfaces the trend; the runner itself doesn't fail-the-build on threshold.
+  threshold:
+    efficacy: 0
+    mutant-coverage: 0
+
+  # Files where mutation testing produces stuck "live mutant" findings without
+  # adding signal — kept out of the analysis to keep the score honest.
+  exclude-files:
+    # Universal lifecycle / bootstrapping
+    - "main.go"
+    - "**/main.go"
+
+    # Health-check marker files (pattern across docker-* repos)
+    - "health.go"
+    - "**/health.go"
+
+    # Struct/interface/doc-only files (no behavior to mutate)
+    - "**/doc.go"
+    - "**/types.go"
+    - "**/interfaces.go"
+    - "**/descs.go"          # prometheus descriptor declarations
+
+    # Test helpers that ship as production code but are imported only from _test.go
+    - "**/testsupport/**"
+    - "**/testcerts/**"
+    - "authtest/**"          # cplieger/auth's test-helper subpackage
+    - "**/test-helpers/**"
+
+    # Build-time codegen tools
+    - "**/cmd/wire-codegen/**"
+
+    # Platform-specific stubs (single-line returns; every mutation equivalent)
+    - "**/login_proc_*.go"
+    - "**/*_signal_*.go"
+
+    # Lifecycle/server orchestration that requires live HTTP/PTY/WS to test
+    - "embed.go"
+    - "**/server/server.go"
+    - "**/server/server_static.go"
+    - "**/server/lifecycle.go"
+    - "**/server/poller.go"
+    - "**/server/scheduler.go"
+    - "**/server/scheduler_scan.go"
+    - "**/server/listen.go"
+    - "**/wsclient/listen.go"
+    - "**/notify/listener.go"
+    - "**/scheduler/scheduler.go"
+    - "**/users/refresh.go"
+    - "**/orchestrator/orchestrator.go"
+    - "**/watch/watch.go"
+    - "**/wiring/wiring.go"
+    - "**/composition/composition.go"
+
+    # Hub / SSE / shell / mcp subsystems (vibekit) — heavily concurrent, need
+    # integration to kill mutations
+    - "**/hub/sse.go"
+    - "**/hub/sse_controller.go"
+    - "**/hub/shell_signal_unix.go"
+    - "**/mcp/prewarm/prewarm.go"
+
+    # Trivial wrappers / version stamps
+    - "**/version/version.go"
+    - "**/metrics/metrics.go"  # prometheus counter registration, no logic
+    - "**/metrics/process.go"  # /proc parsing — needs Linux env to exercise
+
+    # Thin httputil adapters (already covered by cplieger/httpx tests)
+    - "**/internal/httputil/httputil.go"
+    - "**/internal/httpx/client.go"
+
+    # SPA route registration (no business logic)
+    - "routes.go"
+    - "**/server/routes.go"
+
+  # Default mutators are reasonable for our codebases. Keep them all on; the
+  # exclude-files list above handles the noisy hotspots.
+  mutants:
+    arithmetic-base:
+      enabled: true
+    conditionals-boundary:
+      enabled: true
+    conditionals-negation:
+      enabled: true
+    increment-decrement:
+      enabled: true
+    invert-assignments:
+      enabled: false
+    invert-bitwise:
+      enabled: false
+    invert-bwassign:
+      enabled: false
+    invert-negatives:
+      enabled: true
+    invert-logical:
+      enabled: false
+    invert-loopctrl:
+      enabled: false
+    remove-self-assignments:
+      enabled: false
