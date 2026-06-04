@@ -8,6 +8,8 @@ github.com/cplieger/health v1.0.0 h1:mevbZo10XtMAzfWaYoi6UrcGooFgHJvlhIJwbNQIVoM
 github.com/cplieger/health v1.0.0/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
 github.com/cplieger/health v1.0.1 h1:ZzOL6vEVOncHU2i2XDVg4G4v654vFaoCuE+Wvp0mXF0=
 github.com/cplieger/health v1.0.1/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
+github.com/cplieger/health v1.0.2 h1:tS2XtQVQL4TXEAr8u0xCtjOqJFrOtRzD8pzm/l2DbSU=
+github.com/cplieger/health v1.0.2/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
