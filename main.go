@@ -123,7 +123,8 @@ func run() int {
 	go ps.Sessions.RunPruneLoop(ctx)
 	wsListener.Listen(ctx)
 
-	// Flip to unready before Shutdown drains so probes see red during drain.
+	// Flip the health marker to unhealthy before Shutdown drains so probes
+	// (Docker HEALTHCHECK + HTTP /api/health) see red during the drain window.
 	marker.Set(false)
 	slog.Info("shutting down", "cause", context.Cause(ctx))
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
