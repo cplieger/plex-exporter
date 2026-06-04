@@ -101,8 +101,13 @@ unleash:
     - "routes.go"
     - "**/server/routes.go"
 
-  # Default mutators are reasonable for our codebases. Keep them all on; the
-  # exclude-files list above handles the noisy hotspots.
+  # All mutators enabled. Equivalent mutants (semantically-no-op mutations
+  # that show as LIVED no matter the test suite — a real phenomenon for
+  # invert-logical especially) become a stable noise floor that bakes into
+  # the rolling 12-week baseline; the regression alert triggers on actual
+  # mean shifts, not on the constant noise. The "Current live mutants"
+  # section in each tracker issue surfaces every individual finding so you
+  # can decide which are actionable.
   mutants:
     arithmetic-base:
       enabled: true
@@ -113,16 +118,16 @@ unleash:
     increment-decrement:
       enabled: true
     invert-assignments:
-      enabled: false
+      enabled: true
     invert-bitwise:
-      enabled: false
+      enabled: true
     invert-bwassign:
-      enabled: false
+      enabled: true
     invert-negatives:
       enabled: true
     invert-logical:
-      enabled: false
+      enabled: true
     invert-loopctrl:
-      enabled: false
+      enabled: true
     remove-self-assignments:
-      enabled: false
+      enabled: true
