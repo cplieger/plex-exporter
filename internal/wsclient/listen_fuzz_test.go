@@ -34,9 +34,8 @@ func FuzzWSNotificationUnmarshal(f *testing.F) {
 		}
 		for _, n := range notif.NotificationContainer.PlaySessionStateNotification {
 			if n.RatingKey != "" {
-				if _, err := strconv.Atoi(n.RatingKey); err != nil {
-					// RatingKey if present must be parseable as int (or handler rejects it)
-				}
+				// RatingKey if present must be parseable as int (or handler rejects it).
+				_, _ = strconv.Atoi(n.RatingKey)
 			}
 			state := sessions.ParseState(n.State)
 			if !validStates[state] {
