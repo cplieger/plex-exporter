@@ -1,9 +1,19 @@
+# Synced from cplieger/ci/.github/workflow-templates/release.yml — DO NOT EDIT.
+# The release pipeline is fully centralized; all logic and per-repo policy
+# lives in cplieger/ci/.github/workflows/release.yaml. This file just calls it.
+#
+# Behavior:
+#   - On every push to main and on workflow_dispatch, the central detect job
+#     computes the cliff version, classifies the repo type (docker/go/ts),
+#     identifies which paths actually changed, and dispatches to the right
+#     downstream branch (Docker build/sign/publish, Go tag, TS publish to
+#     npm+JSR, or any combination for hybrid repos with subpackages).
+#   - To change behavior for this repo (e.g., disable Docker Hub mirror,
+#     force arm64-only), edit the "Resolve repo policy" step in
+#     cplieger/ci/.github/workflows/release.yaml — there is no per-repo
+#     override surface here.
 name: Release
 
-# Auto-publishes on merge to main following the cliff scheme:
-# - git-cliff computes the next version from conventional commits since the last tag
-# - if no bump is warranted (chore/ci/docs/style/test only), the run exits early
-# - otherwise: build, publish (Docker / npm+JSR / Go tag), tag, GitHub Release
 on:
   push:
     branches: [main]
@@ -18,10 +28,7 @@ permissions:
   attestations: write
   security-events: write
 
-# Note: concurrency is set at the reusable workflow level (cplieger/ci) — adding
-# another concurrency block here causes a startup_failure due to the duplicate.
-
 jobs:
   release:
-    uses: cplieger/ci/.github/workflows/release.yaml@49ec4be725bc5117be1181418964b0df22bd87d8 # v1
+    uses: cplieger/ci/.github/workflows/release.yaml@8eeb2fcd95f7c07c813c8fa0e753112d3d38fff1 # main
     secrets: inherit
