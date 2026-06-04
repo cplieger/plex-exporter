@@ -22,5 +22,4 @@ jobs:
     uses: cplieger/ci/.github/workflows/docker-release.yaml@2c6289a7dee062be6411c1cd0d3ab4f784d75f1e # v1
     with:
       registries: "ghcr,dockerhub"
-      notify-repo: "cplieger/homelab"
     secrets: inherit
