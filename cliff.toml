@@ -28,7 +28,13 @@ tag_pattern = "v[0-9].*"
 commit_parsers = [
   # Order matters: more-specific patterns first.
   { message = "^release:", skip = true },
-  # Dependency bumps are real runtime changes — bump patch.
+  # devDeps don't ship to consumers — Renovate tags devDep PRs with the
+  # `devdeps` scope (see cplieger/.github default.json packageRules), which
+  # cliff skips here so npm devDep updates don't trigger releases.
+  { message = "^chore\\(devdeps\\)", skip = true },
+  # Dependency bumps for runtime / peer / Dockerfile / gomod use the default
+  # `deps` scope and DO release — base image bumps, runtime lib bumps, etc.
+  # are real artifact changes.
   { message = "^chore\\(deps\\)", group = "Dependencies" },
   # Pure-meta commits never warrant a release. `no_increment_regex` is
   # documented to skip these but doesn't actually prevent the patch fallback
