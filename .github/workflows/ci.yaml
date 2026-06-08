@@ -4,15 +4,20 @@
 # web frontend) and dispatches to the appropriate reusable workflow. Hybrid
 # repos (Go + TS web frontend) run multiple jobs in parallel automatically —
 # no per-repo configuration needed.
+#
+# No paths-ignore: the required status check (ci / validate) can never be
+# satisfied if the workflow is skipped by a path filter — GitHub leaves the
+# check pending forever, permanently blocking docs-only PRs. The workflow
+# therefore always runs; the central ci.yaml gates the heavy language jobs on a
+# real code change (so docs-only pushes run only detect + markdown + validate)
+# and always runs the markdown lint.
 name: CI
 
 on:
   push:
     branches: [main]
-    paths-ignore: ["**/*.md", "LICENSE", ".gitignore"]
   pull_request:
     branches: [main]
-    paths-ignore: ["**/*.md", "LICENSE", ".gitignore"]
   workflow_dispatch:
 
 permissions:
