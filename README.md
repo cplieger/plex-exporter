@@ -13,6 +13,7 @@ See what your Plex server is doing in Grafana — sessions, libraries, bandwidth
 Connects to your Plex Media Server and exposes metrics (active sessions, library sizes, bandwidth, transcoding status) in a format that Prometheus can scrape and Grafana can visualize.
 
 **Key metrics exposed:**
+
 - Library duration, storage, and item counts (movies, episodes, tracks)
 - Active session details (user, device, resolution, stream type)
 - Transcode type detection (video/audio/both) and subtitle handling
@@ -128,7 +129,7 @@ Pick the configuration that matches your Plex server:
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `plex_plays_active` | Gauge | `server`, `server_id`, `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location`, `local` | Currently active play sessions (1 per session). Use `count(plex_plays_active)` for total stream count. Removed after 60s of inactivity. |
-| `plex_play_seconds_total` | Counter | *(same as above)* | Cumulative play time for the session (seconds) |
+| `plex_play_seconds_total` | Counter | _(same as above)_ | Cumulative play time for the session (seconds) |
 | `plex_session_bandwidth_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Real-time session bandwidth from the Plex Sessions API (kbps) |
 | `plex_session_bitrate_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Live stream bitrate per session (kbps). Replaces the former `stream_bitrate` label on `plex_plays_active`/`plex_play_seconds_total`, which caused unbounded cardinality as Plex reports changing bitrates during adaptive streaming. |
 
@@ -222,6 +223,7 @@ All dependencies are updated automatically via [Renovate](https://github.com/ren
 ## Credits
 
 This is an original tool that builds upon [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter).
+
 - Grafana Hackathon 2022
   — the original hackathon project that started it all
 - [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter)
