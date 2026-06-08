@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/httpx"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
@@ -55,70 +56,84 @@ func writeSelfSignedPEM(t *testing.T) string {
 }
 
 // newTestClient wires a test Client against the given httptest.Server.
-// Delegates to the exported NewTestClientFromServer and overrides Retry
-// with a fast base delay for test speed.
+// Delegates to the exported NewTestClientFromServer. The returned client has
+// no retry transport, so each Get is a single attempt — the right default
+// for the non-retry tests below.
 func newTestClient(t *testing.T, ts *httptest.Server) *Client {
 	t.Helper()
+	return NewTestClientFromServer(t, ts)
+}
+
+// newRetryTestClient wires a test Client whose transport is wrapped in an
+// httpx retry round-tripper with a microsecond base delay (for test speed)
+// and the given retry count (maxRetries == retries after the initial
+// attempt, so total attempts == maxRetries+1). This mirrors what NewClient
+// installs in production, letting the retry tests exercise the real httpx
+// path now that GetWithRetry no longer owns a per-call retry loop.
+func newRetryTestClient(t *testing.T, ts *httptest.Server, maxRetries int) *Client {
+	t.Helper()
+	return newRetryTestClientDelay(t, ts, maxRetries, time.Microsecond)
+}
+
+// newRetryTestClientDelay is newRetryTestClient with an explicit backoff base
+// delay, used by tests that need a real backoff window (e.g. cancel-during-
+// backoff) rather than the microsecond default.
+func newRetryTestClientDelay(t *testing.T, ts *httptest.Server, maxRetries int, base time.Duration) *Client {
+	t.Helper()
 	c := NewTestClientFromServer(t, ts)
-	c.Retry = RetryConfig{BaseDelay: time.Microsecond}
+	c.HTTPClient.Transport = httpx.NewRetryRoundTripper(
+		c.HTTPClient.Transport,
+		httpx.WithMaxRetries(maxRetries),
+		httpx.WithRTBaseDelay(base),
+	)
 	return c
 }
 
-// Tests relocated from apps/plex-exporter/main_test.go and
-// apps/plex-exporter/mutation_test.go as part of the internal/plex
-// migration (cycle 1, chain step 3). They exercise the retry/backoff
-// surface directly against the exported API and no longer rely on any
-// package-main aliases.
+// Retry tests below exercise the httpx retry transport that NewClient now
+// installs (see newRetryTestClient). The retried set is httpx's default —
+// transient transport errors + 429/502/503/504 — so these tests use 503 as
+// the retryable fixture (the prior hand-rolled loop retried 500 too; httpx
+// deliberately does not). The final GetWithRetry int arg is ignored now that
+// the transport owns the attempt count.
 
-func TestGetWithRetry_retries_correct_number_of_times(t *testing.T) {
-	// Verifies that maxRetries=1 means exactly 1 attempt (no retries).
-	attempts := 0
+func TestGetWithRetry_zero_retries_makes_single_attempt(t *testing.T) {
+	// maxRetries=0 on the transport => exactly 1 attempt, even for a
+	// retryable status. Also proves the GetWithRetry int arg is ignored:
+	// we pass 99 yet still get a single attempt.
+	var attempts atomic.Int32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
-		w.WriteHeader(http.StatusInternalServerError)
+		attempts.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
 	})
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	parsed, _ := url.Parse(ts.URL)
-	client := &Client{
-		HTTPClient: ts.Client(),
-		BaseURL:    parsed,
-		Token:      TestToken,
-		Retry:      RetryConfig{BaseDelay: time.Microsecond},
-	}
-
+	client := newRetryTestClient(t, ts, 0)
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	_ = client.GetWithRetry(context.Background(), "/", &resp, 1)
+	_ = client.GetWithRetry(context.Background(), "/", &resp, 99)
 
-	if attempts != 1 {
-		t.Errorf("attempts = %d, want 1 (maxRetries=1 means 1 attempt)", attempts)
+	if got := attempts.Load(); got != 1 {
+		t.Errorf("attempts = %d, want 1 (0 retries; call arg is ignored)", got)
 	}
 }
 
-func TestGetWithRetry_maxRetries4_makes_4_attempts(t *testing.T) {
-	// Verifies that maxRetries=4 means exactly 4 attempts.
-	attempts := 0
+func TestGetWithRetry_makes_maxRetries_plus_one_attempts(t *testing.T) {
+	// maxRetries=3 on the transport => 4 total attempts on a persistently
+	// retryable (503) response.
+	var attempts atomic.Int32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
-		w.WriteHeader(http.StatusInternalServerError)
+		attempts.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
 	})
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	parsed, _ := url.Parse(ts.URL)
-	client := &Client{
-		HTTPClient: ts.Client(),
-		BaseURL:    parsed,
-		Token:      TestToken,
-		Retry:      RetryConfig{BaseDelay: time.Microsecond},
-	}
-
+	client := newRetryTestClient(t, ts, 3)
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	_ = client.GetWithRetry(context.Background(), "/", &resp, 4)
+	_ = client.GetWithRetry(context.Background(), "/", &resp, 0)
 
-	if attempts != 4 {
-		t.Errorf("attempts = %d, want 4 (maxRetries=4)", attempts)
+	if got := attempts.Load(); got != 4 {
+		t.Errorf("attempts = %d, want 4 (maxRetries=3 => 4 attempts)", got)
 	}
 }
 
@@ -290,11 +305,10 @@ func TestGetContainerSize(t *testing.T) {
 }
 
 func TestGetWithRetry(t *testing.T) {
-	attempts := 0
+	var attempts atomic.Int32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
-		if attempts < 3 {
-			w.WriteHeader(http.StatusInternalServerError)
+		if attempts.Add(1) < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 		fmt.Fprint(w, `{"MediaContainer":{"friendlyName":"RetryPlex"}}`)
@@ -302,150 +316,79 @@ func TestGetWithRetry(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	parsed, _ := url.Parse(ts.URL)
-	client := &Client{
-		HTTPClient: ts.Client(),
-		BaseURL:    parsed,
-		Token:      TestToken,
-		Retry:      RetryConfig{BaseDelay: time.Microsecond},
-	}
-
+	// maxRetries=2 => up to 3 attempts; 503,503,200 succeeds on the 3rd.
+	client := newRetryTestClient(t, ts, 2)
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	err := client.GetWithRetry(context.Background(), "/", &resp, 3)
+	err := client.GetWithRetry(context.Background(), "/", &resp, 0)
 	if err != nil {
 		t.Fatalf("unexpected error after retries: %v", err)
 	}
 	if resp.MediaContainer.FriendlyName != "RetryPlex" {
 		t.Errorf("name = %q, want RetryPlex", resp.MediaContainer.FriendlyName)
 	}
-	if attempts != 3 {
-		t.Errorf("attempts = %d, want 3", attempts)
+	if got := attempts.Load(); got != 3 {
+		t.Errorf("attempts = %d, want 3", got)
 	}
 }
 
 func TestGetWithRetryExhausted(t *testing.T) {
+	var attempts atomic.Int32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
+		attempts.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
 	})
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	parsed, _ := url.Parse(ts.URL)
-	client := &Client{
-		HTTPClient: ts.Client(),
-		BaseURL:    parsed,
-		Token:      TestToken,
-		Retry:      RetryConfig{BaseDelay: time.Microsecond},
-	}
-
+	// maxRetries=1 => 2 attempts, then the last 503 surfaces unchanged.
+	client := newRetryTestClient(t, ts, 1)
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	err := client.GetWithRetry(context.Background(), "/", &resp, 2)
+	err := client.GetWithRetry(context.Background(), "/", &resp, 0)
 	if err == nil {
 		t.Fatal("expected error after exhausting retries")
+	}
+	// Caller-side mapping is preserved: a non-200 becomes *HTTPStatusError.
+	se, ok := errors.AsType[*HTTPStatusError](err)
+	if !ok {
+		t.Fatalf("err = %T, want *HTTPStatusError", err)
+	}
+	if se.Code != http.StatusServiceUnavailable {
+		t.Errorf("status code = %d, want 503", se.Code)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("attempts = %d, want 2 (maxRetries=1 => 2 attempts)", got)
 	}
 }
 
 func TestGetWithRetryCancellation(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusServiceUnavailable)
 	})
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	parsed, _ := url.Parse(ts.URL)
-	client := &Client{
-		HTTPClient: ts.Client(),
-		BaseURL:    parsed,
-		Token:      TestToken,
-		Retry:      RetryConfig{BaseDelay: time.Microsecond},
-	}
+	client := newRetryTestClient(t, ts, 5)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	err := client.GetWithRetry(ctx, "/", &resp, 5)
+	err := client.GetWithRetry(ctx, "/", &resp, 0)
 	if err == nil {
 		t.Fatal("expected error on cancelled context")
 	}
 }
 
-func TestGetWithRetry_cancelled_after_failure_returns_last_error(t *testing.T) {
-	// When context is cancelled after at least one failed attempt,
-	// getWithRetry should return lastErr (the real error), not ctx.Err().
-	// This exercises the uncovered branch at line 289-291.
-	//
-	// `attempts` uses atomic.Int32 because the HTTP handler goroutine mutates
-	// it while the test goroutine reads it after getWithRetry returns; without
-	// atomic access the race detector fires intermittently under -race.
+// TestGetWithRetry_honors_retry_after_on_429 is the defect-fix test. The
+// prior hand-rolled loop IGNORED the Retry-After header on 429 and used its
+// own exponential backoff; the httpx retry transport honors it. With a
+// microsecond base delay, a Retry-After of 1s forces the retry to wait ~1s
+// (not microseconds), proving the header is respected.
+func TestGetWithRetry_honors_retry_after_on_429(t *testing.T) {
 	var attempts atomic.Int32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts.Add(1)
-		w.WriteHeader(http.StatusInternalServerError)
-	})
-	ts := httptest.NewServer(handler)
-	defer ts.Close()
-
-	parsed, _ := url.Parse(ts.URL)
-	client := &Client{
-		HTTPClient: ts.Client(),
-		BaseURL:    parsed,
-		Token:      TestToken,
-		Retry:      RetryConfig{BaseDelay: time.Microsecond},
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	// Cancel after the first attempt completes but before the second starts.
-	// With retryBaseDelay=1us, we need to cancel during the backoff.
-	go func() {
-		time.Sleep(5 * time.Millisecond)
-		cancel()
-	}()
-
-	var resp plexapi.MC[plexapi.ServerIdentity]
-	err := client.GetWithRetry(ctx, "/", &resp, 10)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	// The error should be the last HTTP error, not context.Canceled,
-	// because lastErr was set before ctx was cancelled.
-	if attempts.Load() < 1 {
-		t.Fatalf("expected at least 1 attempt, got %d", attempts.Load())
-	}
-	// Either lastErr (httpStatusError) or ctx.Err() is acceptable here
-	// depending on timing, but the function must not return nil.
-	if err == nil {
-		t.Error("getWithRetry must return non-nil error when context is cancelled")
-	}
-}
-
-func TestGetWithRetry_no_retry_on_4xx(t *testing.T) {
-	for _, code := range []int{400, 401, 403, 405, 422} {
-		t.Run(fmt.Sprintf("status_%d", code), func(t *testing.T) {
-			attempts := 0
-			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				attempts++
-				w.WriteHeader(code)
-			})
-			ts := httptest.NewServer(handler)
-			defer ts.Close()
-
-			client := newTestClient(t, ts)
-			var resp plexapi.MC[plexapi.ServerIdentity]
-			_ = client.GetWithRetry(context.Background(), "/", &resp, 3)
-
-			if attempts != 1 {
-				t.Errorf("status %d: attempts = %d, want 1 (no retry on 4xx)", code, attempts)
-			}
-		})
-	}
-}
-
-func TestGetWithRetry_retries_on_429(t *testing.T) {
-	attempts := 0
-	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
-		if attempts < 3 {
+		if attempts.Add(1) == 1 {
+			w.Header().Set("Retry-After", "1")
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
@@ -454,53 +397,106 @@ func TestGetWithRetry_retries_on_429(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := newTestClient(t, ts)
+	client := newRetryTestClient(t, ts, 2)
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	err := client.GetWithRetry(context.Background(), "/", &resp, 3)
-	if err != nil {
+	start := time.Now()
+	if err := client.GetWithRetry(context.Background(), "/", &resp, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if attempts != 3 {
-		t.Errorf("attempts = %d, want 3 (429 should be retried)", attempts)
+	elapsed := time.Since(start)
+
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("attempts = %d, want 2 (429 then 200)", got)
+	}
+	// Retry-After=1 honored: with a microsecond base delay, the only way the
+	// retry waits ~1s is by honoring the header. Allow scheduler slack.
+	if elapsed < 900*time.Millisecond {
+		t.Errorf("elapsed = %v, want >= ~1s (Retry-After must be honored, not the microsecond base delay)", elapsed)
 	}
 }
 
-func TestGetWithRetry_cancellation_during_backoff(t *testing.T) {
-	// Verify that cancelling the context during the backoff delay between
-	// retries returns ctx.Err() promptly (exercises the ctx.Done() case
-	// in the timer select).
-	attempts := 0
+func TestGetWithRetry_no_retry_on_4xx(t *testing.T) {
+	// With retries enabled (maxRetries=3), 4xx responses other than 429 must
+	// still make exactly 1 attempt — httpx's default retry set excludes them.
+	for _, code := range []int{400, 401, 403, 405, 422} {
+		t.Run(fmt.Sprintf("status_%d", code), func(t *testing.T) {
+			var attempts atomic.Int32
+			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				attempts.Add(1)
+				w.WriteHeader(code)
+			})
+			ts := httptest.NewServer(handler)
+			defer ts.Close()
+
+			client := newRetryTestClient(t, ts, 3)
+			var resp plexapi.MC[plexapi.ServerIdentity]
+			_ = client.GetWithRetry(context.Background(), "/", &resp, 0)
+
+			if got := attempts.Load(); got != 1 {
+				t.Errorf("status %d: attempts = %d, want 1 (no retry on 4xx)", code, got)
+			}
+		})
+	}
+}
+
+func TestGetWithRetry_retries_on_429(t *testing.T) {
+	var attempts atomic.Int32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
-		w.WriteHeader(http.StatusInternalServerError)
+		if attempts.Add(1) < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		fmt.Fprint(w, `{"MediaContainer":{"friendlyName":"OK"}}`)
 	})
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := NewTestClient(t, ts.URL)
-	client.HTTPClient = ts.Client()
-	client.Retry = RetryConfig{BaseDelay: 10 * time.Second}
+	client := newRetryTestClient(t, ts, 2)
+	var resp plexapi.MC[plexapi.ServerIdentity]
+	err := client.GetWithRetry(context.Background(), "/", &resp, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := attempts.Load(); got != 3 {
+		t.Errorf("attempts = %d, want 3 (429 should be retried)", got)
+	}
+}
+
+func TestGetWithRetry_cancellation_during_backoff(t *testing.T) {
+	// Cancelling the context during the backoff delay between retries must
+	// abort promptly with a non-nil error and not exhaust all attempts
+	// (httpx's SleepCtx returns the context error).
+	var attempts atomic.Int32
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	// 10s base delay guarantees a wide backoff window to cancel within.
+	client := newRetryTestClientDelay(t, ts, 5, 10*time.Second)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	// Cancel after a short delay — long enough for the first attempt to
-	// complete and enter the backoff timer, but before the 10s timer fires.
+	// complete and enter the backoff wait, but before the 10s wait elapses.
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
 
 	var resp plexapi.MC[plexapi.ServerIdentity]
-	err := client.GetWithRetry(ctx, "/", &resp, 5)
+	err := client.GetWithRetry(ctx, "/", &resp, 0)
 	if err == nil {
 		t.Fatal("expected error when context cancelled during backoff")
 	}
-	// Should have made at least 1 attempt before cancellation.
-	if attempts < 1 {
-		t.Errorf("attempts = %d, want >= 1", attempts)
+	got := attempts.Load()
+	if got < 1 {
+		t.Errorf("attempts = %d, want >= 1", got)
 	}
-	// Should NOT have exhausted all 5 retries.
-	if attempts >= 5 {
-		t.Errorf("attempts = %d, want < 5 (should cancel during backoff)", attempts)
+	// Should NOT have exhausted all 6 attempts (cancelled during backoff).
+	if got >= 6 {
+		t.Errorf("attempts = %d, want < 6 (should cancel during backoff)", got)
 	}
 }
 
@@ -518,8 +514,8 @@ func TestNewPlexClient_default_no_tls_skip(t *testing.T) {
 	if c.HTTPClient.Timeout != 10*time.Second {
 		t.Errorf("timeout = %v, want 10s", c.HTTPClient.Timeout)
 	}
-	if c.HTTPClient.Transport != nil {
-		t.Error("default client must use nil Transport (stdlib default), not a custom insecure one")
+	if _, ok := c.HTTPClient.Transport.(*httpx.RetryRoundTripper); !ok {
+		t.Errorf("Transport = %T, want *httpx.RetryRoundTripper (retry transport installed by NewClient)", c.HTTPClient.Transport)
 	}
 	if c.HTTPClient.CheckRedirect == nil {
 		t.Error("CheckRedirect must be set to prevent token leaks across cross-origin redirects")
@@ -530,13 +526,21 @@ func TestNewPlexClient_ca_cert_path_sets_root_cas(t *testing.T) {
 	// Generate an in-memory self-signed CA cert + write to a temp file.
 	caPath := writeSelfSignedPEM(t)
 
+	// NewClient wraps the CA-pinned transport in the retry round-tripper.
 	c, err := NewClient("https://plex.example:32400", "tok", caPath)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	tr, ok := c.HTTPClient.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("Transport = %T, want *http.Transport", c.HTTPClient.Transport)
+	if _, ok := c.HTTPClient.Transport.(*httpx.RetryRoundTripper); !ok {
+		t.Errorf("Transport = %T, want *httpx.RetryRoundTripper wrapping the CA-pinned transport", c.HTTPClient.Transport)
+	}
+
+	// The retry round-tripper hides its inner transport, so verify the CA
+	// pinning on the transport plexTLSTransport builds (the same value
+	// NewClient wraps): RootCAs populated, TLS 1.2 min, verification on.
+	tr, err := plexTLSTransport(caPath)
+	if err != nil {
+		t.Fatalf("plexTLSTransport: %v", err)
 	}
 	if tr.TLSClientConfig == nil {
 		t.Fatal("TLSClientConfig must be set when caCertPath is provided")
@@ -558,8 +562,11 @@ func TestNewPlexClient_no_ca_cert_uses_default_transport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	if c.HTTPClient.Transport != nil {
-		t.Error("default-transport path must leave Transport nil so the OS trust store is used")
+	// With no CA cert, NewClient still installs the retry round-tripper but
+	// wraps a nil base, so httpx falls back to http.DefaultTransport (OS
+	// trust store). No custom/insecure *http.Transport is created.
+	if _, ok := c.HTTPClient.Transport.(*httpx.RetryRoundTripper); !ok {
+		t.Errorf("Transport = %T, want *httpx.RetryRoundTripper over the default transport", c.HTTPClient.Transport)
 	}
 }
 
