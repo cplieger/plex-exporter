@@ -1,0 +1,39 @@
+# Canonical line-ending + diff policy for all cplieger repos.
+#
+# Normalize every text file to LF in the repository and force LF on checkout,
+# regardless of each contributor's git config. Git for Windows ships with
+# core.autocrlf=true at the system level, which otherwise rewrites the working
+# tree to CRLF on checkout and produces endless EOL-only diffs against the
+# LF-committed blobs. `text=auto` lets git detect binary files and leave them
+# untouched; `eol=lf` pins text checkouts to LF on every platform.
+#
+# Distributed to all releaseable + python repos via cplieger/ci's sync
+# workflow (see scripts/classify-repos.sh). Keep this uniform across repos;
+# repos with extra needs (e.g. homelab's age-encrypted blobs) maintain their
+# own superset and are excluded from the sync.
+
+# Force LF for all text; auto-detect and leave binary files untouched.
+* text=auto eol=lf
+
+# Shell scripts must be LF — a stray CR breaks the shebang and `read` loops.
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# Explicit binary types — never apply EOL conversion or text diffs, even if
+# content-detection would otherwise guess wrong.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.gz    binary
+*.zip   binary
+
+# Generated / vendored files — collapse in PR diffs and exclude from GitHub
+# language statistics. No-ops in repos that don't contain them.
+go.sum            linguist-generated
+package-lock.json linguist-generated
