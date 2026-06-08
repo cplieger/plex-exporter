@@ -8,12 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 	"golang.org/x/sync/errgroup"
-
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plexapi"
-	"plex-exporter/internal/sessions"
 )
 
 // HandlePlaying applies a "playing"-type websocket notification to the

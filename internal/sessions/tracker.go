@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
 // State is a normalised session playback state derived from the Plex

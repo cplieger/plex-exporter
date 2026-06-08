@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"testing"
 
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plexapi"
-	"plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
 func FuzzWSNotificationUnmarshal(f *testing.F) {

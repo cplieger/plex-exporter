@@ -13,10 +13,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
 // connState is a mutex-protected bool used by tests to observe the

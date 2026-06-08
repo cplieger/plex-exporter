@@ -3,9 +3,9 @@ package wsclient
 import (
 	"time"
 
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
 // listenerFor builds a Listener wired for a test with noop error/connected hooks.

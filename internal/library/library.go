@@ -1,6 +1,6 @@
 package library
 
-import "plex-exporter/internal/plexapi"
+import "github.com/cplieger/plex-exporter/internal/plexapi"
 
 // Library types recognised by the exporter. Values match the Plex
 // server's "type" field on a library directory; they are part of the

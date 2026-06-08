@@ -18,12 +18,11 @@ import (
 	"time"
 
 	"github.com/cplieger/health"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/server"
+	"github.com/cplieger/plex-exporter/internal/wsclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/server"
-	"plex-exporter/internal/wsclient"
 )
 
 func main() {

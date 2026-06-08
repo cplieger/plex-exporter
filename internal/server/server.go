@@ -10,11 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/plexapi"
-	"plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
 // Server is the Plex orchestrator. Fields are exported so that package

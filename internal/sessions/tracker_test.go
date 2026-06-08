@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
 func TestTrackerUpdate(t *testing.T) {
@@ -186,6 +186,7 @@ func TestRunPruneLoopCancellation(t *testing.T) {
 		t.Fatal("RunPruneLoop did not exit on cancelled context")
 	}
 }
+
 func TestSessionTrackerResumeAfterStop(t *testing.T) {
 	tracker := NewTracker()
 

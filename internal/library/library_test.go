@@ -3,9 +3,8 @@ package library
 import (
 	"testing"
 
+	"github.com/cplieger/plex-exporter/internal/plexapi"
 	"pgregory.net/rapid"
-
-	"plex-exporter/internal/plexapi"
 )
 
 func TestContentTypeLabel(t *testing.T) {

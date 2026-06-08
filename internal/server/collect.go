@@ -4,12 +4,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plexapi"
-	"plex-exporter/internal/sessions"
 )
 
 // maxLabelLen is the maximum byte length for user-controlled Prometheus

@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 	"pgregory.net/rapid"
-
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/plexapi"
-	"plex-exporter/internal/sessions"
 )
 
 func TestTranscodeKind(t *testing.T) {
@@ -335,6 +334,7 @@ func TestMarkTranscodePending(t *testing.T) {
 		})
 	}
 }
+
 func TestHandleTranscodeUpdateMatchesPending(t *testing.T) {
 	tracker := sessions.NewTracker()
 	tracker.Sessions["s1"] = sessions.Session{
