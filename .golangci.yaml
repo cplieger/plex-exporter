@@ -79,3 +79,36 @@ linters:
         text: "string .* has .* occurrences"
         linters:
           - goconst
+
+# Formatters (golangci-lint v2). `golangci-lint run` reports unformatted
+# files as issues (exit 1), so the existing lint step enforces these — no
+# extra workflow step / version bump needed; the config propagates via
+# sync.yaml. `golangci-lint fmt` applies them.
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gofumpt:
+      # Strictest: the `-extra` rules (group adjacent same-type params,
+      # forbid naked returns) on top of gofumpt's strict superset of
+      # gofmt. module-path is auto-detected from each repo's go.mod when
+      # left empty.
+      extra-rules: true
+    gci:
+      # Deterministic import grouping: standard -> third-party -> local
+      # module (folded by gofumpt into the third-party group). A separate
+      # gci `localmodule`/`prefix` section is intentionally NOT used: gofumpt
+      # never emits a distinct local-import group, so it would never converge.
+      # goimports is intentionally NOT enabled: it conflicts with gci on
+      # ordering, and its only unique capability (add/remove imports) is
+      # moot in CI — the Go compiler already rejects unused/missing
+      # imports, and editors handle it via gopls.
+      sections:
+        - standard
+        - default
+      custom-order: true
+  exclusions:
+    # Generated files are auto-excluded (default generated: lax).
+    paths:
+      - node_modules
