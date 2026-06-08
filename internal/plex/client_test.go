@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
 // writeSelfSignedPEM generates an in-memory self-signed CA cert and writes
@@ -133,6 +133,7 @@ func TestHTTPStatusError_Error(t *testing.T) {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 }
+
 func TestGetWithHeaders(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Plex-Token") != TestToken {

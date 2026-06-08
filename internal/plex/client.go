@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
 // MaxResponseBody caps the bytes we read from a Plex HTTP response to

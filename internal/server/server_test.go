@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
 func TestRefreshResources_updates_host_metrics(t *testing.T) {

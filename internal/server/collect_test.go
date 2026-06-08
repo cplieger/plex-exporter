@@ -7,14 +7,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"pgregory.net/rapid"
-
-	"plex-exporter/internal/library"
-	"plex-exporter/internal/metrics"
-	"plex-exporter/internal/plexapi"
-	"plex-exporter/internal/sessions"
 )
 
 // testMeta constructs a plexapi.SessionMetadata from JSON to avoid anonymous
@@ -201,21 +200,29 @@ func TestTruncLabel(t *testing.T) {
 		{"exact max length passthrough", strings.Repeat("a", maxLabelLen), strings.Repeat("a", maxLabelLen)},
 		{"one byte over max truncates", strings.Repeat("a", maxLabelLen+1), strings.Repeat("a", maxLabelLen)},
 		// 127 ASCII + 2-byte é: boundary at byte 128 lands mid-é.
-		{"2-byte codepoint straddling boundary is dropped",
+		{
+			"2-byte codepoint straddling boundary is dropped",
 			strings.Repeat("a", 127) + "é" + "xx",
-			strings.Repeat("a", 127)},
+			strings.Repeat("a", 127),
+		},
 		// 126 ASCII + 3-byte € (U+20AC): boundary at byte 128 lands mid-€.
-		{"3-byte codepoint straddling boundary is dropped",
+		{
+			"3-byte codepoint straddling boundary is dropped",
 			strings.Repeat("a", 126) + "€" + "zz",
-			strings.Repeat("a", 126)},
+			strings.Repeat("a", 126),
+		},
 		// 125 ASCII + 4-byte 😀 (U+1F600): boundary at byte 128 lands mid-emoji.
-		{"4-byte codepoint straddling boundary is dropped",
+		{
+			"4-byte codepoint straddling boundary is dropped",
 			strings.Repeat("a", 125) + "😀" + "zz",
-			strings.Repeat("a", 125)},
+			strings.Repeat("a", 125),
+		},
 		// 126 ASCII + 2-byte é ends at byte 128: keep all 128.
-		{"codepoint ending exactly at boundary is kept",
+		{
+			"codepoint ending exactly at boundary is kept",
 			strings.Repeat("a", 126) + "é" + "zz",
-			strings.Repeat("a", 126) + "é"},
+			strings.Repeat("a", 126) + "é",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -417,6 +424,7 @@ func TestNormalizeLabel_with_known_allowlists(t *testing.T) {
 		})
 	}
 }
+
 func TestDescribe(t *testing.T) {
 	srv := &Server{Sessions: sessions.NewTracker()}
 	ch := make(chan *prometheus.Desc, len(metrics.AllDescs)*2)

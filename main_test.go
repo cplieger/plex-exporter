@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"plex-exporter/internal/plex"
-	"plex-exporter/internal/server"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/server"
 )
 
 func TestEnvOr(t *testing.T) {
