@@ -17,4 +17,4 @@ permissions:
 
 jobs:
   scan:
-    uses: cplieger/ci/.github/workflows/security-scan.yaml@ba35d79d7edb7a6a566ec78a1d1fa4237e1f155f # v2
+    uses: cplieger/ci/.github/workflows/security-scan.yaml@d2f934e9ff113e9b66a442c276d94b6f84be03a9 # v2
