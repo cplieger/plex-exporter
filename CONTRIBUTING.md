@@ -72,7 +72,7 @@ full reference.
 ## Conventions and gotchas
 
 - **Metric cardinality is load-bearing.** Per-session bitrate lives in
-  its own `plex_session_bitrate_kbps` gauge, *not* as a label on
+  its own `plex_session_bitrate_kbps` gauge, _not_ as a label on
   `plex_plays_active`/`plex_play_seconds_total` — adaptive streaming
   reports changing bitrates that would otherwise explode label
   cardinality. Don't add high-churn values as labels.
