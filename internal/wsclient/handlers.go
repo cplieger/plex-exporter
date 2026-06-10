@@ -38,7 +38,7 @@ func (l *Listener) HandlePlaying(ctx context.Context, notif plexapi.WSNotificati
 	}
 
 	var sessResp plexapi.MC[plexapi.MetadataListResponse]
-	if err := l.Client.GetWithRetry(ctx, "/status/sessions", &sessResp, 3); err != nil {
+	if err := l.Client.Get(ctx, "/status/sessions", &sessResp); err != nil {
 		slog.Warn("failed to fetch sessions", "error", err)
 		l.RecordError("sessions_fetch")
 		return
@@ -85,7 +85,7 @@ func (l *Listener) HandlePlaying(ctx context.Context, notif plexapi.WSNotificati
 	for i, v := range valid {
 		g.Go(func() error {
 			var metaResp plexapi.MC[plexapi.MetadataListResponse]
-			if err := l.Client.GetWithRetry(gctx, "/library/metadata/"+v.n.RatingKey, &metaResp, 3); err != nil {
+			if err := l.Client.Get(gctx, "/library/metadata/"+v.n.RatingKey, &metaResp); err != nil {
 				slog.Warn("failed to fetch metadata", "key", v.n.RatingKey, "error", err)
 				l.RecordError("metadata_fetch")
 				return nil

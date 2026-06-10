@@ -100,7 +100,7 @@ Pick the configuration that matches your Plex server:
 | Endpoint | Method | Description |
 |---|---|---|
 | `/metrics` | GET | Prometheus metrics (see below) |
-| `/api/health` | GET | Returns `{"status":"ok"}` when ready, 503 when starting/stopping |
+| `/api/health` | GET | Returns `{"status":"OK"}` when ready, 503 when starting/stopping |
 
 ### Server Metrics
 
