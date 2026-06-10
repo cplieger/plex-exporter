@@ -23,8 +23,7 @@ import (
 const MaxResponseBody = 10 << 20 // 10 MB
 
 // Retry transport defaults installed by NewClient. defaultMaxRetries is the
-// number of retries *after* the initial attempt, so 2 == 3 total attempts —
-// matching the prior GetWithRetry(maxRetries=3) production call sites.
+// number of retries *after* the initial attempt, so 2 == 3 total attempts.
 // defaultRetryBaseDelay matches the prior hand-rolled retryBaseDelay default.
 const (
 	defaultMaxRetries     = 2
@@ -203,16 +202,4 @@ func (c *Client) GetContainerSize(ctx context.Context, path string) (int64, erro
 		return 0, err
 	}
 	return resp.MediaContainer.TotalSize, nil
-}
-
-// GetWithRetry fetches path with automatic retry. Retry behavior — attempt
-// count, jittered exponential backoff, Retry-After honoring on 429, and the
-// retried set (429/502/503/504 + transient transport errors) — is now
-// provided by the client's retry transport, configured in NewClient. The
-// final int argument is retained for call-site compatibility and no longer
-// controls the attempt count (the retry transport owns it). 404 maps to
-// ErrNotFound; other non-200 responses map to *HTTPStatusError; the 10 MiB
-// body cap and JSON decoding are preserved via Get/GetWithHeaders.
-func (c *Client) GetWithRetry(ctx context.Context, path string, result any, _ int) error {
-	return c.Get(ctx, path, result)
 }

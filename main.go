@@ -27,7 +27,7 @@ import (
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "health" {
-		health.RunProbe(healthMarkerPath)
+		health.RunProbe(health.DefaultPath)
 	}
 	os.Exit(run())
 }
@@ -39,7 +39,7 @@ func run() int {
 	// Remove stale health file from a previous run that may have crashed
 	// before its defer ran. Without this, the health probe would report
 	// healthy before the initial Plex connection succeeds.
-	marker := health.NewMarker(healthMarkerPath)
+	marker := health.NewMarker(health.DefaultPath)
 	marker.Set(false)
 	defer marker.Cleanup()
 
