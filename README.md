@@ -152,31 +152,6 @@ name, others are empty.
 
 The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container becomes unhealthy only if the initial Plex connection fails or the metrics server fails to start; WebSocket disconnects do not trigger unhealthy status because the exporter reconnects automatically with exponential backoff (monitor via `plex_websocket_connected`).
 
-## Code quality
-
-| Metric | Value |
-|--------|-------|
-| [Test Coverage](https://go.dev/blog/cover) | 81.6% |
-| Tests | 188 |
-| [Cyclomatic Complexity](https://en.wikipedia.org/wiki/Cyclomatic_complexity) (avg) | 4.0 |
-| [Cognitive Complexity](https://www.sonarsource.com/docs/CognitiveComplexity.pdf) (avg) | 3.8 |
-| [Mutation Efficacy](https://en.wikipedia.org/wiki/Mutation_testing) | 87.3% (59 runs) |
-| Test Framework | Property-based ([rapid](https://github.com/flyingmutant/rapid)) + table-driven |
-
-Tests cover Prometheus metric collection (all 13 metric descriptors,
-server/library/session metrics, Plex Pass gating), session tracking
-(play/stop/resume lifecycle, concurrent sessions, bandwidth
-accumulation, prune timeouts), transcode detection and subtitle
-classification, library item counting with artist-type fallback,
-bandwidth tracking with boundary conditions, HTTP client retry logic,
-and the full refresh cycle (server info, library items, resources).
-Property-based tests verify invariants across all pure functions.
-
-Not tested: WebSocket connection management, the main event loop,
-and ticker-based refresh scheduling — these are I/O-bound runtime
-paths. WebSocket health is monitored via the
-`plex_websocket_connected` Prometheus metric.
-
 ## Security
 
 **No vulnerabilities found.** All scans clean across 7 tools.
