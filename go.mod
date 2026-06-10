@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/coder/websocket v1.8.14
 	github.com/cplieger/health v1.1.0
-	github.com/cplieger/httpx v1.0.3
+	github.com/cplieger/httpx v1.0.4
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	golang.org/x/sync v0.21.0
