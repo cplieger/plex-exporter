@@ -6,6 +6,8 @@ github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9
 github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/cplieger/health v1.1.0 h1:s//JW6MZtiHLLAhJhD21wxzeqFP94dqV0KMa+zJRTWM=
 github.com/cplieger/health v1.1.0/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
+github.com/cplieger/health v1.1.1 h1:3FiPlrT5w8td3tqHdBaNN0r3JVpwlmuQrg01y01JsNI=
+github.com/cplieger/health v1.1.1/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
 github.com/cplieger/httpx v1.0.3 h1:1rsrqRZPkdotSBEr3ZihpBsJ0+3emV46G47DTS1tIkg=
 github.com/cplieger/httpx v1.0.3/go.mod h1:luKty8jqtz5JiZQG4JEQiEPGbqXdo1m12BMSQ4XleA8=
 github.com/cplieger/httpx v1.0.4 h1:tiOkXqoJcs78W4rl0GNBHwXRRu6f1npGPx57iIanxSY=
