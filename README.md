@@ -27,7 +27,7 @@ Connects to your Plex Media Server and exposes metrics (active sessions, library
 ### Why this design
 
 - **WebSocket for real-time session tracking** — listens to the Plex notification stream for instant session updates instead of polling on an interval
-- **Single binary with no runtime dependencies** — only two direct Go dependencies (`coder/websocket` and `prometheus/client_golang`), everything else is stdlib
+- **Single binary with no runtime dependencies** — minimal direct Go dependencies (`coder/websocket` and `prometheus/client_golang`), everything else is stdlib
 - **Distroless and rootless** — runs on `gcr.io/distroless/static` as UID 65534 with no shell or package manager, minimizing attack surface
 - **Prometheus-native** — exposes a standard `/metrics` endpoint that works with any Prometheus-compatible scraper and any Grafana dashboard, no custom visualization layer
 
@@ -155,7 +155,7 @@ The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (
 
 ## Security
 
-**No vulnerabilities found.** All scans clean across 7 tools.
+**No vulnerabilities found.** All scans clean.
 
 | Tool | Result |
 |------|--------|
@@ -186,15 +186,15 @@ intentional).
 
 All dependencies are updated automatically via [Renovate](https://github.com/renovatebot/renovate) and pinned by digest or version for reproducibility.
 
-| Dependency | Version | Source |
-|------------|---------|--------|
-| golang | `1.26-alpine` | [Go](https://hub.docker.com/_/golang) |
-| gcr.io/distroless/static-debian13 | `nonroot` | [Distroless](https://github.com/GoogleContainerTools/distroless) |
-| github.com/coder/websocket | `v1.8.14` | [GitHub](https://github.com/coder/websocket) |
-| github.com/prometheus/client_golang | `v1.23.2` | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/prometheus/client_model | `v0.6.2` | [GitHub](https://github.com/prometheus/client_golang) |
-| golang.org/x/sync | `v0.20.0` | [Go stdlib](https://pkg.go.dev/golang.org/x/sync) |
-| pgregory.net/rapid | `v1.3.0` | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |
+| Dependency | Source |
+|------------|--------|
+| golang | [Go](https://hub.docker.com/_/golang) |
+| gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
+| github.com/coder/websocket | [GitHub](https://github.com/coder/websocket) |
+| github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
+| github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_golang) |
+| golang.org/x/sync | [Go stdlib](https://pkg.go.dev/golang.org/x/sync) |
+| pgregory.net/rapid | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |
 
 ## Credits
 
