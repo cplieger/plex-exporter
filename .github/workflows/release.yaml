@@ -19,16 +19,20 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Permissions must include everything the called reusable workflow declares,
-# since GitHub takes the intersection of caller and callee permissions.
+# Top-level permissions are read-only (OpenSSF Scorecard Token-Permissions);
+# the release job declares the write scopes it actually needs. GitHub takes the
+# intersection of these job-level grants and what the called reusable workflow
+# declares, so scoping them to the job is functionally equivalent.
 permissions:
-  contents: write
-  packages: write
-  id-token: write
-  attestations: write
-  security-events: write
+  contents: read
 
 jobs:
   release:
-    uses: cplieger/ci/.github/workflows/release.yaml@a28f3730fec44be2e29e687e779dd7d43520771c # v2
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+      security-events: write
+    uses: cplieger/ci/.github/workflows/release.yaml@1dd6c2f85dcf1db0bd369226df61611f79fb1a2f # v2
     secrets: inherit
