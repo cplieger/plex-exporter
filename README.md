@@ -1,13 +1,14 @@
 # plex-exporter
 
-[![CI](https://github.com/cplieger/plex-exporter/actions/workflows/ci.yaml/badge.svg)](https://github.com/cplieger/plex-exporter/actions/workflows/ci.yaml)
-[![GitHub release](https://img.shields.io/github/v/release/cplieger/plex-exporter)](https://github.com/cplieger/plex-exporter/releases)
 [![Image Size](https://ghcr-badge.egpl.dev/cplieger/plex-exporter/size)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter)
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/plex-exporter/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/plex-exporter)
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/coverage.json)](https://github.com/cplieger/plex-exporter/actions/workflows/coverage.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cplieger/plex-exporter)](https://goreportcard.com/report/github.com/cplieger/plex-exporter)
+[![Test coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/coverage.json)](https://github.com/cplieger/plex-exporter/actions/workflows/coverage.yml)
+[![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/mutation.json)](https://github.com/cplieger/plex-exporter/issues?q=label%3Agremlins-tracker)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13216/badge)](https://www.bestpractices.dev/projects/13216)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/plex-exporter/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/plex-exporter)
+[![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/plex-exporter/releases)
 
 See what your Plex server is doing in Grafana — sessions, libraries, bandwidth, transcoding.
 
