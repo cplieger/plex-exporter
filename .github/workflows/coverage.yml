@@ -12,12 +12,19 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Top-level permissions are read-only (OpenSSF Scorecard Token-Permissions);
+# the coverage job declares the contents:write it needs to publish the badge
+# JSON to the orphan `badges` branch. GitHub intersects this job-level grant
+# with what the called reusable workflow declares, so it is functionally
+# equivalent to a top-level grant but scores minimal on Scorecard.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   coverage:
+    permissions:
+      contents: write
     # NOTE: pin this @SHA to the ci release tag that first contains
     # coverage.yaml when cutting that tag (see ci.md "Updating and propagating").
     # Renovate then tracks the `# v2` comment and bumps the digest thereafter.
-    uses: cplieger/ci/.github/workflows/coverage.yaml@203f6e69bcb5973ec62184eedce55495f7a8b202 # main
+    uses: cplieger/ci/.github/workflows/coverage.yaml@6ba54634a74aaf7e895b31be5960d3720bef2ec7 # main
