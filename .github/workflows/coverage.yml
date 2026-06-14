@@ -1,0 +1,23 @@
+# Synced from cplieger/ci/.github/workflow-templates/coverage.yml — DO NOT EDIT.
+# Measures test coverage on main and publishes a shields `endpoint` badge to
+# the orphan `badges` branch (read by the README coverage badge). Only synced
+# to Go/TS repos (shell/Dockerfile-only repos have no statement coverage).
+#
+# Runs on main + manual dispatch only (never PRs) — the badge reflects main,
+# and this keeps it off the per-PR critical path. Not a required check.
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  coverage:
+    # NOTE: pin this @SHA to the ci release tag that first contains
+    # coverage.yaml when cutting that tag (see ci.md "Updating and propagating").
+    # Renovate then tracks the `# v2` comment and bumps the digest thereafter.
+    uses: cplieger/ci/.github/workflows/coverage.yaml@main # v2
