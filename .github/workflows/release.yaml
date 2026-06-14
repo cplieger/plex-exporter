@@ -34,5 +34,5 @@ jobs:
       id-token: write
       attestations: write
       security-events: write
-    uses: cplieger/ci/.github/workflows/release.yaml@203f6e69bcb5973ec62184eedce55495f7a8b202 # v2
+    uses: cplieger/ci/.github/workflows/release.yaml@f3e8b6046090f35e9db83d9b7dc41d69adafd608 # v2
     secrets: inherit
