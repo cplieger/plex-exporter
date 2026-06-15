@@ -35,71 +35,80 @@ unleash:
 
   # Files where mutation testing produces stuck "live mutant" findings without
   # adding signal — kept out of the analysis to keep the score honest.
+  #
+  # These are Go (RE2) REGULAR EXPRESSIONS, matched with regexp.MatchString
+  # against each repo-relative file path (forward slashes, e.g.
+  # "internal/server/server.go"). They are NOT globs — gremlins aborts the
+  # whole run if a value isn't a valid regexp (a leading "*" from a glob like
+  # "**/main.go" is the classic failure). Single-quote every entry so YAML
+  # keeps the regex backslashes intact; double quotes treat "\." as an escape
+  # and silently corrupt the pattern. Idioms used below:
+  #   (^|/)foo\.go$   foo.go at the repo root OR in any subdirectory
+  #   ^foo\.go$       foo.go at the repo root only
+  #   (^|/)bar/       anything under a bar/ directory at any depth
   exclude-files:
     # Universal lifecycle / bootstrapping
-    - "main.go"
-    - "**/main.go"
+    - '(^|/)main\.go$'
 
     # Health-check marker files (pattern across docker-* repos)
-    - "health.go"
-    - "**/health.go"
+    - '(^|/)health\.go$'
 
     # Struct/interface/doc-only files (no behavior to mutate)
-    - "**/doc.go"
-    - "**/types.go"
-    - "**/interfaces.go"
-    - "**/descs.go"          # prometheus descriptor declarations
+    - '(^|/)doc\.go$'
+    - '(^|/)types\.go$'
+    - '(^|/)interfaces\.go$'
+    - '(^|/)descs\.go$'          # prometheus descriptor declarations
 
     # Test helpers that ship as production code but are imported only from _test.go
-    - "**/testsupport/**"
-    - "**/testcerts/**"
-    - "authtest/**"          # cplieger/auth's test-helper subpackage
-    - "**/test-helpers/**"
+    - '(^|/)testsupport/'
+    - '(^|/)testcerts/'
+    - '(^|/)authtest/'          # cplieger/auth's test-helper subpackage
+    - '(^|/)test-helpers/'
 
     # Build-time codegen tools
-    - "**/cmd/wire-codegen/**"
+    - '(^|/)cmd/wire-codegen/'
 
-    # Platform-specific stubs (single-line returns; every mutation equivalent)
-    - "**/login_proc_*.go"
-    - "**/*_signal_*.go"
+    # Platform-specific stubs (single-line returns; every mutation equivalent).
+    # The _signal_ pattern also covers hub/shell_signal_unix.go.
+    - '(^|/)login_proc_[^/]*\.go$'
+    - '(^|/)[^/]*_signal_[^/]*\.go$'
 
     # Lifecycle/server orchestration that requires live HTTP/PTY/WS to test
-    - "embed.go"
-    - "**/server/server.go"
-    - "**/server/server_static.go"
-    - "**/server/lifecycle.go"
-    - "**/server/poller.go"
-    - "**/server/scheduler.go"
-    - "**/server/scheduler_scan.go"
-    - "**/server/listen.go"
-    - "**/wsclient/listen.go"
-    - "**/notify/listener.go"
-    - "**/scheduler/scheduler.go"
-    - "**/users/refresh.go"
-    - "**/orchestrator/orchestrator.go"
-    - "**/watch/watch.go"
-    - "**/wiring/wiring.go"
-    - "**/composition/composition.go"
+    - '(^|/)embed\.go$'
+    - '(^|/)server/server\.go$'
+    - '(^|/)server/server_static\.go$'
+    - '(^|/)server/lifecycle\.go$'
+    - '(^|/)server/poller\.go$'
+    - '(^|/)server/scheduler\.go$'
+    - '(^|/)server/scheduler_scan\.go$'
+    - '(^|/)server/listen\.go$'
+    - '(^|/)wsclient/listen\.go$'
+    - '(^|/)notify/listener\.go$'
+    - '(^|/)scheduler/scheduler\.go$'
+    - '(^|/)users/refresh\.go$'
+    - '(^|/)orchestrator/orchestrator\.go$'
+    - '(^|/)watch/watch\.go$'
+    - '(^|/)wiring/wiring\.go$'
+    - '(^|/)composition/composition\.go$'
 
-    # Hub / SSE / shell / mcp subsystems (vibekit) — heavily concurrent, need
+    # Hub / SSE / mcp subsystems (vibekit) — heavily concurrent, need
     # integration to kill mutations
-    - "**/hub/sse.go"
-    - "**/hub/sse_controller.go"
-    - "**/hub/shell_signal_unix.go"
-    - "**/mcp/prewarm/prewarm.go"
+    - '(^|/)hub/sse\.go$'
+    - '(^|/)hub/sse_controller\.go$'
+    - '(^|/)mcp/prewarm/prewarm\.go$'
 
     # Trivial wrappers / version stamps
-    - "**/version/version.go"
-    - "**/metrics/metrics.go"  # prometheus counter registration, no logic
-    - "**/metrics/process.go"  # /proc parsing — needs Linux env to exercise
+    - '(^|/)version/version\.go$'
+    - '(^|/)metrics/metrics\.go$'  # prometheus counter registration, no logic
+    - '(^|/)metrics/process\.go$'  # /proc parsing — needs Linux env to exercise
 
     # Thin httputil adapters (already covered by cplieger/httpx tests)
-    - "**/internal/httputil/httputil.go"
-    - "**/internal/httpx/client.go"
+    - '(^|/)internal/httputil/httputil\.go$'
+    - '(^|/)internal/httpx/client\.go$'
 
     # SPA route registration (no business logic)
-    - "routes.go"
-    - "**/server/routes.go"
+    - '^routes\.go$'
+    - '(^|/)server/routes\.go$'
 
   # All mutators enabled. Equivalent mutants (semantically-no-op mutations
   # that show as LIVED no matter the test suite — a real phenomenon for
