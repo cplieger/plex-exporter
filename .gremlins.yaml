@@ -110,20 +110,6 @@ unleash:
     - '^routes\.go$'
     - '(^|/)server/routes\.go$'
 
-    # wiregen: the go/packages + go/types loader and the codegen emitter.
-    # Every wiregen test drives go/packages.Load (the live Go toolchain), so
-    # gremlins pays a multi-second compile per mutant and reruns the whole
-    # suite for each one. With all three root files in scope the weekly run
-    # blew past the 90-min job timeout (mutant phase ran ~88 min without
-    # finishing). Excluding the loader (ast_engine.go) and the high-volume,
-    # low-signal column/offset arithmetic in the emitter (emitters.go) keeps
-    # the run under the cap while preserving mutation coverage of the core
-    # registry-walking logic in wiregen.go. Same rationale as the live-toolchain
-    # exclusions above (server/PTY/WS files): killable only via the full
-    # integration harness that dominates runtime.
-    - '(^|/)ast_engine\.go$'
-    - '(^|/)emitters\.go$'
-
   # All mutators enabled. Equivalent mutants (semantically-no-op mutations
   # that show as LIVED no matter the test suite — a real phenomenon for
   # invert-logical especially) become a stable noise floor that bakes into
