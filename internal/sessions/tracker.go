@@ -69,8 +69,6 @@ const (
 // handler in package server) can read and mutate the tracked state
 // under the tracker's mutex without a wall of getter methods.
 type Session struct {
-	Meta           plexapi.SessionMetadata
-	MediaMeta      plexapi.SessionMetadata
 	PlayStarted    time.Time
 	LastUpdate     time.Time
 	TranscodeType  string
@@ -80,6 +78,8 @@ type Session struct {
 	LibID          string
 	LibType        string
 	State          State
+	Meta           plexapi.SessionMetadata
+	MediaMeta      plexapi.SessionMetadata
 	PrevPlayedTime time.Duration
 }
 

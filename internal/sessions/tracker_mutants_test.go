@@ -12,9 +12,9 @@ import (
 // in memory so tests can assert on observable log side-effects (the only
 // output of Prune's pruned/stale aggregate counters).
 type recordingHandler struct {
-	mu      sync.Mutex
-	level   slog.Level
 	records []slog.Record
+	level   slog.Level
+	mu      sync.Mutex
 }
 
 func (h *recordingHandler) Enabled(_ context.Context, l slog.Level) bool { return l >= h.level }
