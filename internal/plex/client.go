@@ -48,9 +48,9 @@ func (e *HTTPStatusError) Error() string {
 }
 
 // Client is the Plex HTTP client. Fields are exported so the internal
-// composition root (package main, package server, package wsclient) can
-// construct test fixtures and read configuration without accessor noise;
-// the whole internal/* tree is a single trust boundary.
+// composition root (package main, package server) can construct test
+// fixtures and read configuration without accessor noise; the whole
+// internal/* tree is a single trust boundary.
 type Client struct {
 	HTTPClient *http.Client
 	BaseURL    *url.URL

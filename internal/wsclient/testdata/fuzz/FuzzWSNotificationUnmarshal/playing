@@ -1,2 +1,0 @@
-go test fuzz v1
-[]byte("{\"NotificationContainer\":{\"type\":\"playing\",\"PlaySessionStateNotification\":[{\"sessionKey\":\"1\",\"state\":\"playing\",\"viewOffset\":1000}]}}")

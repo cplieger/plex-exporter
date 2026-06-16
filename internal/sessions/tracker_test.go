@@ -367,6 +367,87 @@ func TestSessionTrackerUpdate_stop_without_media_no_accumulation(t *testing.T) {
 	}
 }
 
+func TestUpdateLibraryLabels_normalizes_long_key(t *testing.T) {
+	// Regression: UpdateLibraryLabels must truncate the key the same way
+	// Update does, so that a session stored via Update with a >64-byte key
+	// is found by UpdateLibraryLabels using the original long key.
+	tracker := NewTracker()
+	longKey := strings.Repeat("a", MaxSessionKeyLen+30)
+
+	// Store session via Update (internally truncates).
+	tracker.Update(longKey, StatePlaying, &plexapi.SessionMetadata{Title: "LongKey"}, nil)
+
+	// Verify stored under truncated key.
+	truncated := longKey[:MaxSessionKeyLen]
+	tracker.mu.Lock()
+	if _, ok := tracker.Sessions[truncated]; !ok {
+		t.Fatal("session not found under truncated key after Update")
+	}
+	tracker.mu.Unlock()
+
+	// UpdateLibraryLabels with the SAME original long key must resolve.
+	var called bool
+	tracker.UpdateLibraryLabels(longKey, func(s *Session) {
+		called = true
+		s.LibName = "Movies"
+		s.LibID = "1"
+		s.LibType = "movie"
+	})
+	if !called {
+		t.Fatal("UpdateLibraryLabels did not find session with long key (truncation mismatch)")
+	}
+
+	tracker.mu.Lock()
+	s := tracker.Sessions[truncated]
+	tracker.mu.Unlock()
+	if s.LibName != "Movies" {
+		t.Errorf("LibName = %q, want Movies", s.LibName)
+	}
+}
+
+func TestUpdateLibraryLabels_short_key_unchanged(t *testing.T) {
+	// Verify that short keys (<=MaxSessionKeyLen) still work as before.
+	tracker := NewTracker()
+	shortKey := "short-session-id"
+
+	tracker.Update(shortKey, StatePlaying, &plexapi.SessionMetadata{Title: "Short"}, nil)
+
+	var called bool
+	tracker.UpdateLibraryLabels(shortKey, func(s *Session) {
+		called = true
+		s.LibName = "TV Shows"
+	})
+	if !called {
+		t.Fatal("UpdateLibraryLabels should find session with short key")
+	}
+
+	tracker.mu.Lock()
+	s := tracker.Sessions[shortKey]
+	tracker.mu.Unlock()
+	if s.LibName != "TV Shows" {
+		t.Errorf("LibName = %q, want TV Shows", s.LibName)
+	}
+}
+
+func TestNormalizeKey(t *testing.T) {
+	// Direct unit test for the normalizeKey helper.
+	short := "abc123"
+	if got := normalizeKey(short); got != short {
+		t.Errorf("normalizeKey(%q) = %q, want unchanged", short, got)
+	}
+
+	exact := strings.Repeat("x", MaxSessionKeyLen)
+	if got := normalizeKey(exact); got != exact {
+		t.Errorf("normalizeKey(len=%d) should be unchanged", MaxSessionKeyLen)
+	}
+
+	long := strings.Repeat("y", MaxSessionKeyLen+50)
+	want := long[:MaxSessionKeyLen]
+	if got := normalizeKey(long); got != want {
+		t.Errorf("normalizeKey(len=%d) = len %d, want len %d", len(long), len(got), MaxSessionKeyLen)
+	}
+}
+
 func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
 	// Targets lived mutant at line 542 (time.Since > SessionTimeout boundary).
 	// A session stopped exactly at the timeout boundary should NOT be pruned

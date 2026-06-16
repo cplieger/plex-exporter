@@ -71,7 +71,19 @@ type MediaInfo struct {
 // SessionMetadata models an entry in /status/sessions or in
 // /library/metadata/<id>.
 type SessionMetadata struct {
-	Player struct {
+	TranscodeSession *WSTranscodeSession `json:"TranscodeSession"`
+	User             struct {
+		Title string `json:"title"`
+		ID    string `json:"id"`
+	} `json:"User"`
+	GrandparentTitle string      `json:"grandparentTitle"`
+	ParentTitle      string      `json:"parentTitle"`
+	Title            string      `json:"title"`
+	Type             string      `json:"type"`
+	LibrarySectionID json.Number `json:"librarySectionID"`
+	SessionKey       string      `json:"sessionKey"`
+	RatingKey        string      `json:"ratingKey"`
+	Player           struct {
 		Device  string `json:"device"`
 		Product string `json:"product"`
 		State   string `json:"state"`
@@ -83,18 +95,7 @@ type SessionMetadata struct {
 		Location  string `json:"location"`
 		Bandwidth int    `json:"bandwidth"`
 	} `json:"Session"`
-	User struct {
-		Title string `json:"title"`
-		ID    string `json:"id"`
-	} `json:"User"`
-	GrandparentTitle string      `json:"grandparentTitle"`
-	ParentTitle      string      `json:"parentTitle"`
-	Title            string      `json:"title"`
-	Type             string      `json:"type"`
-	LibrarySectionID json.Number `json:"librarySectionID"`
-	SessionKey       string      `json:"sessionKey"`
-	RatingKey        string      `json:"ratingKey"`
-	Media            []MediaInfo `json:"Media"`
+	Media []MediaInfo `json:"Media"`
 }
 
 // MetadataListResponse is shared by /status/sessions and
@@ -103,8 +104,13 @@ type MetadataListResponse struct {
 	Metadata []SessionMetadata `json:"Metadata"`
 }
 
-// WSTranscodeSession is a TranscodeSession entry in a websocket
-// notification.
+// WSTranscodeSession is a TranscodeSession element embedded in the
+// /status/sessions response (nested under each Video entry). The
+// classification functions in package sessions use its decision fields
+// to derive the transcode_type and subtitle_action Prometheus labels.
+// The "WS" prefix is historical (the struct originated from the
+// websocket notification path); it is kept to avoid a rename-churn
+// across consumers.
 type WSTranscodeSession struct {
 	Key              string `json:"key"`
 	VideoDecision    string `json:"videoDecision"`
@@ -115,23 +121,4 @@ type WSTranscodeSession struct {
 	VideoCodec       string `json:"videoCodec"`
 	AudioCodec       string `json:"audioCodec"`
 	Container        string `json:"container"`
-}
-
-// WSPlayNotification is a PlaySessionStateNotification entry in a
-// websocket notification.
-type WSPlayNotification struct {
-	SessionKey       string `json:"sessionKey"`
-	RatingKey        string `json:"ratingKey"`
-	State            string `json:"state"`
-	TranscodeSession string `json:"transcodeSession"`
-	ViewOffset       int64  `json:"viewOffset"`
-}
-
-// WSNotification is the top-level websocket event envelope.
-type WSNotification struct {
-	NotificationContainer struct {
-		Type                         string               `json:"type"`
-		PlaySessionStateNotification []WSPlayNotification `json:"PlaySessionStateNotification"`
-		TranscodeSession             []WSTranscodeSession `json:"TranscodeSession"`
-	} `json:"NotificationContainer"`
 }

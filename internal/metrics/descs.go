@@ -84,9 +84,6 @@ var (
 	DescEstTransmitBytes = prometheus.NewDesc(
 		"plex_estimated_transmit_bytes_total", "Estimated bytes from bitrates",
 		SrvLabels, nil)
-	DescWSConnected = prometheus.NewDesc(
-		"plex_websocket_connected", "Websocket connection status (1/0)",
-		SrvLabels, nil)
 	DescHTTPReachable = prometheus.NewDesc(
 		"plex_http_reachable", "HTTP polling reachability (1=last refresh succeeded, 0=failed)",
 		SrvLabels, nil)
@@ -105,7 +102,7 @@ var AllDescs = []*prometheus.Desc{
 	DescTransmitBytes, DescActiveTranscodes,
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
-	DescEstTransmitBytes, DescWSConnected,
+	DescEstTransmitBytes,
 	DescHTTPReachable, DescErrors,
 }
 
@@ -113,8 +110,7 @@ var AllDescs = []*prometheus.Desc{
 // DescErrors. Keeping it fixed prevents unbounded Prometheus cardinality
 // from a compromised Plex server returning attacker-controlled error strings.
 var ErrorTypes = []string{
-	"refresh", "websocket_dial", "websocket_read",
-	"invalid_message", "sessions_fetch", "metadata_fetch",
+	"refresh", "sessions_fetch", "metadata_fetch",
 	"invalid_rating_key", "metrics_server", "library_items",
 }
 

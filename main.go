@@ -1,8 +1,8 @@
 // Package main is the composition root for plex-exporter. Wiring
 // only: env parsing, concrete-type construction from internal/*
 // packages, HTTP listener, and goroutine launch. All business logic
-// lives in internal/{plex,plexapi,metrics,library,sessions,server,
-// wsclient}; see those packages for behaviour.
+// lives in internal/{plex,plexapi,metrics,library,sessions,server};
+// see those packages for behaviour.
 package main
 
 import (
@@ -20,7 +20,6 @@ import (
 	"github.com/cplieger/health"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"
-	"github.com/cplieger/plex-exporter/internal/wsclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -112,15 +111,11 @@ func run() int {
 
 	marker.Set(true)
 
-	wsListener := &wsclient.Listener{
-		Client:       ps.Client,
-		Sessions:     ps.Sessions,
-		Libraries:    ps.SnapshotLibraries,
-		RecordError:  ps.RecordError,
-		SetConnected: ps.SetWSConnected,
-	}
 	go ps.Sessions.RunPruneLoop(ctx)
-	wsListener.Listen(ctx)
+	go ps.RunSessionPollLoop(ctx)
+
+	// Block until context is cancelled (SIGINT/SIGTERM).
+	<-ctx.Done()
 
 	// Flip the health marker to unhealthy before Shutdown drains so probes
 	// (Docker HEALTHCHECK + HTTP /api/health) see red during the drain window.

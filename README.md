@@ -24,13 +24,13 @@ Connects to your Plex Media Server and exposes metrics (active sessions, library
 - Session bandwidth and location (LAN/WAN)
 - Host CPU and memory utilization (Plex Pass)
 - Bandwidth transmission totals (Plex Pass)
-- WebSocket connection health
+- HTTP polling reachability
 - Active transcode session count
 
 ### Why this design
 
-- **WebSocket for real-time session tracking** — listens to the Plex notification stream for instant session updates instead of polling on an interval
-- **Single binary with no runtime dependencies** — minimal direct Go dependencies (`coder/websocket` and `prometheus/client_golang`), everything else is stdlib
+- **Polling `/status/sessions` for real-time session tracking** — polls the Plex sessions API on a short interval (5s) for near-instant session detection, with the tracker pruning sessions after 60s of inactivity
+- **Single binary with no runtime dependencies** — minimal direct Go dependencies (`prometheus/client_golang`), everything else is stdlib
 - **Distroless and rootless** — runs on `gcr.io/distroless/static` as UID 65534 with no shell or package manager, minimizing attack surface
 - **Prometheus-native** — exposes a standard `/metrics` endpoint that works with any Prometheus-compatible scraper and any Grafana dashboard, no custom visualization layer
 
@@ -40,10 +40,6 @@ Connects to your Plex Media Server and exposes metrics (active sessions, library
   and bandwidth statistics require Plex Pass. Without it, those
   metrics are simply absent — the exporter still works for all
   other metrics.
-- **WebSocket is required.** The exporter uses the Plex WebSocket
-  notification stream for real-time session tracking. If your Plex
-  server is behind a reverse proxy, ensure WebSocket connections
-  are forwarded correctly.
 - **Library item counts are cached.** Episode, track, and item
   counts are refreshed every 15 minutes to avoid hammering the
   Plex API. Counts may lag slightly after large library scans.
@@ -116,9 +112,8 @@ Pick the configuration that matches your Plex server:
 | `plex_transmit_bytes_total` | Counter | `server`, `server_id` | Cumulative bytes transmitted (from Plex bandwidth API). Requires Plex Pass. Resets on container restart — indicative only. |
 | `plex_estimated_transmit_bytes_total` | Counter | `server`, `server_id` | Estimated bytes transmitted based on session bitrates. Resets on container restart — indicative only. |
 | `plex_active_transcode_sessions` | Gauge | `server`, `server_id` | Number of active video transcode sessions (from root endpoint, no Plex Pass needed) |
-| `plex_websocket_connected` | Gauge | `server`, `server_id` | WebSocket connection status: `1` = connected, `0` = disconnected |
 | `plex_http_reachable` | Gauge | `server`, `server_id` | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed |
-| `plex_exporter_errors_total` | Counter | `server`, `server_id`, `type` | Exporter error count by type. Types: `refresh`, `websocket_dial`, `websocket_read`, `invalid_message`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
+| `plex_exporter_errors_total` | Counter | `server`, `server_id`, `type` | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
 
 ### Library Metrics
 
@@ -141,7 +136,7 @@ Pick the configuration that matches your Plex server:
 
 | Label | Values | Description |
 |---|---|---|
-| `stream_type` | `direct play`, `copy`, `transcode` | How the stream is being delivered |
+| `stream_type` | `directplay`, `copy`, `transcode` | How the stream is being delivered |
 | `transcode_type` | `none`, `video`, `audio`, `both` | What is being transcoded |
 | `subtitle_action` | `none`, `burn`, `copy`, `transcode` | How subtitles are handled |
 | `location` | `lan`, `wan` | Client network location |
@@ -154,7 +149,7 @@ name, others are empty.
 
 ## Healthcheck
 
-The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container becomes unhealthy only if the initial Plex connection fails or the metrics server fails to start; WebSocket disconnects do not trigger unhealthy status because the exporter reconnects automatically with exponential backoff (monitor via `plex_websocket_connected`).
+The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container becomes unhealthy only if the initial Plex connection fails or the metrics server fails to start.
 
 ## Security
 
@@ -176,11 +171,11 @@ read-only Prometheus data (standard for internal exporters).
 `nonroot` on a distroless base image with no shell.
 
 **Details for advanced users:** Plex response bodies capped at
-10 MB via `io.LimitReader`. WebSocket messages capped at 1 MB.
-All HTTP clients use explicit 10s timeouts; the metrics server
-sets `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`,
-`IdleTimeout`, and `MaxHeaderBytes` (1 MB). Rating keys
-validated via `strconv.Atoi` before URL construction. Explicit
+10 MB via `io.LimitReader`. All HTTP clients use explicit 10s
+timeouts; the metrics server sets `ReadHeaderTimeout`,
+`ReadTimeout`, `WriteTimeout`, `IdleTimeout`, and
+`MaxHeaderBytes` (1 MB). Rating keys validated via
+`strconv.Atoi` before URL construction. Explicit
 `MinVersion: tls.VersionTLS12` set on TLS config. Semgrep flags
 the `/tmp/.healthy` marker and the opt-in TLS skip (both
 intentional).
@@ -193,7 +188,6 @@ All dependencies are updated automatically via [Renovate](https://github.com/ren
 |------------|--------|
 | golang | [Go](https://hub.docker.com/_/golang) |
 | gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
-| github.com/coder/websocket | [GitHub](https://github.com/coder/websocket) |
 | github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
 | github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_golang) |
 | golang.org/x/sync | [Go stdlib](https://pkg.go.dev/golang.org/x/sync) |
@@ -214,8 +208,6 @@ This is an original tool that builds upon [prometheus-plex-exporter](https://git
   transcode tracking, and configurable library refresh
 - [Plex Media Server API](https://developer.plex.tv/pms/) — the
   official API documentation
-- [coder/websocket](https://github.com/coder/websocket) — Go
-  WebSocket implementation
 - [prometheus/client_golang](https://github.com/prometheus/client_golang)
   — Prometheus instrumentation library for Go
 

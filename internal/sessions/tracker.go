@@ -11,10 +11,10 @@ import (
 )
 
 // State is a normalised session playback state derived from the Plex
-// websocket PlaySessionStateNotification.State string.
+// /status/sessions Player.State string.
 type State string
 
-// State values observed from Plex websocket notifications.
+// State values observed from Plex session polling.
 const (
 	StatePlaying State = "playing"
 	StateStopped State = "stopped"
@@ -65,21 +65,21 @@ const (
 )
 
 // Session is a single tracked Plex playback session. All fields are
-// exported so callers (currently the Prometheus collector and the
-// websocket handlers in package main) can read and mutate the tracked
-// state under the tracker's mutex without a wall of getter methods.
+// exported so callers (the Prometheus collector and the session poll
+// handler in package server) can read and mutate the tracked state
+// under the tracker's mutex without a wall of getter methods.
 type Session struct {
+	Meta           plexapi.SessionMetadata
+	MediaMeta      plexapi.SessionMetadata
 	PlayStarted    time.Time
 	LastUpdate     time.Time
 	TranscodeType  string
-	TranscodeKey   string // bare Plex transcode session ID from PlaySessionStateNotification.transcodeSession; correlates with TranscodeSession.key (path-prefixed).
+	TranscodeKey   string
 	SubtitleAction string
 	LibName        string
 	LibID          string
 	LibType        string
 	State          State
-	Meta           plexapi.SessionMetadata
-	MediaMeta      plexapi.SessionMetadata
 	PrevPlayedTime time.Duration
 }
 
@@ -131,10 +131,20 @@ func NewTracker() *Tracker {
 	}
 }
 
+// normalizeKey truncates a session key to MaxSessionKeyLen so that
+// write and lookup always use the same map key.
+func normalizeKey(id string) string {
+	if len(id) > MaxSessionKeyLen {
+		return id[:MaxSessionKeyLen]
+	}
+	return id
+}
+
 // UpdateLibraryLabels applies fn to the session identified by id under
 // the tracker's lock. No-op if the session does not exist. If fn sets
 // TranscodeKey, the transcode index is updated.
 func (t *Tracker) UpdateLibraryLabels(id string, fn func(*Session)) {
+	id = normalizeKey(id)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if ss, ok := t.Sessions[id]; ok {
@@ -206,18 +216,15 @@ func (t *Tracker) SnapshotSessions() (sessions map[string]Session, kbits float64
 	return sessions, kbits
 }
 
-// Update records a websocket state transition for the given session
-// key. The meta and mediaMeta arguments may be nil; when non-nil they
-// replace the cached metadata on the tracked session. On a
-// playing→non-playing transition with attached media, the elapsed play
-// time is accumulated into TotalEstimatedKBits for the transmit-bytes
-// estimator.
+// Update records a state transition for the given session key. The meta
+// and mediaMeta arguments may be nil; when non-nil they replace the
+// cached metadata on the tracked session. On a playing→non-playing
+// transition with attached media, the elapsed play time is accumulated
+// into TotalEstimatedKBits for the transmit-bytes estimator.
 func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.SessionMetadata) {
 	// Bound SessionKey length to prevent high-cardinality label explosion
 	// from a malicious or buggy Plex server.
-	if len(id) > MaxSessionKeyLen {
-		id = id[:MaxSessionKeyLen]
-	}
+	id = normalizeKey(id)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 

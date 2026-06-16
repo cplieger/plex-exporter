@@ -10,28 +10,25 @@ constructing the concrete types from `internal/*`, the HTTP listener,
 and goroutine launch. Keep behaviour out of it — all logic lives in the
 `internal/` packages:
 
-- `internal/plexapi` — pure JSON/XML wire types for the Plex API and the
-  WebSocket notification envelope. No imports beyond `encoding/json`.
+- `internal/plexapi` — pure JSON/XML wire types for the Plex API
+  responses. No imports beyond `encoding/json`.
 - `internal/plex` — HTTP client for Plex, including retry semantics and
   the `httpStatusError` sentinels that let callers tell 4xx from 5xx.
 - `internal/library` — the `Library` value type plus pure classification
   helpers (`IsType`, `ContentTypeLabel`, `Build`, `ItemCountTypes`).
   Deterministic and side-effect free.
 - `internal/sessions` — in-memory active-session tracker, updated by the
-  WebSocket listener and snapshotted by the collector. Owns the prune
-  loop and the session bounds.
+  poll loop and snapshotted by the collector. Owns the prune logic and
+  the session bounds.
 - `internal/metrics` — the Prometheus descriptor set (labels, descs,
   error-type allowlist). Exports descriptor variables only.
 - `internal/server` — the `plexServer` orchestrator: refresh loop,
   per-subsystem refresh methods, and the Prometheus `Describe`/`Collect`
   implementation that emits metrics from `plexServer` state.
-- `internal/wsclient` — the WebSocket listener for Plex's notification
-  channel. Reconnect, backoff, ping/pong, and read-limit policy live
-  here.
 
-Sessions are tracked in real time over the Plex WebSocket notification
-stream rather than by interval polling; library item counts are the
-exception, cached and refreshed every 15 minutes.
+Sessions are tracked by polling `/status/sessions` every 5s; a stateful
+tracker reconciles poll snapshots into metric updates (prune after 60s
+idle). Library item counts are cached and refreshed every 15 minutes.
 
 ## Local development
 
@@ -53,9 +50,9 @@ import ordering (standard → third-party → local). `sloglint` is
 
 Tests are property-based (`pgregory.net/rapid`) plus table-driven, and
 live beside the code they test. Cover pure functions with properties;
-the WebSocket loop, main event loop, and ticker scheduling are
-intentionally left to runtime monitoring (`plex_websocket_connected`)
-rather than unit tests.
+the poll path is covered by `session_poll_test.go`. Not tested: main
+event loop, ticker scheduling (I/O-bound runtime paths — monitored via
+`plex_http_reachable`).
 
 The container build is reproducible and rootless:
 
@@ -82,9 +79,6 @@ full reference.
   bandwidth-transmission metrics come from undocumented endpoints that
   404 without Plex Pass. Those paths must stay non-fatal — the exporter
   keeps serving every other metric.
-- **WebSocket dial guard.** `coder/websocket`'s `Dial` can return a
-  non-nil `*http.Response` with a nil `Body`; guard before calling
-  `resp.Body.Close()`.
 - **New metrics:** add the descriptor in `internal/metrics`, emit it
   from `Collect` in `internal/server`, and document it in the README's
   metrics tables.

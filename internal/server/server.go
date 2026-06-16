@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,13 +16,13 @@ import (
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 	"github.com/cplieger/plex-exporter/internal/sessions"
+	"golang.org/x/sync/errgroup"
 )
 
 // Server is the Plex orchestrator. Fields are exported so that package
-// main (Describe/Collect/websocket code still living there this step)
-// and tests can read and mutate them under mu without a wall of
-// accessor methods. The whole internal/* tree is a single trust
-// boundary.
+// main (Describe/Collect code) and tests can read and mutate them under
+// mu without a wall of accessor methods. The whole internal/* tree is a
+// single trust boundary.
 type Server struct {
 	LastItemsRefresh time.Time
 	ErrorCounts      map[string]float64
@@ -42,7 +43,6 @@ type Server struct {
 	refreshing       atomic.Bool
 	HTTPReachable    bool
 	PlexPass         bool
-	WSConnected      bool
 }
 
 // NewServer returns an initialised Server for the given Plex HTTP client.
@@ -177,13 +177,6 @@ func (s *Server) SetHTTPReachable(v bool) {
 	s.mu.Unlock()
 }
 
-// SetWSConnected atomically sets the WSConnected flag.
-func (s *Server) SetWSConnected(v bool) {
-	s.mu.Lock()
-	s.WSConnected = v
-	s.mu.Unlock()
-}
-
 // SnapshotLibraries returns a copy of the current library list under the mutex.
 func (s *Server) SnapshotLibraries() []library.Library {
 	s.mu.Lock()
@@ -210,7 +203,6 @@ type Snapshot struct {
 	HostMem          float64
 	TransmitBytes    float64
 	ActiveTranscodes int
-	WSConnected      float64
 	HTTPReachable    float64
 }
 
@@ -238,9 +230,6 @@ func (s *Server) Snapshot() Snapshot {
 	maps.Copy(snap.ErrorCounts, s.ErrorCounts)
 	if s.PlexPass {
 		snap.PlexPass = "true"
-	}
-	if s.WSConnected {
-		snap.WSConnected = 1.0
 	}
 	if s.HTTPReachable {
 		snap.HTTPReachable = 1.0
@@ -367,4 +356,155 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 		}
 	}
 	s.LastBandwidthAt = highest
+}
+
+// SessionPollInterval is the interval between /status/sessions polls.
+// Short enough (~5s) that the 60s tracker retention catches transient
+// sessions between scrapes.
+const SessionPollInterval = 5 * time.Second
+
+// RunSessionPollLoop polls /status/sessions on a short interval, feeding
+// the tracker with session state, transcode classification, and library
+// labels. Replaces the former WebSocket event-driven architecture while
+// keeping the tracker's accumulation/pruning/classification unchanged.
+func (s *Server) RunSessionPollLoop(ctx context.Context) {
+	ticker := time.NewTicker(SessionPollInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.RefreshSessions(ctx)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// RefreshSessions fetches /status/sessions, applies each active session
+// to the tracker, classifies transcode state inline (from the embedded
+// TranscodeSession element), and fills library labels via
+// /library/metadata/<ratingKey>.
+func (s *Server) RefreshSessions(ctx context.Context) {
+	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var sessResp plexapi.MC[plexapi.MetadataListResponse]
+	if err := s.Client.Get(fetchCtx, "/status/sessions", &sessResp); err != nil {
+		slog.Warn("session poll: failed to fetch sessions", "error", err)
+		s.RecordError("sessions_fetch")
+		return
+	}
+
+	activeSessions := sessResp.MediaContainer.Metadata
+	if len(activeSessions) == 0 {
+		return
+	}
+
+	// Validate rating keys and build the work set.
+	type sessionWork struct {
+		sess  *plexapi.SessionMetadata
+		state sessions.State
+	}
+	work := make([]sessionWork, 0, len(activeSessions))
+	for i := range activeSessions {
+		m := &activeSessions[i]
+		if m.SessionKey == "" {
+			continue
+		}
+		if _, err := strconv.Atoi(m.RatingKey); err != nil {
+			slog.Warn("session poll: invalid rating key", "key", m.RatingKey)
+			s.RecordError("invalid_rating_key")
+			continue
+		}
+		state := sessions.ParseState(m.Player.State)
+		work = append(work, sessionWork{sess: m, state: state})
+	}
+
+	if len(work) == 0 {
+		return
+	}
+
+	// Batch fetch /library/metadata/<ratingKey> concurrently for library labels.
+	var mu sync.Mutex
+	mediaResults := make(map[int]*plexapi.SessionMetadata, len(work))
+
+	g, gctx := errgroup.WithContext(fetchCtx)
+	g.SetLimit(min(4, len(work)))
+	for i, w := range work {
+		g.Go(func() error {
+			var metaResp plexapi.MC[plexapi.MetadataListResponse]
+			if err := s.Client.Get(gctx, "/library/metadata/"+w.sess.RatingKey, &metaResp); err != nil {
+				slog.Warn("session poll: metadata fetch failed", "key", w.sess.RatingKey, "error", err)
+				s.RecordError("metadata_fetch")
+				return nil
+			}
+			if len(metaResp.MediaContainer.Metadata) == 0 {
+				slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
+				return nil
+			}
+			mu.Lock()
+			mediaResults[i] = &metaResp.MediaContainer.Metadata[0]
+			mu.Unlock()
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	// Apply state updates.
+	libs := s.SnapshotLibraries()
+	for i, w := range work {
+		media := mediaResults[i]
+		if media == nil {
+			// Still update the tracker with session state even without library metadata.
+			s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, nil)
+		} else {
+			s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, media)
+			s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
+				fillSessionLibrary(ss, media, libs)
+			})
+		}
+
+		// Classify transcode inline from the embedded TranscodeSession.
+		if w.sess.TranscodeSession != nil {
+			ts := w.sess.TranscodeSession
+			kind := sessions.TranscodeKind(ts)
+			subtitle := sessions.SubtitleAction(ts)
+
+			// Apply directly via UpdateTranscode if the session has a transcode key,
+			// otherwise set it on the session via UpdateLibraryLabels.
+			if ts.Key != "" {
+				matched := s.Sessions.UpdateTranscode(ts.Key, kind, subtitle)
+				if !matched {
+					// Direct set on the session when index doesn't match.
+					s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
+						ss.TranscodeType = kind
+						ss.SubtitleAction = subtitle
+					})
+				}
+			} else {
+				s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
+					ss.TranscodeType = kind
+					ss.SubtitleAction = subtitle
+				})
+			}
+		}
+	}
+}
+
+// fillSessionLibrary populates library labels on ss when missing, using the
+// provided library list matched by LibrarySectionID. No-op if ss already
+// has a library name.
+func fillSessionLibrary(ss *sessions.Session, media *plexapi.SessionMetadata, libs []library.Library) {
+	if ss.LibName != "" {
+		return
+	}
+	for _, lib := range libs {
+		if lib.ID != media.LibrarySectionID.String() {
+			continue
+		}
+		ss.LibName = lib.Name
+		ss.LibID = lib.ID
+		ss.LibType = lib.Type
+		return
+	}
 }
