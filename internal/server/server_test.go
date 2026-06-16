@@ -545,7 +545,7 @@ func TestRecordError_known_type_increments(t *testing.T) {
 	srv := NewServer(&plex.Client{})
 	srv.RecordError("refresh")
 	srv.RecordError("refresh")
-	srv.RecordError("websocket_dial")
+	srv.RecordError("sessions_fetch")
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -553,8 +553,8 @@ func TestRecordError_known_type_increments(t *testing.T) {
 	if srv.ErrorCounts["refresh"] != 2 {
 		t.Errorf("errorCounts[refresh] = %v, want 2", srv.ErrorCounts["refresh"])
 	}
-	if srv.ErrorCounts["websocket_dial"] != 1 {
-		t.Errorf("errorCounts[websocket_dial] = %v, want 1", srv.ErrorCounts["websocket_dial"])
+	if srv.ErrorCounts["sessions_fetch"] != 1 {
+		t.Errorf("errorCounts[sessions_fetch] = %v, want 1", srv.ErrorCounts["sessions_fetch"])
 	}
 }
 
@@ -594,7 +594,6 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 		Platform:        "Linux",
 		PlatformVersion: "6.1",
 		PlexPass:        true,
-		WSConnected:     true,
 		HTTPReachable:   true,
 		Sessions:        sessions.NewTracker(),
 		ErrorCounts:     map[string]float64{"refresh": 3},
@@ -607,9 +606,6 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 
 	if snap.PlexPass != metrics.ValTrue {
 		t.Errorf("plexPass = %q, want true", snap.PlexPass)
-	}
-	if snap.WSConnected != 1.0 {
-		t.Errorf("wsConnected = %v, want 1.0", snap.WSConnected)
 	}
 	if snap.HTTPReachable != 1.0 {
 		t.Errorf("httpReachable = %v, want 1.0", snap.HTTPReachable)
@@ -625,7 +621,6 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 func TestSnapshot_false_booleans(t *testing.T) {
 	srv := &Server{
 		PlexPass:      false,
-		WSConnected:   false,
 		HTTPReachable: false,
 		Sessions:      sessions.NewTracker(),
 	}
@@ -634,9 +629,6 @@ func TestSnapshot_false_booleans(t *testing.T) {
 
 	if snap.PlexPass != metrics.ValFalse {
 		t.Errorf("plexPass = %q, want false", snap.PlexPass)
-	}
-	if snap.WSConnected != 0.0 {
-		t.Errorf("wsConnected = %v, want 0.0", snap.WSConnected)
 	}
 	if snap.HTTPReachable != 0.0 {
 		t.Errorf("httpReachable = %v, want 0.0", snap.HTTPReachable)

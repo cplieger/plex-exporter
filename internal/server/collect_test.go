@@ -457,7 +457,6 @@ func TestCollectServerMetrics(t *testing.T) {
 		HostMem:          0.65,
 		TransmitBytes:    12345,
 		ActiveTranscodes: 2,
-		WSConnected:      true,
 		Libraries: []library.Library{
 			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 1000, StorageTotal: 2000, ItemsCount: 50},
 			{ID: "2", Name: "TV Shows", Type: library.TypeShow, DurationTotal: 3000, StorageTotal: 4000, ItemsCount: 0},
@@ -470,10 +469,10 @@ func TestCollectServerMetrics(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base: server_info, cpu, mem, transmit, active_transcodes, ws_connected,
+	// Base: server_info, cpu, mem, transmit, active_transcodes,
 	// http_reachable + len(metrics.ErrorTypes) error counters.
 	// Plus: 2x lib_duration, 2x lib_storage, 1x lib_items (only Movies has count>0), est_transmit
-	want := 7 + len(metrics.ErrorTypes) + 5 + 1
+	want := 6 + len(metrics.ErrorTypes) + 5 + 1
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 		for i, m := range ms {
@@ -495,9 +494,9 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base: server_info, cpu, mem, transmit, active_transcodes, ws_connected,
+	// Base: server_info, cpu, mem, transmit, active_transcodes,
 	// http_reachable + len(metrics.ErrorTypes) error counters, est_transmit.
-	want := 7 + len(metrics.ErrorTypes) + 1
+	want := 6 + len(metrics.ErrorTypes) + 1
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 	}
@@ -695,7 +694,6 @@ func TestCollectWithActiveSessions(t *testing.T) {
 		HostMem:          0.7,
 		TransmitBytes:    50000,
 		ActiveTranscodes: 1,
-		WSConnected:      true,
 		Libraries: []library.Library{
 			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 5000, StorageTotal: 10000, ItemsCount: 100},
 		},
@@ -707,9 +705,9 @@ func TestCollectWithActiveSessions(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base 7 (+ metrics.ErrorTypes + http_reachable) + 1 lib_duration + 1 lib_storage
+	// Base 6 (+ metrics.ErrorTypes) + 1 lib_duration + 1 lib_storage
 	// + 1 lib_items + play_count + play_seconds + session_bandwidth + session_bitrate + est_transmit.
-	want := 7 + len(metrics.ErrorTypes) + 3 + 5
+	want := 6 + len(metrics.ErrorTypes) + 3 + 5
 	if len(ms) != want {
 		t.Errorf("Collect with sessions produced %d metrics, want %d", len(ms), want)
 	}
@@ -814,9 +812,9 @@ func TestCollectMultipleLibraries(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base 7 (+ metrics.ErrorTypes + http_reachable) + 3x lib_duration, 3x lib_storage,
+	// Base 6 (+ metrics.ErrorTypes) + 3x lib_duration, 3x lib_storage,
 	// 3x lib_items, + est_transmit.
-	want := 7 + len(metrics.ErrorTypes) + 9 + 1
+	want := 6 + len(metrics.ErrorTypes) + 9 + 1
 	if len(ms) != want {
 		t.Errorf("Collect multi-lib produced %d metrics, want %d", len(ms), want)
 	}
@@ -1228,41 +1226,6 @@ func TestCollect_host_metrics_values(t *testing.T) {
 	_, memVal := metricSnapshot(t, memMetrics[0])
 	if memVal != 0.65 {
 		t.Errorf("host_mem = %v, want 0.65", memVal)
-	}
-}
-
-func TestCollect_ws_connected_values(t *testing.T) {
-	// Verify ws_connected is 1.0 when connected, 0.0 when not.
-	for _, tc := range []struct {
-		name      string
-		connected bool
-		want      float64
-	}{
-		{"connected", true, 1.0},
-		{"disconnected", false, 0.0},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := &Server{
-				Name:        "Srv",
-				ID:          "id1",
-				WSConnected: tc.connected,
-				Sessions:    sessions.NewTracker(),
-			}
-
-			ch := make(chan prometheus.Metric, 20)
-			srv.Collect(ch)
-			close(ch)
-
-			byDesc := collectByDesc(ch)
-			wsMetrics := byDesc[descKey(metrics.DescWSConnected)]
-			if len(wsMetrics) != 1 {
-				t.Fatalf("expected 1 ws_connected metric, got %d", len(wsMetrics))
-			}
-			_, val := metricSnapshot(t, wsMetrics[0])
-			if val != tc.want {
-				t.Errorf("ws_connected = %v, want %v", val, tc.want)
-			}
-		})
 	}
 }
 

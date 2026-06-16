@@ -1,5 +1,5 @@
 // Package sessions maintains the in-memory active-session tracker
-// updated by the websocket listener and snapshotted by the collector.
+// updated by the session poll loop and snapshotted by the collector.
 // The tracker exposes its mutex, map, and per-session fields so the
 // remaining callers in package main can orchestrate lock scope without
 // a wall of getter methods; when a caller outside this module needs a
