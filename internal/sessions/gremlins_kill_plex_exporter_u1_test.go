@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"maps"
 	"reflect"
 	"testing"
 )
@@ -15,9 +16,7 @@ func gk_plex_exporter_u1_snapshotIndex(t *testing.T, tr *Tracker) map[string]str
 	tr.mu.Lock()
 	defer tr.mu.Unlock()
 	out := make(map[string]string, len(tr.transcodeIndex))
-	for k, v := range tr.transcodeIndex {
-		out[k] = v
-	}
+	maps.Copy(out, tr.transcodeIndex)
 	return out
 }
 
@@ -43,10 +42,10 @@ func TestGkPlexExporterU1_UpdateLibraryLabels_transcodeIndexWriteGate(t *testing
 	const id = "sess-1"
 
 	cases := []struct {
+		wantIndex map[string]string
 		name      string
-		preKey    string            // ss.TranscodeKey before fn runs (oldKey)
-		postKey   string            // ss.TranscodeKey fn sets
-		wantIndex map[string]string // expected transcodeIndex after the call
+		preKey    string
+		postKey   string
 	}{
 		{
 			// Non-empty AND changed from old: original writes the entry.
