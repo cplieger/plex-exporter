@@ -134,10 +134,7 @@ func NewTracker() *Tracker {
 // normalizeKey truncates a session key to MaxSessionKeyLen so that
 // write and lookup always use the same map key.
 func normalizeKey(id string) string {
-	if len(id) > MaxSessionKeyLen {
-		return id[:MaxSessionKeyLen]
-	}
-	return id
+	return id[:min(len(id), MaxSessionKeyLen)]
 }
 
 // UpdateLibraryLabels applies fn to the session identified by id under
