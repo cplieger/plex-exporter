@@ -69,79 +69,79 @@ services:
 
 ### Environment variables
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `PLEX_SERVER` | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`) | `http://plex:32400` | Yes |
-| `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken | - | Yes |
-| `TZ` | Container timezone | `Europe/Paris` | No |
-| `LISTEN_ADDRESS` | Address and port for the metrics HTTP server | `:9594` | No |
-| `PLEX_CA_CERT_PATH` | Path to a PEM file containing your Plex server's CA certificate. When set, that CA is added to the TLS RootCAs pool — TLS verification stays **on**, pinned to your CA. Required only when (a) your `PLEX_SERVER` uses `https://` and (b) the cert isn't trusted by the OS bundle (i.e. you signed it yourself or with a private CA). Plain `http://` URLs and Plex's official `*.plex.direct` HTTPS URLs need **no** TLS env var. | unset | No |
+| Variable            | Description                                                                                                                                                                                                                                                                                                                                                                                                                        | Default             | Required |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------- |
+| `PLEX_SERVER`       | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`)                                                                                                                                                                                                                                                                                                                                     | `http://plex:32400` | Yes      |
+| `PLEX_TOKEN`        | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken                                                                                                                                                                                                                                                                                                             | -                   | Yes      |
+| `TZ`                | Container timezone                                                                                                                                                                                                                                                                                                                                                                                                                 | `Europe/Paris`      | No       |
+| `LISTEN_ADDRESS`    | Address and port for the metrics HTTP server                                                                                                                                                                                                                                                                                                                                                                                       | `:9594`             | No       |
+| `PLEX_CA_CERT_PATH` | Path to a PEM file containing your Plex server's CA certificate. When set, that CA is added to the TLS RootCAs pool — TLS verification stays **on**, pinned to your CA. Required only when (a) your `PLEX_SERVER` uses `https://` and (b) the cert isn't trusted by the OS bundle (i.e. you signed it yourself or with a private CA). Plain `http://` URLs and Plex's official `*.plex.direct` HTTPS URLs need **no** TLS env var. | unset               | No       |
 
 ### TLS / certificate setup
 
 Pick the configuration that matches your Plex server:
 
-| Your `PLEX_SERVER` looks like | What to do |
-|---|---|
-| `http://plex:32400` (Docker network, LAN, etc.) | nothing — TLS isn't in use |
-| `https://<hash>.plex.direct:32400` (Plex's official cert) | nothing — Let's Encrypt is trusted by default |
+| Your `PLEX_SERVER` looks like                                                  | What to do                                                                   |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `http://plex:32400` (Docker network, LAN, etc.)                                | nothing — TLS isn't in use                                                   |
+| `https://<hash>.plex.direct:32400` (Plex's official cert)                      | nothing — Let's Encrypt is trusted by default                                |
 | `https://192.0.2.100:32400` or `https://plex.local` (self-signed / private CA) | set `PLEX_CA_CERT_PATH` to the PEM file of the CA that signed your Plex cert |
 
 ### Ports
 
-| Port | Description |
-|------|-------------|
+| Port   | Description                                                               |
+| ------ | ------------------------------------------------------------------------- |
 | `9594` | Prometheus metrics endpoint (`/metrics`) and health check (`/api/health`) |
 
 ## Metrics reference
 
 ### HTTP Endpoints
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/metrics` | GET | Prometheus metrics (see below) |
-| `/api/health` | GET | Returns `{"status":"OK"}` when ready, 503 when starting/stopping |
+| Endpoint      | Method | Description                                                      |
+| ------------- | ------ | ---------------------------------------------------------------- |
+| `/metrics`    | GET    | Prometheus metrics (see below)                                   |
+| `/api/health` | GET    | Returns `{"status":"OK"}` when ready, 503 when starting/stopping |
 
 ### Server Metrics
 
-| Metric | Type | Labels | Description |
-|---|---|---|---|
-| `plex_server_info` | Gauge (always 1) | `server`, `server_id`, `version`, `platform`, `platform_version`, `plex_pass` | Server metadata and Plex Pass status |
-| `plex_host_cpu_utilization_ratio` | Gauge | `server`, `server_id` | Host CPU utilization as a ratio (0.0–1.0). Requires Plex Pass. |
-| `plex_host_memory_utilization_ratio` | Gauge | `server`, `server_id` | Host memory utilization as a ratio (0.0–1.0). Requires Plex Pass. |
-| `plex_transmit_bytes_total` | Counter | `server`, `server_id` | Cumulative bytes transmitted (from Plex bandwidth API). Requires Plex Pass. Resets on container restart — indicative only. |
-| `plex_estimated_transmit_bytes_total` | Counter | `server`, `server_id` | Estimated bytes transmitted based on session bitrates. Resets on container restart — indicative only. |
-| `plex_active_transcode_sessions` | Gauge | `server`, `server_id` | Number of active video transcode sessions (from root endpoint, no Plex Pass needed) |
-| `plex_http_reachable` | Gauge | `server`, `server_id` | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed |
-| `plex_exporter_errors_total` | Counter | `server`, `server_id`, `type` | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
+| Metric                                | Type             | Labels                                                                        | Description                                                                                                                                  |
+| ------------------------------------- | ---------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plex_server_info`                    | Gauge (always 1) | `server`, `server_id`, `version`, `platform`, `platform_version`, `plex_pass` | Server metadata and Plex Pass status                                                                                                         |
+| `plex_host_cpu_utilization_ratio`     | Gauge            | `server`, `server_id`                                                         | Host CPU utilization as a ratio (0.0–1.0). Requires Plex Pass.                                                                               |
+| `plex_host_memory_utilization_ratio`  | Gauge            | `server`, `server_id`                                                         | Host memory utilization as a ratio (0.0–1.0). Requires Plex Pass.                                                                            |
+| `plex_transmit_bytes_total`           | Counter          | `server`, `server_id`                                                         | Cumulative bytes transmitted (from Plex bandwidth API). Requires Plex Pass. Resets on container restart — indicative only.                   |
+| `plex_estimated_transmit_bytes_total` | Counter          | `server`, `server_id`                                                         | Estimated bytes transmitted based on session bitrates. Resets on container restart — indicative only.                                        |
+| `plex_active_transcode_sessions`      | Gauge            | `server`, `server_id`                                                         | Number of active video transcode sessions (from root endpoint, no Plex Pass needed)                                                          |
+| `plex_http_reachable`                 | Gauge            | `server`, `server_id`                                                         | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed                                                                        |
+| `plex_exporter_errors_total`          | Counter          | `server`, `server_id`, `type`                                                 | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
 
 ### Library Metrics
 
-| Metric | Type | Labels | Description |
-|---|---|---|---|
-| `plex_library_duration_milliseconds` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total duration of all items in the library (ms) |
-| `plex_library_storage_bytes` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total storage used by the library (bytes) |
-| `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Number of items in the library. `content_type` is `movies`, `episodes`, `tracks`, `photos`, or `items`. Refreshed every 15 minutes. |
+| Metric                               | Type  | Labels                                                                         | Description                                                                                                                         |
+| ------------------------------------ | ----- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `plex_library_duration_milliseconds` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`                 | Total duration of all items in the library (ms)                                                                                     |
+| `plex_library_storage_bytes`         | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`                 | Total storage used by the library (bytes)                                                                                           |
+| `plex_library_items`                 | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Number of items in the library. `content_type` is `movies`, `episodes`, `tracks`, `photos`, or `items`. Refreshed every 15 minutes. |
 
 ### Session Metrics
 
-| Metric | Type | Labels | Description |
-|---|---|---|---|
-| `plex_plays_active` | Gauge | `server`, `server_id`, `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location`, `local` | Currently active play sessions (1 per session). Use `count(plex_plays_active)` for total stream count. Removed after 60s of inactivity. |
-| `plex_play_seconds_total` | Counter | _(same as above)_ | Cumulative play time for the session (seconds) |
-| `plex_session_bandwidth_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Real-time session bandwidth from the Plex Sessions API (kbps) |
-| `plex_session_bitrate_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Live stream bitrate per session (kbps). Replaces the former `stream_bitrate` label on `plex_plays_active`/`plex_play_seconds_total`, which caused unbounded cardinality as Plex reports changing bitrates during adaptive streaming. |
+| Metric                        | Type    | Labels                                                                                                                                                                                                                                                                                       | Description                                                                                                                                                                                                                          |
+| ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `plex_plays_active`           | Gauge   | `server`, `server_id`, `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location`, `local` | Currently active play sessions (1 per session). Use `count(plex_plays_active)` for total stream count. Removed after 60s of inactivity.                                                                                              |
+| `plex_play_seconds_total`     | Counter | _(same as above)_                                                                                                                                                                                                                                                                            | Cumulative play time for the session (seconds)                                                                                                                                                                                       |
+| `plex_session_bandwidth_kbps` | Gauge   | `server`, `server_id`, `session`, `user`, `location`                                                                                                                                                                                                                                         | Real-time session bandwidth from the Plex Sessions API (kbps)                                                                                                                                                                        |
+| `plex_session_bitrate_kbps`   | Gauge   | `server`, `server_id`, `session`, `user`, `location`                                                                                                                                                                                                                                         | Live stream bitrate per session (kbps). Replaces the former `stream_bitrate` label on `plex_plays_active`/`plex_play_seconds_total`, which caused unbounded cardinality as Plex reports changing bitrates during adaptive streaming. |
 
 ### Session Label Reference
 
-| Label | Values | Description |
-|---|---|---|
-| `stream_type` | `directplay`, `copy`, `transcode` | How the stream is being delivered |
-| `transcode_type` | `none`, `video`, `audio`, `both` | What is being transcoded |
-| `subtitle_action` | `none`, `burn`, `copy`, `transcode` | How subtitles are handled |
-| `location` | `lan`, `wan` | Client network location |
-| `local` | `true`, `false` | Whether the client is on the local network |
-| `media_type` | `movie`, `episode`, `track`, etc. | Plex media type |
+| Label             | Values                              | Description                                |
+| ----------------- | ----------------------------------- | ------------------------------------------ |
+| `stream_type`     | `directplay`, `copy`, `transcode`   | How the stream is being delivered          |
+| `transcode_type`  | `none`, `video`, `audio`, `both`    | What is being transcoded                   |
+| `subtitle_action` | `none`, `burn`, `copy`, `transcode` | How subtitles are handled                  |
+| `location`        | `lan`, `wan`                        | Client network location                    |
+| `local`           | `true`, `false`                     | Whether the client is on the local network |
+| `media_type`      | `movie`, `episode`, `track`, etc.   | Plex media type                            |
 
 For episodes: `title` = show name, `child_title` = season,
 `grandchild_title` = episode title. For movies: `title` = movie
@@ -155,15 +155,15 @@ The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (
 
 **No vulnerabilities found.** All scans clean.
 
-| Tool | Result |
-|------|--------|
-| [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) | No vulnerabilities in call graph |
-| [golangci-lint](https://golangci-lint.run/) (gosec, gocritic) | 0 issues |
-| [trivy](https://trivy.dev/) | 0 vulnerabilities (distroless base) |
-| [grype](https://github.com/anchore/grype) | 0 vulnerabilities |
-| [gitleaks](https://github.com/gitleaks/gitleaks) | No secrets detected |
-| [semgrep](https://semgrep.dev/) | 2 info (false positives) |
-| [hadolint](https://github.com/hadolint/hadolint) | Clean |
+| Tool                                                                | Result                              |
+| ------------------------------------------------------------------- | ----------------------------------- |
+| [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) | No vulnerabilities in call graph    |
+| [golangci-lint](https://golangci-lint.run/) (gosec, gocritic)       | 0 issues                            |
+| [trivy](https://trivy.dev/)                                         | 0 vulnerabilities (distroless base) |
+| [grype](https://github.com/anchore/grype)                           | 0 vulnerabilities                   |
+| [gitleaks](https://github.com/gitleaks/gitleaks)                    | No secrets detected                 |
+| [semgrep](https://semgrep.dev/)                                     | 2 info (false positives)            |
+| [hadolint](https://github.com/hadolint/hadolint)                    | Clean                               |
 
 Connects outbound to Plex only. The `/metrics` endpoint serves
 read-only Prometheus data (standard for internal exporters).
@@ -184,14 +184,14 @@ intentional).
 
 All dependencies are updated automatically via [Renovate](https://github.com/renovatebot/renovate) and pinned by digest or version for reproducibility.
 
-| Dependency | Source |
-|------------|--------|
-| golang | [Go](https://hub.docker.com/_/golang) |
-| gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
-| github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_golang) |
-| golang.org/x/sync | [Go stdlib](https://pkg.go.dev/golang.org/x/sync) |
-| pgregory.net/rapid | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |
+| Dependency                          | Source                                                           |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| golang                              | [Go](https://hub.docker.com/_/golang)                            |
+| gcr.io/distroless/static            | [Distroless](https://github.com/GoogleContainerTools/distroless) |
+| github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang)            |
+| github.com/prometheus/client_model  | [GitHub](https://github.com/prometheus/client_golang)            |
+| golang.org/x/sync                   | [Go stdlib](https://pkg.go.dev/golang.org/x/sync)                |
+| pgregory.net/rapid                  | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid)              |
 
 ## Credits
 
