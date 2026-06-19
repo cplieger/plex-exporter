@@ -588,15 +588,16 @@ func TestRecordError_nil_map_initialized(t *testing.T) {
 
 func TestSnapshot_boolean_conversions(t *testing.T) {
 	srv := &Server{
-		Name:            "Srv",
-		ID:              "id1",
-		Version:         "1.0",
-		Platform:        "Linux",
-		PlatformVersion: "6.1",
-		PlexPass:        true,
-		HTTPReachable:   true,
-		Sessions:        sessions.NewTracker(),
-		ErrorCounts:     map[string]float64{"refresh": 3},
+		Name:              "Srv",
+		ID:                "id1",
+		Version:           "1.0",
+		Platform:          "Linux",
+		PlatformVersion:   "6.1",
+		PlexPass:          true,
+		HTTPReachable:     true,
+		SessionsReachable: true,
+		Sessions:          sessions.NewTracker(),
+		ErrorCounts:       map[string]float64{"refresh": 3},
 		Libraries: []library.Library{
 			{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 10},
 		},
@@ -610,6 +611,9 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 	if snap.HTTPReachable != 1.0 {
 		t.Errorf("httpReachable = %v, want 1.0", snap.HTTPReachable)
 	}
+	if snap.SessionsReachable != 1.0 {
+		t.Errorf("sessionsReachable = %v, want 1.0", snap.SessionsReachable)
+	}
 	if snap.ErrorCounts["refresh"] != 3 {
 		t.Errorf("errorCounts[refresh] = %v, want 3", snap.ErrorCounts["refresh"])
 	}
@@ -620,9 +624,10 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 
 func TestSnapshot_false_booleans(t *testing.T) {
 	srv := &Server{
-		PlexPass:      false,
-		HTTPReachable: false,
-		Sessions:      sessions.NewTracker(),
+		PlexPass:          false,
+		HTTPReachable:     false,
+		SessionsReachable: false,
+		Sessions:          sessions.NewTracker(),
 	}
 
 	snap := srv.Snapshot()
@@ -632,6 +637,9 @@ func TestSnapshot_false_booleans(t *testing.T) {
 	}
 	if snap.HTTPReachable != 0.0 {
 		t.Errorf("httpReachable = %v, want 0.0", snap.HTTPReachable)
+	}
+	if snap.SessionsReachable != 0.0 {
+		t.Errorf("sessionsReachable = %v, want 0.0", snap.SessionsReachable)
 	}
 }
 

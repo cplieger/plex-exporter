@@ -24,25 +24,26 @@ import (
 // mu without a wall of accessor methods. The whole internal/* tree is a
 // single trust boundary.
 type Server struct {
-	LastItemsRefresh time.Time
-	ErrorCounts      map[string]float64
-	Client           *plex.Client
-	Sessions         *sessions.Tracker
-	ID               string
-	Name             string
-	Version          string
-	Platform         string
-	PlatformVersion  string
-	Libraries        []library.Library
-	HostCPU          float64
-	HostMem          float64
-	TransmitBytes    float64
-	LastBandwidthAt  int
-	ActiveTranscodes int
-	mu               sync.Mutex
-	refreshing       atomic.Bool
-	HTTPReachable    bool
-	PlexPass         bool
+	LastItemsRefresh  time.Time
+	ErrorCounts       map[string]float64
+	Client            *plex.Client
+	Sessions          *sessions.Tracker
+	ID                string
+	Name              string
+	Version           string
+	Platform          string
+	PlatformVersion   string
+	Libraries         []library.Library
+	HostCPU           float64
+	HostMem           float64
+	TransmitBytes     float64
+	LastBandwidthAt   int
+	ActiveTranscodes  int
+	mu                sync.Mutex
+	refreshing        atomic.Bool
+	HTTPReachable     bool
+	SessionsReachable bool
+	PlexPass          bool
 }
 
 // NewServer returns an initialised Server for the given Plex HTTP client.
@@ -177,6 +178,13 @@ func (s *Server) SetHTTPReachable(v bool) {
 	s.mu.Unlock()
 }
 
+// SetSessionsReachable atomically sets the SessionsReachable flag.
+func (s *Server) SetSessionsReachable(v bool) {
+	s.mu.Lock()
+	s.SessionsReachable = v
+	s.mu.Unlock()
+}
+
 // SnapshotLibraries returns a copy of the current library list under the mutex.
 func (s *Server) SnapshotLibraries() []library.Library {
 	s.mu.Lock()
@@ -191,19 +199,20 @@ func (s *Server) SnapshotLibraries() []library.Library {
 // lock scope to a single block. PlexPass is stored as a string so the
 // caller can emit it directly as a Prometheus label value.
 type Snapshot struct {
-	ErrorCounts      map[string]float64
-	PlatformVersion  string
-	Name             string
-	ID               string
-	Version          string
-	Platform         string
-	PlexPass         string
-	Libraries        []library.Library
-	HostCPU          float64
-	HostMem          float64
-	TransmitBytes    float64
-	ActiveTranscodes int
-	HTTPReachable    float64
+	ErrorCounts       map[string]float64
+	PlatformVersion   string
+	Name              string
+	ID                string
+	Version           string
+	Platform          string
+	PlexPass          string
+	Libraries         []library.Library
+	HostCPU           float64
+	HostMem           float64
+	TransmitBytes     float64
+	ActiveTranscodes  int
+	HTTPReachable     float64
+	SessionsReachable float64
 }
 
 // Snapshot returns a consistent point-in-time copy of the server's
@@ -233,6 +242,9 @@ func (s *Server) Snapshot() Snapshot {
 	}
 	if s.HTTPReachable {
 		snap.HTTPReachable = 1.0
+	}
+	if s.SessionsReachable {
+		snap.SessionsReachable = 1.0
 	}
 	return snap
 }
@@ -392,8 +404,12 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	if err := s.Client.Get(fetchCtx, "/status/sessions", &sessResp); err != nil {
 		slog.Warn("session poll: failed to fetch sessions", "error", err)
 		s.RecordError("sessions_fetch")
+		s.SetSessionsReachable(false)
 		return
 	}
+	// Set reachable BEFORE the empty-sessions early return so a healthy
+	// "no one watching" poll correctly reads 1 rather than going stale.
+	s.SetSessionsReachable(true)
 
 	activeSessions := sessResp.MediaContainer.Metadata
 	if len(activeSessions) == 0 {
