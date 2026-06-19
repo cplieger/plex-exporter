@@ -19,4 +19,4 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: cplieger/ci/.github/workflows/security-scan.yaml@19f9337480a2ff840612c8f0c10a5e3997969f22 # v2
+    uses: cplieger/ci/.github/workflows/security-scan.yaml@89644d8c69a38e98fcfb25c56c68ebd73d164891 # v2
