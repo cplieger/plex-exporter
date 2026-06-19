@@ -87,6 +87,9 @@ var (
 	DescHTTPReachable = prometheus.NewDesc(
 		"plex_http_reachable", "HTTP polling reachability (1=last refresh succeeded, 0=failed)",
 		SrvLabels, nil)
+	DescSessionPollReachable = prometheus.NewDesc(
+		"plex_session_poll_reachable", "Session poll reachability (1=last /status/sessions poll succeeded, 0=failed)",
+		SrvLabels, nil)
 	DescErrors = prometheus.NewDesc(
 		"plex_exporter_errors_total",
 		"Plex exporter error count by type",
@@ -103,7 +106,7 @@ var AllDescs = []*prometheus.Desc{
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
 	DescEstTransmitBytes,
-	DescHTTPReachable, DescErrors,
+	DescHTTPReachable, DescSessionPollReachable, DescErrors,
 }
 
 // ErrorTypes is the bounded allowlist of `type` label values emitted on

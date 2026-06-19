@@ -113,6 +113,7 @@ Pick the configuration that matches your Plex server:
 | `plex_estimated_transmit_bytes_total` | Counter          | `server`, `server_id`                                                         | Estimated bytes transmitted based on session bitrates. Resets on container restart — indicative only.                                        |
 | `plex_active_transcode_sessions`      | Gauge            | `server`, `server_id`                                                         | Number of active video transcode sessions (from root endpoint, no Plex Pass needed)                                                          |
 | `plex_http_reachable`                 | Gauge            | `server`, `server_id`                                                         | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed                                                                        |
+| `plex_session_poll_reachable`         | Gauge            | `server`, `server_id`                                                         | Session poll reachability: `1` = last `/status/sessions` poll succeeded, `0` = failed                                                        |
 | `plex_exporter_errors_total`          | Counter          | `server`, `server_id`, `type`                                                 | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
 
 ### Library Metrics

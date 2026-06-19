@@ -72,6 +72,7 @@ func run() int {
 		return 1
 	}
 	ps.SetHTTPReachable(true)
+	ps.SetSessionsReachable(true)
 	slog.Info("connected to plex server",
 		"name", ps.Name, "version", ps.Version,
 		"libraries", len(ps.Libraries))

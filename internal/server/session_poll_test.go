@@ -67,6 +67,12 @@ func TestRefreshSessions_basic_playing_session(t *testing.T) {
 	if s.LibID != "1" {
 		t.Errorf("libID = %q, want 1", s.LibID)
 	}
+	srv.mu.Lock()
+	reachable := srv.SessionsReachable
+	srv.mu.Unlock()
+	if !reachable {
+		t.Errorf("sessionsReachable = %v, want true after successful poll", reachable)
+	}
 }
 
 func TestRefreshSessions_with_transcode_session(t *testing.T) {
@@ -250,6 +256,14 @@ func TestRefreshSessions_empty_response(t *testing.T) {
 	if len(snap) != 0 {
 		t.Errorf("expected 0 sessions, got %d", len(snap))
 	}
+	// A healthy "no one watching" poll must read reachable=1: the success
+	// set is placed before the empty-sessions early return.
+	srv.mu.Lock()
+	reachable := srv.SessionsReachable
+	srv.mu.Unlock()
+	if !reachable {
+		t.Errorf("sessionsReachable = %v, want true after successful empty poll", reachable)
+	}
 }
 
 func TestRefreshSessions_invalid_rating_key_skipped(t *testing.T) {
@@ -295,14 +309,19 @@ func TestRefreshSessions_fetch_error_records_error(t *testing.T) {
 
 	client := plex.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
+	srv.SetSessionsReachable(true) // seed true so the error branch's flip to false is observable
 
 	srv.RefreshSessions(context.Background())
 
 	srv.mu.Lock()
 	errCount := srv.ErrorCounts["sessions_fetch"]
+	reachable := srv.SessionsReachable
 	srv.mu.Unlock()
 	if errCount != 1 {
 		t.Errorf("errorCounts[sessions_fetch] = %v, want 1", errCount)
+	}
+	if reachable {
+		t.Errorf("sessionsReachable = %v, want false after fetch error", reachable)
 	}
 }
 
