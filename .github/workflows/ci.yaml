@@ -25,4 +25,4 @@ permissions:
 
 jobs:
   ci:
-    uses: cplieger/ci/.github/workflows/ci.yaml@89644d8c69a38e98fcfb25c56c68ebd73d164891 # v2
+    uses: cplieger/ci/.github/workflows/ci.yaml@ac467576c24c005816d1eb364acd60aec33cc9d2 # v2
