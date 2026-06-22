@@ -1,37 +1,1003 @@
 {
-  "__inputs": [{"name":"DS_PROMETHEUS","label":"Prometheus","description":"","type":"datasource","pluginId":"prometheus","pluginName":"Prometheus"}],
-  "annotations":{"list":[]},
-  "editable":true,
-  "fiscalYearStartMonth":0,
-  "graphTooltip":1,
-  "links":[],
-  "panels":[
-    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":0},"id":100,"title":"Server Overview","type":"row"},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"mappings":[{"options":{"1":{"text":"Online"}},"type":"value"}],"thresholds":{"steps":[{"color":"green","value":null}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":0,"y":1},"id":1,"options":{"colorMode":"background","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Server Status","type":"stat","targets":[{"expr":"plex_server_info{server=~\"$server\"}","legendFormat":"{{ server }} v{{ version }}"}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"mappings":[{"options":{"0":{"text":"Disconnected","color":"red"},"1":{"text":"Connected","color":"green"}},"type":"value"}],"thresholds":{"steps":[{"color":"red","value":null},{"color":"green","value":1}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":6,"y":1},"id":2,"options":{"colorMode":"background","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Session Poll","type":"stat","targets":[{"expr":"plex_session_poll_reachable{server=~\"$server\"}","legendFormat":"{{ server }}"}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":null},{"color":"yellow","value":1},{"color":"orange","value":3},{"color":"red","value":5}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":12,"y":1},"id":40,"options":{"colorMode":"value","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Active Streams","type":"stat","targets":[{"expr":"count(plex_play_seconds_total{server=~\"$server\"}) or vector(0)","legendFormat":""}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"blue","value":null},{"color":"yellow","value":1},{"color":"orange","value":3}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":18,"y":1},"id":3,"options":{"colorMode":"value","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Active Transcodes","type":"stat","targets":[{"expr":"plex_active_transcode_sessions{server=~\"$server\"}","legendFormat":"{{ server }}"}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"purple","value":null}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":0,"y":4},"id":42,"options":{"colorMode":"value","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Total Items","type":"stat","targets":[{"expr":"sum(plex_library_items{server=~\"$server\"})","legendFormat":""}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"decbytes","thresholds":{"steps":[{"color":"purple","value":null}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":6,"y":4},"id":43,"options":{"colorMode":"value","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Total Storage","type":"stat","targets":[{"expr":"sum(plex_library_storage_bytes{server=~\"$server\"})","legendFormat":""}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"ms","thresholds":{"steps":[{"color":"purple","value":null}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":12,"y":4},"id":44,"options":{"colorMode":"value","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Total Duration","type":"stat","targets":[{"expr":"sum(plex_library_duration_milliseconds{server=~\"$server\"})","legendFormat":""}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"mappings":[{"options":{"0":{"text":"No","color":"yellow"},"1":{"text":"Yes","color":"green"}},"type":"value"}],"thresholds":{"steps":[{"color":"yellow","value":null},{"color":"green","value":1}]},"color":{"mode":"thresholds"}}},"gridPos":{"h":3,"w":6,"x":18,"y":4},"id":41,"options":{"colorMode":"value","graphMode":"none","reduceOptions":{"calcs":["lastNotNull"]}},"title":"Plex Pass","type":"stat","targets":[{"expr":"count(plex_server_info{server=~\"$server\",plex_pass=\"true\"}) or on() vector(0)","legendFormat":""}]},
-    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":7},"id":102,"title":"Active Sessions","type":"row"},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"color":{"mode":"palette-classic"}},"overrides":[{"matcher":{"id":"byName","options":"Play Time"},"properties":[{"id":"unit","value":"s"}]}]},"gridPos":{"h":8,"w":24,"x":0,"y":8},"id":20,"options":{"showHeader":true,"sortBy":[{"displayName":"Play Time","desc":true}]},"title":"Active Sessions","type":"table","targets":[{"expr":"plex_play_seconds_total{server=~\"$server\"}","legendFormat":"","format":"table","instant":true,"refId":"A"}],"transformations":[{"id":"organize","options":{"excludeByName":{"Time":true,"server":true,"server_id":true,"__name__":true,"instance":true,"job":true,"library_id":true,"library_type":true,"media_type":true,"session":true,"device":true,"hostname":true},"indexByName":{"user":0,"device_type":1,"title":2,"child_title":3,"grandchild_index":4,"grandchild_title":5,"library":6,"stream_type":7,"stream_resolution":8,"stream_file_resolution":9,"transcode_type":10,"subtitle_action":11,"location":12,"local":13,"Value":14},"renameByName":{"library":"Library","title":"Title","child_title":"Season/Album","grandchild_index":"Episode","grandchild_title":"Episode Title","user":"User","device_type":"Client","stream_type":"Stream","stream_resolution":"Resolution","stream_file_resolution":"File Resolution","transcode_type":"Transcode","subtitle_action":"Subtitles","location":"Location","local":"Local","Value":"Play Time"}}}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"kbps","color":{"mode":"palette-classic"},"custom":{"fillOpacity":20}}},"gridPos":{"h":8,"w":12,"x":0,"y":38},"id":21,"options":{"tooltip":{"mode":"multi"},"legend":{"displayMode":"list","placement":"bottom"}},"title":"Session Bandwidth","type":"timeseries","targets":[{"expr":"sum(plex_session_bandwidth_kbps{server=~\"$server\"}) by (server)","legendFormat":"{{ server }}"}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"kbps","color":{"mode":"palette-classic"},"custom":{"fillOpacity":20}}},"gridPos":{"h":8,"w":12,"x":12,"y":38},"id":22,"options":{"tooltip":{"mode":"multi"},"legend":{"displayMode":"list","placement":"bottom"}},"title":"Session Bitrate","type":"timeseries","targets":[{"expr":"sum(plex_session_bitrate_kbps{server=~\"$server\"}) by (server)","legendFormat":"{{ server }}"}]},
-    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":16},"id":101,"title":"Library Details","type":"row"},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"color":{"mode":"palette-classic"}},"overrides":[{"matcher":{"id":"byName","options":"Items"},"properties":[{"id":"unit","value":"none"},{"id":"decimals","value":0}]},{"matcher":{"id":"byName","options":"Storage"},"properties":[{"id":"unit","value":"decbytes"}]},{"matcher":{"id":"byName","options":"Duration"},"properties":[{"id":"unit","value":"ms"}]}]},"gridPos":{"h":12,"w":24,"x":0,"y":17},"id":10,"options":{"showHeader":true,"sortBy":[{"displayName":"Storage","desc":true}],"footer":{"show":true,"reducer":["sum"],"countRows":false,"fields":["Items","Storage","Duration"]}},"title":"","type":"table","targets":[{"expr":"sum by (library) (plex_library_items{server=~\"$server\"})","legendFormat":"","format":"table","instant":true,"refId":"A"},{"expr":"sum by (library) (plex_library_storage_bytes{server=~\"$server\"})","legendFormat":"","format":"table","instant":true,"refId":"B"},{"expr":"sum by (library) (plex_library_duration_milliseconds{server=~\"$server\"})","legendFormat":"","format":"table","instant":true,"refId":"C"}],"transformations":[{"id":"merge","options":{}},{"id":"groupBy","options":{"fields":{"library":{"aggregations":[],"operation":"groupby"},"Value #A":{"aggregations":["lastNotNull"],"operation":"aggregate"},"Value #B":{"aggregations":["lastNotNull"],"operation":"aggregate"},"Value #C":{"aggregations":["lastNotNull"],"operation":"aggregate"}}}},{"id":"organize","options":{"indexByName":{"library":0,"Value #A (lastNotNull)":1,"Value #B (lastNotNull)":2,"Value #C (lastNotNull)":3},"renameByName":{"library":"Library","Value #A (lastNotNull)":"Items","Value #B (lastNotNull)":"Storage","Value #C (lastNotNull)":"Duration"}}}]},
-    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":29},"id":103,"title":"Resources","type":"row"},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"percentunit","min":0,"max":1,"color":{"mode":"palette-classic"},"custom":{"fillOpacity":20}}},"gridPos":{"h":8,"w":12,"x":0,"y":30},"id":30,"options":{"tooltip":{"mode":"multi"},"legend":{"displayMode":"list","placement":"bottom"}},"title":"CPU Utilization","type":"timeseries","targets":[{"expr":"plex_host_cpu_utilization_ratio{server=~\"$server\"}","legendFormat":"{{ server }}"}]},
-    {"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"fieldConfig":{"defaults":{"unit":"percentunit","min":0,"max":1,"color":{"mode":"palette-classic"},"custom":{"fillOpacity":20}}},"gridPos":{"h":8,"w":12,"x":12,"y":30},"id":31,"options":{"tooltip":{"mode":"multi"},"legend":{"displayMode":"list","placement":"bottom"}},"title":"Memory Utilization","type":"timeseries","targets":[{"expr":"plex_host_memory_utilization_ratio{server=~\"$server\"}","legendFormat":"{{ server }}"}]}
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "Server Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "text": "Online"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Server Status",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "plex_server_info{server=~\"$server\"}",
+          "legendFormat": "{{ server }} v{{ version }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Unreachable",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Reachable",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Session Poll",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "plex_session_poll_reachable{server=~\"$server\"}",
+          "legendFormat": "{{ server }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "id": 40,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Active Streams",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(plex_play_seconds_total{server=~\"$server\"}) or vector(0)",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 3
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Active Transcodes",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "plex_active_transcode_sessions{server=~\"$server\"}",
+          "legendFormat": "{{ server }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "id": 42,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total Items",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(plex_library_items{server=~\"$server\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "id": 43,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total Storage",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(plex_library_storage_bytes{server=~\"$server\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "id": 44,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Total Duration",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(plex_library_duration_milliseconds{server=~\"$server\"})",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "No",
+                  "color": "yellow"
+                },
+                "1": {
+                  "text": "Yes",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "id": 41,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "title": "Plex Pass",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "count(plex_server_info{server=~\"$server\",plex_pass=\"true\"}) or on() vector(0)",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 102,
+      "title": "Active Sessions",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Play Time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 20,
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Play Time",
+            "desc": true
+          }
+        ]
+      },
+      "title": "Active Sessions",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "plex_play_seconds_total{server=~\"$server\"}",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "server": true,
+              "server_id": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "library_id": true,
+              "library_type": true,
+              "media_type": true,
+              "session": true,
+              "device": true,
+              "hostname": true,
+              "__tenant_id__": true,
+              "grandchild_title": true
+            },
+            "indexByName": {
+              "user": 0,
+              "device_type": 1,
+              "title": 2,
+              "child_title": 3,
+              "grandchild_index": 4,
+              "library": 6,
+              "stream_type": 7,
+              "stream_resolution": 8,
+              "stream_file_resolution": 9,
+              "transcode_type": 10,
+              "subtitle_action": 11,
+              "location": 12,
+              "local": 13,
+              "Value": 14
+            },
+            "renameByName": {
+              "library": "Library",
+              "title": "Title",
+              "child_title": "Season",
+              "grandchild_index": "Episode",
+              "user": "User",
+              "device_type": "Client",
+              "stream_type": "Stream",
+              "stream_resolution": "Resolution",
+              "stream_file_resolution": "File Resolution",
+              "transcode_type": "Transcode",
+              "subtitle_action": "Subtitles",
+              "location": "Location",
+              "local": "Local",
+              "Value": "Play Time"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kbps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "id": 21,
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "title": "Session Bandwidth",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(plex_session_bandwidth_kbps{server=~\"$server\"}) by (server)",
+          "legendFormat": "{{ server }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kbps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "id": 22,
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "title": "Session Bitrate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(plex_session_bitrate_kbps{server=~\"$server\"}) by (server)",
+          "legendFormat": "{{ server }}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 101,
+      "title": "Library Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Items"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Storage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 10,
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Storage",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": [
+            "Items",
+            "Storage",
+            "Duration"
+          ]
+        }
+      },
+      "title": "",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "sum by (library) (plex_library_items{server=~\"$server\"})",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (library) (plex_library_storage_bytes{server=~\"$server\"})",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (library) (plex_library_duration_milliseconds{server=~\"$server\"})",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "library",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time #A": true,
+              "Time #B": true,
+              "Time #C": true
+            },
+            "indexByName": {
+              "library": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3
+            },
+            "renameByName": {
+              "library": "Library",
+              "Value #A": "Items",
+              "Value #B": "Storage",
+              "Value #C": "Duration"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 103,
+      "title": "Resources",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 30,
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "title": "CPU Utilization",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "plex_host_cpu_utilization_ratio{server=~\"$server\"}",
+          "legendFormat": "{{ server }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 20
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 31,
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "title": "Memory Utilization",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "plex_host_memory_utilization_ratio{server=~\"$server\"}",
+          "legendFormat": "{{ server }}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "id": 50,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "title": "Library Growth (30d)",
+      "description": "Items added to each library section in the last 30 days",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "delta(plex_library_items{server=~\"$server\"}[30d])",
+          "legendFormat": "{{library}}",
+          "refId": "A"
+        }
+      ]
+    }
   ],
-  "schemaVersion":39,
-  "tags":["plex","prometheus"],
-  "templating":{"list":[{"current":{},"datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"definition":"label_values(plex_server_info, server)","includeAll":true,"multi":true,"name":"server","query":{"query":"label_values(plex_server_info, server)"},"refresh":2,"type":"query"}]},
-  "time":{"from":"now-1h","to":"now"},
-  "timepicker":{},
-  "timezone":"",
-  "title":"Plex Media Server",
-  "uid":"plex-exporter",
-  "version":1
+  "schemaVersion": 39,
+  "tags": [
+    "plex",
+    "prometheus"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "Mimir",
+          "value": "mimir"
+        },
+        "hide": 0
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(plex_server_info, server)",
+        "includeAll": true,
+        "multi": true,
+        "name": "server",
+        "query": {
+          "query": "label_values(plex_server_info, server)"
+        },
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Plex Media Server",
+  "uid": "plex-exporter",
+  "version": 1
 }
