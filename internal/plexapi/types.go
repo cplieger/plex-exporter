@@ -79,7 +79,6 @@ type SessionMetadata struct {
 	GrandparentTitle string      `json:"grandparentTitle"`
 	ParentTitle      string      `json:"parentTitle"`
 	Title            string      `json:"title"`
-	Index            int         `json:"index"`
 	Type             string      `json:"type"`
 	LibrarySectionID json.Number `json:"librarySectionID"`
 	SessionKey       string      `json:"sessionKey"`
@@ -97,6 +96,7 @@ type SessionMetadata struct {
 		Bandwidth int    `json:"bandwidth"`
 	} `json:"Session"`
 	Media []MediaInfo `json:"Media"`
+	Index int         `json:"index"`
 }
 
 // MetadataListResponse is shared by /status/sessions and
