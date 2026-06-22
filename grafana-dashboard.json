@@ -910,6 +910,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "palette-classic"
           },
@@ -991,8 +992,9 @@
       }
     ]
   },
+  "refresh": "30s",
   "time": {
-    "from": "now-1h",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {},
