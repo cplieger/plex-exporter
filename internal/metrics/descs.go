@@ -14,7 +14,7 @@ var (
 	PlayLabels = []string{
 		LabelServer, LabelServerID,
 		"library", "library_id", "library_type",
-		"media_type", "title", "child_title", "grandchild_title",
+		"media_type", "title", "child_title", "grandchild_title", "grandchild_index",
 		"stream_type", "stream_resolution", "stream_file_resolution",
 		"device", "device_type", "user", "session",
 		"transcode_type", "subtitle_action", "location", "local",

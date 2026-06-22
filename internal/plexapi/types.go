@@ -79,6 +79,7 @@ type SessionMetadata struct {
 	GrandparentTitle string      `json:"grandparentTitle"`
 	ParentTitle      string      `json:"parentTitle"`
 	Title            string      `json:"title"`
+	Index            int         `json:"index"`
 	Type             string      `json:"type"`
 	LibrarySectionID json.Number `json:"librarySectionID"`
 	SessionKey       string      `json:"sessionKey"`

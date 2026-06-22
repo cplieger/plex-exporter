@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strconv"
 	"time"
 	"unicode/utf8"
 
@@ -202,6 +203,7 @@ func sessionLabelValues(
 	libName, libID, libType := resolveLibrary(sess, libByID)
 
 	title, childTitle, grandchildTitle := sessionLabels(&sess.MediaMeta)
+	grandchildIndex := sessionIndex(&sess.MediaMeta)
 
 	ttype := orDefault(sess.TranscodeType, metrics.ValNone)
 	if ttype == metrics.ValPending {
@@ -215,7 +217,7 @@ func sessionLabelValues(
 	return []string{
 		srvName, srvID, libName, libID, libType,
 		metrics.MediaTypeAllowlist.Normalize(sess.MediaMeta.Type),
-		truncLabel(title), truncLabel(childTitle), truncLabel(grandchildTitle),
+		truncLabel(title), truncLabel(childTitle), truncLabel(grandchildTitle), grandchildIndex,
 		metrics.StreamTypeAllowlist.Normalize(streamType),
 		metrics.ResolutionAllowlist.Normalize(streamRes),
 		metrics.ResolutionAllowlist.Normalize(fileRes),
@@ -239,6 +241,20 @@ func sessionLabels(m *plexapi.SessionMetadata) (title, child, grandchild string)
 	default:
 		return m.Title, "", ""
 	}
+}
+
+// sessionIndex returns the episode or track number as a string for
+// episodes and tracks, or "" for movies and other types where Plex's
+// index field is not meaningful. Kept as a separate label
+// (grandchild_index) so grandchild_title continues to carry the name.
+func sessionIndex(m *plexapi.SessionMetadata) string {
+	switch m.Type {
+	case library.TypeEpisode, library.TypeTrack:
+		if m.Index > 0 {
+			return strconv.Itoa(m.Index)
+		}
+	}
+	return ""
 }
 
 // orDefault returns s when non-empty, otherwise def.

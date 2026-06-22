@@ -1334,3 +1334,27 @@ func TestCollectSessions_play_seconds_stopped_uses_prev(t *testing.T) {
 		t.Errorf("play_seconds = %v, want ~5 (prevPlayedTime)", val)
 	}
 }
+
+// TestSessionIndex pins the grandchild_index label derivation: episodes and
+// tracks expose their Plex index (episode/track number) as a string; movies
+// and other types, and a missing/zero index, yield "".
+func TestSessionIndex(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+		want string
+	}{
+		{"episode with index", `{"type":"episode","index":5}`, "5"},
+		{"track with index", `{"type":"track","index":12}`, "12"},
+		{"movie has no episode number", `{"type":"movie","index":0}`, ""},
+		{"episode missing index", `{"type":"episode"}`, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := testMeta(t, tc.json)
+			if got := sessionIndex(&m); got != tc.want {
+				t.Errorf("sessionIndex(%s) = %q, want %q", tc.json, got, tc.want)
+			}
+		})
+	}
+}
