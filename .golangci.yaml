@@ -52,7 +52,10 @@ linters:
       require-specific: true
   exclusions:
     presets:
-      - comments
+      # `comments` preset removed: revive's `exported` (every exported symbol
+      # needs a doc comment starting with its name) and `package-comments`
+      # (every package needs a doc comment) are now enforced fleet-wide.
+      # All consumer repos were updated before this change was propagated.
       - std-error-handling
       - common-false-positives
       - legacy
