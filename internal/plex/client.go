@@ -11,9 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/httpx"
+	"github.com/cplieger/httpx/v2"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
@@ -22,11 +23,13 @@ import (
 // /status/sessions and /library responses with headroom.
 const MaxResponseBody = 10 << 20 // 10 MB
 
-// Retry transport defaults installed by NewClient. defaultMaxRetries is the
-// number of retries *after* the initial attempt, so 2 == 3 total attempts.
-// defaultRetryBaseDelay matches the prior hand-rolled retryBaseDelay default.
+// Retry transport defaults installed by NewClient. defaultMaxAttempts is the
+// TOTAL number of attempts including the first, so 3 == initial attempt + 2
+// retries. (httpx v2's WithRTMaxAttempts counts total attempts, replacing v1's
+// WithMaxRetries, which counted retries-beyond-first.) defaultRetryBaseDelay
+// matches the prior hand-rolled retryBaseDelay default.
 const (
-	defaultMaxRetries     = 2
+	defaultMaxAttempts    = 3
 	defaultRetryBaseDelay = 100 * time.Millisecond
 )
 
@@ -54,6 +57,7 @@ func (e *HTTPStatusError) Error() string {
 type Client struct {
 	HTTPClient *http.Client
 	BaseURL    *url.URL
+	retries    *atomic.Int64
 	Token      string
 }
 
@@ -66,7 +70,7 @@ type Client struct {
 // The transport is wrapped in an httpx retry round-tripper that retries
 // 429/502/503/504 responses and transient transport errors with jittered
 // exponential backoff, HONORING the Retry-After header on 429. Retry count
-// and base delay are fixed at construction (see defaultMaxRetries /
+// and base delay are fixed at construction (see defaultMaxAttempts /
 // defaultRetryBaseDelay); every Get on the returned Client benefits from
 // this without a per-call retry loop.
 //
@@ -98,14 +102,20 @@ func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 		base = tr
 	}
 
+	// retries counts every retry attempt the round-tripper makes (via the
+	// WithOnRetry hook below); surfaced as the plex_http_retries_total metric.
+	retries := new(atomic.Int64)
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 		// Retry transport wraps the (CA-pinned or default) base transport.
 		// It honors Retry-After on 429 and retries 429/502/503/504 +
 		// transient transport errors with jittered exponential backoff.
 		Transport: httpx.NewRetryRoundTripper(base,
-			httpx.WithMaxRetries(defaultMaxRetries),
+			httpx.WithRTMaxAttempts(defaultMaxAttempts),
 			httpx.WithRTBaseDelay(defaultRetryBaseDelay),
+			httpx.WithOnRetry(func(int, *http.Request, *http.Response, error) {
+				retries.Add(1)
+			}),
 		),
 		// Plex's API does not issue redirects; refuse to follow any. Go's
 		// default CheckRedirect forwards custom headers (including
@@ -115,7 +125,18 @@ func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &Client{BaseURL: parsed, Token: token, HTTPClient: httpClient}, nil
+	return &Client{BaseURL: parsed, Token: token, HTTPClient: httpClient, retries: retries}, nil
+}
+
+// Retries returns the cumulative number of HTTP retry attempts the retry
+// round-tripper has performed across all requests on this client; it is
+// surfaced as the plex_http_retries_total metric. Returns 0 for clients not
+// built by NewClient (e.g. test fixtures), which install no retry hook.
+func (c *Client) Retries() int64 {
+	if c.retries == nil {
+		return 0
+	}
+	return c.retries.Load()
 }
 
 // plexTLSTransport builds a CA-pinned *http.Transport from caCertPath. TLS

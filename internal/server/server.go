@@ -213,6 +213,7 @@ type Snapshot struct {
 	ActiveTranscodes  int
 	HTTPReachable     float64
 	SessionsReachable float64
+	Retries           float64
 }
 
 // Snapshot returns a consistent point-in-time copy of the server's
@@ -245,6 +246,9 @@ func (s *Server) Snapshot() Snapshot {
 	}
 	if s.SessionsReachable {
 		snap.SessionsReachable = 1.0
+	}
+	if s.Client != nil {
+		snap.Retries = float64(s.Client.Retries())
 	}
 	return snap
 }

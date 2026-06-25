@@ -470,9 +470,9 @@ func TestCollectServerMetrics(t *testing.T) {
 
 	ms := drainMetrics(ch)
 	// Base: server_info, cpu, mem, transmit, active_transcodes,
-	// http_reachable, session_poll_reachable + len(metrics.ErrorTypes) error counters.
+	// http_reachable, session_poll_reachable, http_retries + len(metrics.ErrorTypes) error counters.
 	// Plus: 2x lib_duration, 2x lib_storage, 1x lib_items (only Movies has count>0), est_transmit
-	want := 7 + len(metrics.ErrorTypes) + 5 + 1
+	want := 8 + len(metrics.ErrorTypes) + 5 + 1
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 		for i, m := range ms {
@@ -495,8 +495,8 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 
 	ms := drainMetrics(ch)
 	// Base: server_info, cpu, mem, transmit, active_transcodes,
-	// http_reachable, session_poll_reachable + len(metrics.ErrorTypes) error counters, est_transmit.
-	want := 7 + len(metrics.ErrorTypes) + 1
+	// http_reachable, session_poll_reachable, http_retries + len(metrics.ErrorTypes) error counters, est_transmit.
+	want := 8 + len(metrics.ErrorTypes) + 1
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 	}
@@ -705,9 +705,9 @@ func TestCollectWithActiveSessions(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base 7 (+ metrics.ErrorTypes) + 1 lib_duration + 1 lib_storage
+	// Base 8 (+ metrics.ErrorTypes) + 1 lib_duration + 1 lib_storage
 	// + 1 lib_items + play_count + play_seconds + session_bandwidth + session_bitrate + est_transmit.
-	want := 7 + len(metrics.ErrorTypes) + 3 + 5
+	want := 8 + len(metrics.ErrorTypes) + 3 + 5
 	if len(ms) != want {
 		t.Errorf("Collect with sessions produced %d metrics, want %d", len(ms), want)
 	}
@@ -812,9 +812,9 @@ func TestCollectMultipleLibraries(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base 7 (+ metrics.ErrorTypes) + 3x lib_duration, 3x lib_storage,
+	// Base 8 (+ metrics.ErrorTypes) + 3x lib_duration, 3x lib_storage,
 	// 3x lib_items, + est_transmit.
-	want := 7 + len(metrics.ErrorTypes) + 9 + 1
+	want := 8 + len(metrics.ErrorTypes) + 9 + 1
 	if len(ms) != want {
 		t.Errorf("Collect multi-lib produced %d metrics, want %d", len(ms), want)
 	}
