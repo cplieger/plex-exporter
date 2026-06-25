@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/cplieger/httpx"
+	"github.com/cplieger/httpx/v2"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
