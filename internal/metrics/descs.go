@@ -90,6 +90,10 @@ var (
 	DescSessionPollReachable = prometheus.NewDesc(
 		"plex_session_poll_reachable", "Session poll reachability (1=last /status/sessions poll succeeded, 0=failed)",
 		SrvLabels, nil)
+	DescHTTPRetries = prometheus.NewDesc(
+		"plex_http_retries_total",
+		"Total HTTP retries performed by the Plex client's retry round-tripper (httpx) across all requests",
+		SrvLabels, nil)
 	DescErrors = prometheus.NewDesc(
 		"plex_exporter_errors_total",
 		"Plex exporter error count by type",
@@ -106,7 +110,7 @@ var AllDescs = []*prometheus.Desc{
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
 	DescEstTransmitBytes,
-	DescHTTPReachable, DescSessionPollReachable, DescErrors,
+	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors,
 }
 
 // ErrorTypes is the bounded allowlist of `type` label values emitted on

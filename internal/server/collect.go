@@ -41,6 +41,7 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 		float64(snap.ActiveTranscodes), snap.Name, snap.ID)
 	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPReachable, prometheus.GaugeValue, snap.HTTPReachable, snap.Name, snap.ID)
 	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable, snap.Name, snap.ID)
+	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPRetries, prometheus.CounterValue, snap.Retries, snap.Name, snap.ID)
 
 	// Emit one sample per known error type. Always emit all so
 	// rate()/increase() return zero rather than stale values.

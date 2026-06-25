@@ -18,10 +18,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/cplieger/httpx"
+	"github.com/cplieger/httpx/v2"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
@@ -354,5 +355,51 @@ func TestNewPlexClient_invalid_url_returns_error(t *testing.T) {
 	_, err := NewClient("://missing-scheme", "tok", "")
 	if err == nil {
 		t.Fatal("NewClient with invalid URL should return error")
+	}
+}
+
+// TestNewClient_counts_retries verifies the WithOnRetry hook installed by
+// NewClient increments the client's retry counter (surfaced as the
+// plex_http_retries_total metric). The server returns one 503 (retried by the
+// round-tripper) then 200, so exactly one retry is recorded.
+func TestNewClient_counts_retries(t *testing.T) {
+	var calls atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable) // retried by the round-tripper
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"MediaContainer":{"friendlyName":"TestPlex"}}`))
+	}))
+	defer ts.Close()
+
+	c, err := NewClient(ts.URL, "tok", "")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if got := c.Retries(); got != 0 {
+		t.Fatalf("Retries() before any request = %d, want 0", got)
+	}
+
+	var resp plexapi.MC[plexapi.ServerIdentity]
+	if err := c.Get(context.Background(), "/", &resp); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if resp.MediaContainer.FriendlyName != "TestPlex" {
+		t.Errorf("friendlyName = %q, want TestPlex", resp.MediaContainer.FriendlyName)
+	}
+	if got := c.Retries(); got != 1 {
+		t.Errorf("Retries() = %d, want 1 (one 503 retried to 200)", got)
+	}
+}
+
+// TestClient_Retries_nil_safe confirms a Client built without NewClient (no
+// retry hook installed, e.g. a test fixture) reports zero retries rather than
+// panicking on the nil counter.
+func TestClient_Retries_nil_safe(t *testing.T) {
+	var c Client
+	if got := c.Retries(); got != 0 {
+		t.Errorf("Retries() on zero-value Client = %d, want 0", got)
 	}
 }
