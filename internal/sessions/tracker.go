@@ -163,19 +163,36 @@ func (t *Tracker) UpdateTranscode(transcodeKey, kind, subtitle string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// Fast path: indexed lookup by bare transcode key.
-	for bareKey, sessKey := range t.transcodeIndex {
-		if strings.Contains(transcodeKey, bareKey) {
-			if ss, ok := t.Sessions[sessKey]; ok {
-				ss.TranscodeType = kind
-				ss.SubtitleAction = subtitle
-				t.Sessions[sessKey] = ss
-				return true
-			}
-		}
+	if t.matchTranscodeByIndex(transcodeKey, kind, subtitle) {
+		return true
 	}
+	return t.matchTranscodeByScan(transcodeKey, kind, subtitle)
+}
 
-	// Fallback: check each session's stored TranscodeKey and Part URLs.
+// matchTranscodeByIndex is the fast path: it resolves transcodeKey through the
+// bareKey→sessionKey index and applies the classification to the indexed
+// session. Returns false when the index misses. Caller must hold t.mu.
+func (t *Tracker) matchTranscodeByIndex(transcodeKey, kind, subtitle string) bool {
+	for bareKey, sessKey := range t.transcodeIndex {
+		if !strings.Contains(transcodeKey, bareKey) {
+			continue
+		}
+		ss, ok := t.Sessions[sessKey]
+		if !ok {
+			continue
+		}
+		ss.TranscodeType = kind
+		ss.SubtitleAction = subtitle
+		t.Sessions[sessKey] = ss
+		return true
+	}
+	return false
+}
+
+// matchTranscodeByScan is the fallback when the index misses: it checks each
+// session's stored TranscodeKey (back-populating the index on a hit) and then
+// its media Part URLs. Caller must hold t.mu.
+func (t *Tracker) matchTranscodeByScan(transcodeKey, kind, subtitle string) bool {
 	for k := range t.Sessions {
 		ss := t.Sessions[k]
 		if ss.TranscodeKey != "" && strings.Contains(transcodeKey, ss.TranscodeKey) {
@@ -186,14 +203,23 @@ func (t *Tracker) UpdateTranscode(transcodeKey, kind, subtitle string) bool {
 			t.transcodeIndex[ss.TranscodeKey] = k
 			return true
 		}
-		for _, m := range ss.Meta.Media {
-			for _, p := range m.Part {
-				if p.Key != "" && strings.Contains(p.Key, transcodeKey) {
-					ss.TranscodeType = kind
-					ss.SubtitleAction = subtitle
-					t.Sessions[k] = ss
-					return true
-				}
+		if mediaPartContains(ss.Meta.Media, transcodeKey) {
+			ss.TranscodeType = kind
+			ss.SubtitleAction = subtitle
+			t.Sessions[k] = ss
+			return true
+		}
+	}
+	return false
+}
+
+// mediaPartContains reports whether any Part URL in media contains
+// transcodeKey as a substring.
+func mediaPartContains(media []plexapi.MediaInfo, transcodeKey string) bool {
+	for _, m := range media {
+		for _, p := range m.Part {
+			if p.Key != "" && strings.Contains(p.Key, transcodeKey) {
+				return true
 			}
 		}
 	}

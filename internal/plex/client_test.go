@@ -148,7 +148,8 @@ func TestGetWithHeaders(t *testing.T) {
 }
 
 func TestGetWithHeaders_invalid_url_returns_error(t *testing.T) {
-	// Targets uncovered line 191-193: url.Parse error path.
+	// The url.Parse error path: a malformed request path must surface as an
+	// error rather than being silently dropped.
 	parsed, _ := url.Parse("http://localhost")
 	client := &Client{
 		HTTPClient: &http.Client{},
