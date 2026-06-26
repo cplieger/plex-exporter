@@ -278,29 +278,42 @@ func (s *Server) refreshLibraryItems(ctx context.Context) {
 		go func() {
 			defer wg.Done()
 			for i := range ch {
-				lb := &libs[i]
-				for _, typ := range library.ItemCountTypes(lb.Type) {
-					if count, ok := s.tryItemCount(ctx, lb.ID, typ); ok {
-						lb.ItemsCount = count
-						break
-					}
-				}
-				if lb.ItemsCount == 0 {
-					slog.Debug("library item count unavailable",
-						"library", lb.Name, "id", lb.ID, "type", lb.Type)
-				}
+				s.fillItemCount(ctx, &libs[i])
 			}
 		}()
 	}
 	wg.Wait()
 
+	s.writeBackItemCounts(libs)
+}
+
+// fillItemCount sets lb.ItemsCount from the first item-count query that
+// returns a positive result for the library's type. When no query yields a
+// positive count it logs at debug and leaves any existing count untouched.
+func (s *Server) fillItemCount(ctx context.Context, lb *library.Library) {
+	for _, typ := range library.ItemCountTypes(lb.Type) {
+		if count, ok := s.tryItemCount(ctx, lb.ID, typ); ok {
+			lb.ItemsCount = count
+			return
+		}
+	}
+	if lb.ItemsCount == 0 {
+		slog.Debug("library item count unavailable",
+			"library", lb.Name, "id", lb.ID, "type", lb.Type)
+	}
+}
+
+// writeBackItemCounts copies refreshed item counts back into s.Libraries
+// under the lock, matching by index and ID so a library-list rebuild that
+// raced with the fetch can't write a count onto the wrong section.
+func (s *Server) writeBackItemCounts(libs []library.Library) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, lb := range libs {
 		if i < len(s.Libraries) && s.Libraries[i].ID == lb.ID {
 			s.Libraries[i].ItemsCount = lb.ItemsCount
 		}
 	}
-	s.mu.Unlock()
 }
 
 // tryItemCount fetches the item count for a library section.
@@ -396,6 +409,13 @@ func (s *Server) RunSessionPollLoop(ctx context.Context) {
 	}
 }
 
+// sessionWork pairs a validated active session with its parsed playback
+// state, carried through the metadata-fetch and tracker-apply passes.
+type sessionWork struct {
+	sess  *plexapi.SessionMetadata
+	state sessions.State
+}
+
 // RefreshSessions fetches /status/sessions, applies each active session
 // to the tracker, classifies transcode state inline (from the embedded
 // TranscodeSession element), and fills library labels via
@@ -415,16 +435,24 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	// "no one watching" poll correctly reads 1 rather than going stale.
 	s.SetSessionsReachable(true)
 
-	activeSessions := sessResp.MediaContainer.Metadata
-	if len(activeSessions) == 0 {
+	work := s.buildSessionWork(sessResp.MediaContainer.Metadata)
+	if len(work) == 0 {
 		return
 	}
 
-	// Validate rating keys and build the work set.
-	type sessionWork struct {
-		sess  *plexapi.SessionMetadata
-		state sessions.State
+	mediaResults := s.fetchSessionMedia(fetchCtx, work)
+
+	libs := s.SnapshotLibraries()
+	for i := range work {
+		s.applySessionUpdate(&work[i], mediaResults[i], libs)
 	}
+}
+
+// buildSessionWork validates active sessions and pairs each kept session
+// with its parsed playback state. Sessions with an empty key are skipped,
+// and a non-numeric rating key is dropped (and recorded) so the later
+// /library/metadata/<key> fetch is never built from unvalidated input.
+func (s *Server) buildSessionWork(activeSessions []plexapi.SessionMetadata) []sessionWork {
 	work := make([]sessionWork, 0, len(activeSessions))
 	for i := range activeSessions {
 		m := &activeSessions[i]
@@ -436,19 +464,20 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 			s.RecordError("invalid_rating_key")
 			continue
 		}
-		state := sessions.ParseState(m.Player.State)
-		work = append(work, sessionWork{sess: m, state: state})
+		work = append(work, sessionWork{sess: m, state: sessions.ParseState(m.Player.State)})
 	}
+	return work
+}
 
-	if len(work) == 0 {
-		return
-	}
-
-	// Batch fetch /library/metadata/<ratingKey> concurrently for library labels.
+// fetchSessionMedia fetches /library/metadata/<ratingKey> for each work item
+// concurrently (at most 4 in flight) and returns the metadata keyed by work
+// index. A fetch error or empty response leaves that index unset, so the
+// caller still applies session state without library labels.
+func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) map[int]*plexapi.SessionMetadata {
 	var mu sync.Mutex
-	mediaResults := make(map[int]*plexapi.SessionMetadata, len(work))
+	results := make(map[int]*plexapi.SessionMetadata, len(work))
 
-	g, gctx := errgroup.WithContext(fetchCtx)
+	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(min(4, len(work)))
 	for i, w := range work {
 		g.Go(func() error {
@@ -463,52 +492,51 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 				return nil
 			}
 			mu.Lock()
-			mediaResults[i] = &metaResp.MediaContainer.Metadata[0]
+			results[i] = &metaResp.MediaContainer.Metadata[0]
 			mu.Unlock()
 			return nil
 		})
 	}
 	_ = g.Wait()
+	return results
+}
 
-	// Apply state updates.
-	libs := s.SnapshotLibraries()
-	for i, w := range work {
-		media := mediaResults[i]
-		if media == nil {
-			// Still update the tracker with session state even without library metadata.
-			s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, nil)
-		} else {
-			s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, media)
-			s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
-				fillSessionLibrary(ss, media, libs)
-			})
-		}
-
-		// Classify transcode inline from the embedded TranscodeSession.
-		if w.sess.TranscodeSession != nil {
-			ts := w.sess.TranscodeSession
-			kind := sessions.TranscodeKind(ts)
-			subtitle := sessions.SubtitleAction(ts)
-
-			// Apply directly via UpdateTranscode if the session has a transcode key,
-			// otherwise set it on the session via UpdateLibraryLabels.
-			if ts.Key != "" {
-				matched := s.Sessions.UpdateTranscode(ts.Key, kind, subtitle)
-				if !matched {
-					// Direct set on the session when index doesn't match.
-					s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
-						ss.TranscodeType = kind
-						ss.SubtitleAction = subtitle
-					})
-				}
-			} else {
-				s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
-					ss.TranscodeType = kind
-					ss.SubtitleAction = subtitle
-				})
-			}
-		}
+// applySessionUpdate feeds one session's state into the tracker, attaches
+// library labels when metadata was fetched, and classifies any transcode.
+func (s *Server) applySessionUpdate(w *sessionWork, media *plexapi.SessionMetadata, libs []library.Library) {
+	if media == nil {
+		// Still update the tracker with session state even without library metadata.
+		s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, nil)
+	} else {
+		s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, media)
+		s.Sessions.UpdateLibraryLabels(w.sess.SessionKey, func(ss *sessions.Session) {
+			fillSessionLibrary(ss, media, libs)
+		})
 	}
+	s.classifyTranscode(w.sess)
+}
+
+// classifyTranscode derives transcode kind and subtitle action from the
+// session's embedded TranscodeSession and writes them to the tracker,
+// preferring a transcode-key index match and falling back to a direct set
+// on the session. No-op when the session carries no TranscodeSession.
+func (s *Server) classifyTranscode(sess *plexapi.SessionMetadata) {
+	ts := sess.TranscodeSession
+	if ts == nil {
+		return
+	}
+	kind := sessions.TranscodeKind(ts)
+	subtitle := sessions.SubtitleAction(ts)
+
+	// A keyed transcode that matches the index is fully applied there;
+	// otherwise set the classification directly on the session.
+	if ts.Key != "" && s.Sessions.UpdateTranscode(ts.Key, kind, subtitle) {
+		return
+	}
+	s.Sessions.UpdateLibraryLabels(sess.SessionKey, func(ss *sessions.Session) {
+		ss.TranscodeType = kind
+		ss.SubtitleAction = subtitle
+	})
 }
 
 // fillSessionLibrary populates library labels on ss when missing, using the
