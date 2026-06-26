@@ -74,10 +74,122 @@ func recordInt64(r slog.Record, key string) (int64, bool) {
 
 const prunedSummaryMsg = "pruned expired sessions"
 
+func TestTrackerPrune(t *testing.T) {
+	tracker := NewTracker()
+
+	tracker.mu.Lock()
+	tracker.Sessions["old"] = Session{
+		State:      StateStopped,
+		LastUpdate: time.Now().Add(-2 * SessionTimeout),
+	}
+	tracker.Sessions["recent"] = Session{
+		State:      StateStopped,
+		LastUpdate: time.Now(),
+	}
+	tracker.Sessions["playing_fresh"] = Session{
+		State:      StatePlaying,
+		LastUpdate: time.Now().Add(-2 * SessionTimeout),
+	}
+	tracker.Sessions["playing_stale"] = Session{
+		// Non-stopped but silent longer than StaleSessionTimeout — orphaned.
+		State:      StatePlaying,
+		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
+	}
+	tracker.Sessions["paused_stale"] = Session{
+		State:      State("paused"),
+		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
+	}
+	tracker.mu.Unlock()
+
+	tracker.Prune()
+
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+
+	if _, ok := tracker.Sessions["old"]; ok {
+		t.Error("old stopped session should be pruned")
+	}
+	if _, ok := tracker.Sessions["recent"]; !ok {
+		t.Error("recent stopped session should be kept")
+	}
+	if _, ok := tracker.Sessions["playing_fresh"]; !ok {
+		t.Error("playing session idle less than StaleSessionTimeout should be kept")
+	}
+	if _, ok := tracker.Sessions["playing_stale"]; ok {
+		t.Error("playing session idle longer than StaleSessionTimeout should be pruned")
+	}
+	if _, ok := tracker.Sessions["paused_stale"]; ok {
+		t.Error("paused session idle longer than StaleSessionTimeout should be pruned")
+	}
+}
+
+// TestTrackerPrune_stale_boundary covers the threshold edge: a non-stopped
+// session idle for less than StaleSessionTimeout must NOT be pruned, one
+// idle past it must be.
+func TestTrackerPrune_stale_boundary(t *testing.T) {
+	tracker := NewTracker()
+
+	tracker.mu.Lock()
+	// Well under the threshold — should be kept.
+	tracker.Sessions["under_threshold"] = Session{
+		State:      StatePlaying,
+		LastUpdate: time.Now().Add(-StaleSessionTimeout + time.Minute),
+	}
+	// Just past the threshold — should be pruned.
+	tracker.Sessions["past_threshold"] = Session{
+		State:      StatePlaying,
+		LastUpdate: time.Now().Add(-StaleSessionTimeout - time.Second),
+	}
+	tracker.mu.Unlock()
+
+	tracker.Prune()
+
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+
+	if _, ok := tracker.Sessions["under_threshold"]; !ok {
+		t.Error("session idle under StaleSessionTimeout should be kept")
+	}
+	if _, ok := tracker.Sessions["past_threshold"]; ok {
+		t.Error("session idle past StaleSessionTimeout should be pruned")
+	}
+}
+
+// TestSessionTrackerPrune_exact_timeout_boundary checks the stopped-session
+// timeout edge: a session stopped within SessionTimeout must be kept and one
+// stopped past it must be pruned (the guard is strictly greater-than, so the
+// boundary itself is retained).
+func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
+	tracker := NewTracker()
+
+	// Session stopped just barely within the timeout — should be kept
+	tracker.mu.Lock()
+	tracker.Sessions["barely_within"] = Session{
+		State:      StateStopped,
+		LastUpdate: time.Now().Add(-SessionTimeout + 100*time.Millisecond),
+	}
+	// Session stopped well past the timeout — should be pruned
+	tracker.Sessions["well_past"] = Session{
+		State:      StateStopped,
+		LastUpdate: time.Now().Add(-SessionTimeout - time.Second),
+	}
+	tracker.mu.Unlock()
+
+	tracker.Prune()
+
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+
+	if _, ok := tracker.Sessions["barely_within"]; !ok {
+		t.Error("barely_within should be kept (within timeout)")
+	}
+	if _, ok := tracker.Sessions["well_past"]; ok {
+		t.Error("well_past should be pruned (past timeout)")
+	}
+}
+
 // TestTrackerPrune_no_removals_emits_no_summary verifies that when nothing is
 // reclaimed, Prune does NOT emit the "pruned expired sessions" debug summary.
-// This pins the `pruned > 0 || stale > 0` boundary: a `>=` mutant would emit
-// the summary even though both counters are zero.
 func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 	getRecords := captureSlog(t, slog.LevelDebug)
 
@@ -99,8 +211,6 @@ func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 
 // TestTrackerPrune_stopped_removal_logs_stopped_count verifies that pruning a
 // single expired stopped session emits the summary with stopped=1, stale=0.
-// This pins `pruned++` (a `--` mutant makes pruned negative, closing the
-// `pruned > 0` gate so no summary is emitted) and the `pruned > 0` negation.
 func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 	getRecords := captureSlog(t, slog.LevelDebug)
 
@@ -128,8 +238,7 @@ func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 
 // TestTrackerPrune_stale_removal_logs_stale_count verifies that pruning a
 // single orphaned non-stopped session emits the summary with stale=1,
-// stopped=0. This pins `stale++` (a `--` mutant closes the `stale > 0` gate)
-// and the `stale > 0` negation in the summary guard.
+// stopped=0.
 func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 	getRecords := captureSlog(t, slog.LevelDebug)
 
@@ -156,9 +265,8 @@ func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 }
 
 // TestTrackerPrune_removes_transcode_index_entry verifies that pruning a
-// session that carries a TranscodeKey also evicts its transcodeIndex entry.
-// This pins the `s.TranscodeKey != ""` guard: a `== ""` negation mutant would
-// skip the delete and leave a stale index entry behind.
+// session that carries a TranscodeKey also evicts its transcodeIndex entry,
+// so a stale index entry is never left behind.
 func TestTrackerPrune_removes_transcode_index_entry(t *testing.T) {
 	tracker := NewTracker()
 	tracker.mu.Lock()

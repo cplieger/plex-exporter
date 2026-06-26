@@ -43,16 +43,6 @@ func TestIsLibraryType(t *testing.T) {
 	}
 }
 
-func TestIsLibraryType_valid_types_exhaustive(t *testing.T) {
-	// Verify the exact set of valid types
-	validTypes := []string{"movie", "show", "artist", "photo", "homevideo"}
-	for _, v := range validTypes {
-		if !IsType(v) {
-			t.Errorf("IsType(%q) = false, want true", v)
-		}
-	}
-}
-
 func TestIsLibraryType_random_strings_mostly_false(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		s := rapid.String().Draw(t, "type")
@@ -74,7 +64,7 @@ func TestContentTypeLabel_always_returns_non_empty(t *testing.T) {
 	})
 }
 
-// --- Tests: Build (l-f8) ---
+// --- Tests: Build ---
 
 func TestBuild(t *testing.T) {
 	tests := []struct {
@@ -246,7 +236,7 @@ func TestBuild_prevItems_preserved(t *testing.T) {
 	}
 }
 
-// --- Tests: ItemCountTypes (l-f11) ---
+// --- Tests: ItemCountTypes ---
 
 func TestItemCountTypes(t *testing.T) {
 	tests := []struct {

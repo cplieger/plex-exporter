@@ -3,10 +3,12 @@ package sessions
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
@@ -51,87 +53,6 @@ func TestTrackerUpdate_stop_accumulates_time(t *testing.T) {
 	}
 	if tracker.TotalEstimatedKBits == 0 {
 		t.Error("TotalEstimatedKBits should be > 0")
-	}
-}
-
-func TestTrackerPrune(t *testing.T) {
-	tracker := NewTracker()
-
-	tracker.mu.Lock()
-	tracker.Sessions["old"] = Session{
-		State:      StateStopped,
-		LastUpdate: time.Now().Add(-2 * SessionTimeout),
-	}
-	tracker.Sessions["recent"] = Session{
-		State:      StateStopped,
-		LastUpdate: time.Now(),
-	}
-	tracker.Sessions["playing_fresh"] = Session{
-		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-2 * SessionTimeout),
-	}
-	tracker.Sessions["playing_stale"] = Session{
-		// Non-stopped but silent longer than StaleSessionTimeout — orphaned.
-		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
-	}
-	tracker.Sessions["paused_stale"] = Session{
-		State:      State("paused"),
-		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
-	}
-	tracker.mu.Unlock()
-
-	tracker.Prune()
-
-	tracker.mu.Lock()
-	defer tracker.mu.Unlock()
-
-	if _, ok := tracker.Sessions["old"]; ok {
-		t.Error("old stopped session should be pruned")
-	}
-	if _, ok := tracker.Sessions["recent"]; !ok {
-		t.Error("recent stopped session should be kept")
-	}
-	if _, ok := tracker.Sessions["playing_fresh"]; !ok {
-		t.Error("playing session idle less than StaleSessionTimeout should be kept")
-	}
-	if _, ok := tracker.Sessions["playing_stale"]; ok {
-		t.Error("playing session idle longer than StaleSessionTimeout should be pruned (h-f3)")
-	}
-	if _, ok := tracker.Sessions["paused_stale"]; ok {
-		t.Error("paused session idle longer than StaleSessionTimeout should be pruned (h-f3)")
-	}
-}
-
-// TestTrackerPrune_stale_boundary covers the threshold edge: a non-stopped
-// session idle for less than StaleSessionTimeout must NOT be pruned, one
-// idle past it must be.
-func TestTrackerPrune_stale_boundary(t *testing.T) {
-	tracker := NewTracker()
-
-	tracker.mu.Lock()
-	// Well under the threshold — should be kept.
-	tracker.Sessions["under_threshold"] = Session{
-		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-StaleSessionTimeout + time.Minute),
-	}
-	// Just past the threshold — should be pruned.
-	tracker.Sessions["past_threshold"] = Session{
-		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-StaleSessionTimeout - time.Second),
-	}
-	tracker.mu.Unlock()
-
-	tracker.Prune()
-
-	tracker.mu.Lock()
-	defer tracker.mu.Unlock()
-
-	if _, ok := tracker.Sessions["under_threshold"]; !ok {
-		t.Error("session idle under StaleSessionTimeout should be kept")
-	}
-	if _, ok := tracker.Sessions["past_threshold"]; ok {
-		t.Error("session idle past StaleSessionTimeout should be pruned")
 	}
 }
 
@@ -306,10 +227,8 @@ func TestSessionTrackerUpdate_existing_session_updates_when_full(t *testing.T) {
 }
 
 func TestSessionTrackerUpdate_stop_accumulates_estimated_kbits(t *testing.T) {
-	// Targets lived mutants at lines 523 (len(s.Meta.Media) > 0 boundary)
-	// and 526 (elapsed.Seconds() * float64(bitrate) arithmetic).
-	// Verifies that stopping a playing session with media accumulates
-	// totalEstimatedKBits correctly.
+	// Stopping a playing session that carries media accumulates
+	// TotalEstimatedKBits from the elapsed play time and the media bitrate.
 	tracker := NewTracker()
 
 	meta := &plexapi.SessionMetadata{
@@ -343,7 +262,6 @@ func TestSessionTrackerUpdate_stop_accumulates_estimated_kbits(t *testing.T) {
 
 func TestSessionTrackerUpdate_stop_without_media_no_accumulation(t *testing.T) {
 	// When session has no media, stopping should NOT accumulate estimated kbits.
-	// This is the inverse test for the len(s.Meta.Media) > 0 check.
 	tracker := NewTracker()
 
 	// Manually set up a playing session without media
@@ -429,53 +347,191 @@ func TestUpdateLibraryLabels_short_key_unchanged(t *testing.T) {
 	}
 }
 
-func TestNormalizeKey(t *testing.T) {
-	// Direct unit test for the normalizeKey helper.
-	short := "abc123"
-	if got := normalizeKey(short); got != short {
-		t.Errorf("normalizeKey(%q) = %q, want unchanged", short, got)
+// snapshotTranscodeIndex returns a copy of the tracker's transcodeIndex under
+// the tracker lock so tests can assert on the exact set of
+// (transcodeKey -> sessionKey) entries. Always non-nil so an empty result
+// compares equal to an empty map literal.
+func snapshotTranscodeIndex(t *testing.T, tr *Tracker) map[string]string {
+	t.Helper()
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	out := make(map[string]string, len(tr.transcodeIndex))
+	maps.Copy(out, tr.transcodeIndex)
+	return out
+}
+
+// TestUpdateLibraryLabels_transcodeIndexWriteGate pins the two-operand guard
+//
+//	if ss.TranscodeKey != "" && ss.TranscodeKey != oldKey { ... write index ... }
+//
+// in UpdateLibraryLabels by asserting the exact transcodeIndex state after the
+// call, across inputs where each operand changes the outcome. The index entry
+// is written only when the post-fn key is non-empty AND differs from the
+// pre-fn key.
+func TestUpdateLibraryLabels_transcodeIndexWriteGate(t *testing.T) {
+	const id = "sess-1"
+
+	cases := []struct {
+		wantIndex map[string]string
+		name      string
+		preKey    string
+		postKey   string
+	}{
+		{
+			name:      "new non-empty key writes index entry",
+			preKey:    "",
+			postKey:   "tk-new",
+			wantIndex: map[string]string{"tk-new": id},
+		},
+		{
+			name:      "unchanged non-empty key writes nothing",
+			preKey:    "tk-x",
+			postKey:   "tk-x",
+			wantIndex: map[string]string{},
+		},
+		{
+			name:      "cleared key writes nothing",
+			preKey:    "tk-y",
+			postKey:   "",
+			wantIndex: map[string]string{},
+		},
 	}
 
-	exact := strings.Repeat("x", MaxSessionKeyLen)
-	if got := normalizeKey(exact); got != exact {
-		t.Errorf("normalizeKey(len=%d) should be unchanged", MaxSessionKeyLen)
-	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := NewTracker()
+			tr.mu.Lock()
+			tr.Sessions[id] = Session{TranscodeKey: tc.preKey}
+			tr.mu.Unlock()
 
-	long := strings.Repeat("y", MaxSessionKeyLen+50)
-	want := long[:MaxSessionKeyLen]
-	if got := normalizeKey(long); got != want {
-		t.Errorf("normalizeKey(len=%d) = len %d, want len %d", len(long), len(got), MaxSessionKeyLen)
+			tr.UpdateLibraryLabels(id, func(s *Session) {
+				s.TranscodeKey = tc.postKey
+			})
+
+			got := snapshotTranscodeIndex(t, tr)
+			if !maps.Equal(got, tc.wantIndex) {
+				t.Errorf("UpdateLibraryLabels(preKey=%q -> postKey=%q): transcodeIndex = %v, want %v",
+					tc.preKey, tc.postKey, got, tc.wantIndex)
+			}
+		})
 	}
 }
 
-func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
-	// Targets lived mutant at line 542 (time.Since > SessionTimeout boundary).
-	// A session stopped exactly at the timeout boundary should NOT be pruned
-	// (> not >=).
-	tracker := NewTracker()
-
-	// Session stopped just barely within the timeout — should be kept
-	tracker.mu.Lock()
-	tracker.Sessions["barely_within"] = Session{
-		State:      StateStopped,
-		LastUpdate: time.Now().Add(-SessionTimeout + 100*time.Millisecond),
+func TestNormalizeKey(t *testing.T) {
+	// normalizeKey clamps a session key to MaxSessionKeyLen so writes and
+	// lookups always use the same map key. Three regions matter: below the cap
+	// (unchanged), exactly at the cap (unchanged — the limit is inclusive), and
+	// above the cap (truncated to exactly MaxSessionKeyLen bytes).
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"short key unchanged", "abc123", "abc123"},
+		{"below cap unchanged", strings.Repeat("a", MaxSessionKeyLen-1), strings.Repeat("a", MaxSessionKeyLen-1)},
+		{"at cap unchanged", strings.Repeat("b", MaxSessionKeyLen), strings.Repeat("b", MaxSessionKeyLen)},
+		{"one past cap truncated", strings.Repeat("c", MaxSessionKeyLen+1), strings.Repeat("c", MaxSessionKeyLen)},
+		{"well past cap truncated", strings.Repeat("y", MaxSessionKeyLen+50), strings.Repeat("y", MaxSessionKeyLen)},
 	}
-	// Session stopped well past the timeout — should be pruned
-	tracker.Sessions["well_past"] = Session{
-		State:      StateStopped,
-		LastUpdate: time.Now().Add(-SessionTimeout - time.Second),
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := normalizeKey(tc.in); got != tc.want {
+				t.Errorf("normalizeKey(len=%d) = %q (len %d), want len %d",
+					len(tc.in), got, len(got), len(tc.want))
+			}
+		})
 	}
-	tracker.mu.Unlock()
+}
 
-	tracker.Prune()
+// TestUpdateTranscode covers the three correlation paths and the no-match
+// case. The transcode index is the fast path; the fallback scan checks each
+// session's stored TranscodeKey (and back-populates the index on a hit) before
+// scanning media Part URLs.
+func TestUpdateTranscode(t *testing.T) {
+	t.Run("index fast path matches and sets classification", func(t *testing.T) {
+		tr := NewTracker()
+		tr.mu.Lock()
+		tr.Sessions["sess1"] = Session{State: StatePlaying}
+		tr.transcodeIndex["bare-key"] = "sess1"
+		tr.mu.Unlock()
 
-	tracker.mu.Lock()
-	defer tracker.mu.Unlock()
+		if !tr.UpdateTranscode("/transcode/bare-key/0", metrics.ValVideo, metrics.ValBurn) {
+			t.Fatal("UpdateTranscode should match via the transcode index")
+		}
 
-	if _, ok := tracker.Sessions["barely_within"]; !ok {
-		t.Error("barely_within should be kept (within timeout)")
-	}
-	if _, ok := tracker.Sessions["well_past"]; ok {
-		t.Error("well_past should be pruned (past timeout)")
-	}
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		s := tr.Sessions["sess1"]
+		if s.TranscodeType != metrics.ValVideo {
+			t.Errorf("TranscodeType = %q, want %q", s.TranscodeType, metrics.ValVideo)
+		}
+		if s.SubtitleAction != metrics.ValBurn {
+			t.Errorf("SubtitleAction = %q, want %q", s.SubtitleAction, metrics.ValBurn)
+		}
+	})
+
+	t.Run("fallback by stored TranscodeKey back-populates the index", func(t *testing.T) {
+		tr := NewTracker()
+		tr.mu.Lock()
+		tr.Sessions["sess1"] = Session{State: StatePlaying, TranscodeKey: "tk-1"}
+		tr.mu.Unlock()
+
+		if !tr.UpdateTranscode("prefix/tk-1/suffix", metrics.ValBoth, metrics.ValCopy) {
+			t.Fatal("UpdateTranscode should match via the stored TranscodeKey")
+		}
+
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		s := tr.Sessions["sess1"]
+		if s.TranscodeType != metrics.ValBoth || s.SubtitleAction != metrics.ValCopy {
+			t.Errorf("classification = (%q, %q), want (%q, %q)",
+				s.TranscodeType, s.SubtitleAction, metrics.ValBoth, metrics.ValCopy)
+		}
+		if got := tr.transcodeIndex["tk-1"]; got != "sess1" {
+			t.Errorf("transcodeIndex[tk-1] = %q, want sess1 (a TranscodeKey hit must back-populate the index)", got)
+		}
+	})
+
+	t.Run("fallback by media part key matches without touching the index", func(t *testing.T) {
+		tr := NewTracker()
+		tr.mu.Lock()
+		tr.Sessions["sess1"] = Session{
+			State: StatePlaying,
+			Meta: plexapi.SessionMetadata{
+				Media: []plexapi.MediaInfo{{Part: []plexapi.MediaPart{{Key: "/library/parts/77/file.mkv?key=xyz"}}}},
+			},
+		}
+		tr.mu.Unlock()
+
+		if !tr.UpdateTranscode("key=xyz", metrics.ValAudio, metrics.ValNone) {
+			t.Fatal("UpdateTranscode should match when a media part key contains the transcode key")
+		}
+
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		if s := tr.Sessions["sess1"]; s.TranscodeType != metrics.ValAudio {
+			t.Errorf("TranscodeType = %q, want %q", s.TranscodeType, metrics.ValAudio)
+		}
+		if len(tr.transcodeIndex) != 0 {
+			t.Errorf("transcodeIndex = %v, want empty (a part-key match must not populate the index)", tr.transcodeIndex)
+		}
+	})
+
+	t.Run("no match returns false and mutates nothing", func(t *testing.T) {
+		tr := NewTracker()
+		tr.mu.Lock()
+		tr.Sessions["sess1"] = Session{State: StatePlaying, TranscodeKey: "tk-1", TranscodeType: metrics.ValNone}
+		tr.mu.Unlock()
+
+		if tr.UpdateTranscode("no-such-key", metrics.ValVideo, metrics.ValBurn) {
+			t.Fatal("UpdateTranscode should return false when nothing matches")
+		}
+
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		s := tr.Sessions["sess1"]
+		if s.TranscodeType != metrics.ValNone || s.SubtitleAction != "" {
+			t.Errorf("session mutated on no-match: TranscodeType=%q SubtitleAction=%q", s.TranscodeType, s.SubtitleAction)
+		}
+	})
 }
