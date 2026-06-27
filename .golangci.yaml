@@ -15,6 +15,7 @@ linters:
     - revive
     - goconst
     - gocyclo
+    - gocognit
     - unconvert
     - unparam
     - prealloc
@@ -40,7 +41,18 @@ linters:
         - style
         - performance
     gocyclo:
-      min-complexity: 18
+      # Cyclomatic complexity ~= the minimum number of test cases needed to
+      # cover every path, so it doubles as a "how much test does this need"
+      # signal. Tightened 18 -> 15 toward McCabe's limit (10), pragmatically
+      # raised for Go since each `if err != nil` adds a path.
+      min-complexity: 15
+    gocognit:
+      # Cognitive complexity (SonarQube's standard ceiling of 15) measures how
+      # hard a function is to understand, the better defect-density signal.
+      # Flat switches and sequential error checks that inflate gocyclo stay low
+      # here; a genuinely path-heavy-but-flat function may carry an explained
+      # //nolint:gocyclo (nolintlint requires the explanation).
+      min-complexity: 15
     goconst:
       ignore-tests: true
     perfsprint:
@@ -62,9 +74,23 @@ linters:
     paths:
       - node_modules
     rules:
+      # Tests are exempt from style/correctness linters (placeholder secrets,
+      # deliberate error-ignores, repeated literals) AND from complexity
+      # (gocyclo + gocognit). Both over-fire on idiomatic Go test code: a
+      # thorough table-driven / property / fuzz test is a loop + t.Run closures
+      # + per-case assertion guards, which gocognit's nesting model scores high
+      # without that being a smell. A 2026-06 fleet scan put clean gold-standard
+      # libraries' flagship tests at cognitive 36-72 (atomicfile TestPendingFile
+      # is 72) and ~320 test funcs fleet-wide over 15; gating those would force
+      # ~320 //nolint or the splitting of cohesive table tests, degrading the
+      # suites. golangci also can't set a test-only threshold (min-complexity is
+      # global), so the prod gate of 15 can't coexist with a lenient test bar.
+      # Test complexity is judged in context instead: the test-review agent's
+      # smell catalog (Eager Test, Conditional Test Logic) plus human review.
       - path: _test\.go
         linters:
           - gocyclo
+          - gocognit
           - errcheck
           - gosec
           - goconst
