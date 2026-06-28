@@ -1,11 +1,44 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/plex"
-	"github.com/cplieger/plex-exporter/internal/server"
 )
+
+func TestIsFatalStartupError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"bad token 401 is fatal", &plex.HTTPStatusError{Code: 401, Status: "401 Unauthorized", Path: "/media/providers"}, true},
+		{"forbidden 403 is fatal", &plex.HTTPStatusError{Code: 403, Status: "403 Forbidden", Path: "/"}, true},
+		{"other 4xx is fatal", &plex.HTTPStatusError{Code: 400, Status: "400 Bad Request", Path: "/"}, true},
+		{"503 is transient", &plex.HTTPStatusError{Code: 503, Status: "503 Service Unavailable", Path: "/"}, false},
+		{"500 is transient", &plex.HTTPStatusError{Code: 500, Status: "500 Internal Server Error", Path: "/"}, false},
+		{"429 rate limited is transient", &plex.HTTPStatusError{Code: 429, Status: "429 Too Many Requests", Path: "/"}, false},
+		{"408 request timeout is transient", &plex.HTTPStatusError{Code: 408, Status: "408 Request Timeout", Path: "/"}, false},
+		{"not found is fatal", fmt.Errorf("fetching providers: %w", plex.ErrNotFound), true},
+		{"unknown CA is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: x509.UnknownAuthorityError{}}), true},
+		{"cert verification error is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: &tls.CertificateVerificationError{Err: errors.New("x509: certificate has expired or is not yet valid")}}), true},
+		{"connection refused is transient", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "http://127.0.0.1:1/", Err: errors.New("connect: connection refused")}), false},
+		{"dns failure is transient", errors.New("fetching providers: dial tcp: lookup plex: no such host"), false},
+		{"wrapped 401 is fatal", fmt.Errorf("fetching providers: %w", &plex.HTTPStatusError{Code: 401, Status: "401 Unauthorized", Path: "/media/providers"}), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isFatalStartupError(tt.err); got != tt.want {
+				t.Errorf("isFatalStartupError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestEnvOr(t *testing.T) {
 	t.Setenv("TEST_ENV_OR", "custom")
@@ -46,21 +79,5 @@ func TestRequireEnv(t *testing.T) {
 				t.Errorf("requireEnv(%q) = %q, want %q", tt.key, got, tt.want)
 			}
 		})
-	}
-}
-
-// TestNewPlexServer verifies that the run() composition root wires the
-// plex client, session tracker, and initial bandwidth cursor correctly.
-func TestNewPlexServer(t *testing.T) {
-	client := &plex.Client{}
-	srv := server.NewServer(client)
-	if srv.Client != client {
-		t.Error("client not set")
-	}
-	if srv.Sessions == nil {
-		t.Error("sessions tracker not initialized")
-	}
-	if srv.LastBandwidthAt == 0 {
-		t.Error("lastBandwidthAt should be initialized to current time")
 	}
 }

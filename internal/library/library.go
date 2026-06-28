@@ -1,6 +1,10 @@
 package library
 
-import "github.com/cplieger/plex-exporter/internal/plexapi"
+import (
+	"strconv"
+
+	"github.com/cplieger/plex-exporter/internal/plexapi"
+)
 
 // Library types recognised by the exporter. Values match the Plex
 // server's "type" field on a library directory; they are part of the
@@ -17,7 +21,6 @@ const (
 const (
 	TypeEpisode = "episode"
 	TypeTrack   = "track"
-	TypeClip    = "clip"
 )
 
 // Plex API identifiers and feature types.
@@ -27,12 +30,12 @@ const (
 	CountLabelItems  = "items"
 )
 
-// KnownSessionMediaTypes is the set of media types valid as Prometheus
-// label values for session metrics. Unknown values are normalised to
-// "other" by the collector.
-var KnownSessionMediaTypes = map[string]bool{
-	TypeMovie: true, TypeEpisode: true, TypeTrack: true, TypeClip: true, TypePhoto: true,
-}
+// MaxLibraries bounds the number of library sections the exporter tracks and
+// emits metrics for. Like sessions.MaxTrackedSessions, it caps Prometheus label
+// cardinality (one series set per library) against a compromised or buggy Plex
+// server returning an unbounded list of distinct numeric section IDs in
+// /media/providers.
+const MaxLibraries = 256
 
 // Library is a Plex library (section) entry. Fields are exported
 // because consumers elsewhere in the exporter read them directly.
@@ -70,6 +73,19 @@ func ContentTypeLabel(libType string) string {
 	}
 }
 
+// isCountableSection reports whether a media-provider directory is a library
+// section the exporter emits metrics for: a recognised type with a numeric
+// section id. The numeric check matters because the id is later interpolated
+// into /library/sections/<id>/all, so a non-numeric id must be rejected before
+// URL construction.
+func isCountableSection(libType, id string) bool {
+	if !IsType(libType) {
+		return false
+	}
+	_, err := strconv.Atoi(id)
+	return err == nil
+}
+
 // Build extracts library entries from the media providers response,
 // preserving existing item counts from prevItems.
 func Build(providers plexapi.MediaProviderResponse, prevItems map[string]int64) []Library {
@@ -83,10 +99,7 @@ func Build(providers plexapi.MediaProviderResponse, prevItems map[string]int64) 
 				continue
 			}
 			for _, d := range f.Directories {
-				if !IsType(d.Type) {
-					continue
-				}
-				libs = append(libs, Library{
+				libs = appendLibrary(libs, Library{
 					ID: d.ID, Name: d.Title, Type: d.Type,
 					DurationTotal: d.DurationTotal, StorageTotal: d.StorageTotal,
 					ItemsCount: prevItems[d.ID],
@@ -95,6 +108,21 @@ func Build(providers plexapi.MediaProviderResponse, prevItems map[string]int64) 
 		}
 	}
 	return libs
+}
+
+// appendLibrary appends lib to libs when lib is a countable section and the
+// MaxLibraries cap has not yet been reached, returning the (possibly
+// unchanged) slice. Centralising the countable + cardinality-cap checks keeps
+// Build's nesting shallow and the cap in one place. Building a candidate
+// Library for a non-countable directory is harmless: the value is discarded.
+func appendLibrary(libs []Library, lib Library) []Library {
+	if !isCountableSection(lib.Type, lib.ID) {
+		return libs
+	}
+	if len(libs) >= MaxLibraries {
+		return libs
+	}
+	return append(libs, lib)
 }
 
 // ItemCountTypes returns the `type=` query params to try in order for

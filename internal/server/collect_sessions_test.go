@@ -38,9 +38,9 @@ func TestCollectSessionsPlaying(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// 5 metrics: play_count, play_seconds, session_bandwidth, session_bitrate, est_transmit
-	if len(ms) != 5 {
-		t.Errorf("collectSessions produced %d metrics, want 5", len(ms))
+	// 4 metrics: play_count, play_seconds, session_bandwidth, session_bitrate
+	if len(ms) != 4 {
+		t.Errorf("collectSessions produced %d metrics, want 4", len(ms))
 	}
 }
 
@@ -58,9 +58,9 @@ func TestCollectSessionsSkipsZeroPlayStarted(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Only est_transmit(1) — session skipped due to zero playStarted
-	if len(ms) != 1 {
-		t.Errorf("collectSessions produced %d metrics, want 1 (est_transmit only)", len(ms))
+	// 0 metrics — the session is skipped (zero playStarted) and nothing else is emitted
+	if len(ms) != 0 {
+		t.Errorf("collectSessions produced %d metrics, want 0", len(ms))
 	}
 }
 
@@ -84,9 +84,9 @@ func TestCollectSessionsLibraryLookup(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// 3 metrics: play_count, play_seconds, est_transmit
-	if len(ms) != 3 {
-		t.Errorf("collectSessions produced %d metrics, want 3", len(ms))
+	// 2 metrics: play_count, play_seconds
+	if len(ms) != 2 {
+		t.Errorf("collectSessions produced %d metrics, want 2", len(ms))
 	}
 }
 
@@ -108,9 +108,9 @@ func TestCollectSessionsUnknownLibrary(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// 3 metrics: play_count, play_seconds, est_transmit
-	if len(ms) != 3 {
-		t.Errorf("collectSessions produced %d metrics, want 3", len(ms))
+	// 2 metrics: play_count, play_seconds
+	if len(ms) != 2 {
+		t.Errorf("collectSessions produced %d metrics, want 2", len(ms))
 	}
 }
 
@@ -141,34 +141,6 @@ func TestCollectSessionsPendingTranscodeNormalized(t *testing.T) {
 	}
 }
 
-func TestCollectSessionsEstimatedTransmitAccumulates(t *testing.T) {
-	tracker := sessions.NewTracker()
-	tracker.TotalEstimatedKBits = 1000
-
-	meta := testMeta(t, `{"Player":{"device":"TV"},"User":{"title":"user4"},"Media":[{"bitrate":5000}]}`)
-	mediaMeta := testMeta(t, `{"type":"movie","title":"Bitrate Movie"}`)
-	tracker.Sessions["s1"] = sessions.Session{
-		PlayStarted: time.Now().Add(-10 * time.Second),
-		LastUpdate:  time.Now(),
-		State:       sessions.StatePlaying,
-		LibName:     "Movies",
-		LibID:       "1",
-		LibType:     library.TypeMovie,
-		Meta:        meta,
-		MediaMeta:   mediaMeta,
-	}
-
-	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
-	if len(ms) < 3 {
-		t.Errorf("collectSessions produced %d metrics, want at least 3", len(ms))
-	}
-}
-
 func TestCollectSessionsEpisodeLabels(t *testing.T) {
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{"Player":{"device":"Roku"},"User":{"title":"viewer"}}`)
@@ -195,9 +167,9 @@ func TestCollectSessionsEpisodeLabels(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// 3 metrics: play_count, play_seconds, est_transmit
-	if len(ms) != 3 {
-		t.Errorf("collectSessions episode produced %d metrics, want 3", len(ms))
+	// 2 metrics: play_count, play_seconds
+	if len(ms) != 2 {
+		t.Errorf("collectSessions episode produced %d metrics, want 2", len(ms))
 	}
 }
 
@@ -241,12 +213,11 @@ func TestCollectSessionsMultipleSessions(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// 8 metrics:
+	// 7 metrics:
 	//   s1 has bandwidth=8000 and bitrate=10000 → play_count, play_seconds, session_bandwidth, session_bitrate (4)
 	//   s2 has no bandwidth and bitrate=3000    → play_count, play_seconds, session_bitrate (3)
-	//   plus est_transmit (1)
-	if len(ms) != 8 {
-		t.Errorf("collectSessions multi produced %d metrics, want 8", len(ms))
+	if len(ms) != 7 {
+		t.Errorf("collectSessions multi produced %d metrics, want 7", len(ms))
 	}
 }
 
@@ -483,137 +454,6 @@ func TestCollectSessions_library_lookup_sets_labels(t *testing.T) {
 				t.Errorf("s2 library_id = %q, want 5", labels["library_id"])
 			}
 		}
-	}
-}
-
-func TestCollectSessions_estimated_transmit_multiplication_factor(t *testing.T) {
-	// With no active sessions and totalEstimatedKBits=1000, est_transmit
-	// should be 1000*128 = 128000 (the kbits→bytes conversion factor).
-	tracker := sessions.NewTracker()
-	tracker.TotalEstimatedKBits = 1000
-
-	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 10)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	estMetrics := byDesc[descKey(metrics.DescEstTransmitBytes)]
-	if len(estMetrics) != 1 {
-		t.Fatalf("expected 1 est_transmit metric, got %d", len(estMetrics))
-	}
-
-	_, value := metricSnapshot(t, estMetrics[0])
-	// 1000 kbits * 128 = 128000 bytes
-	if value != 128000 {
-		t.Errorf("est_transmit = %v, want 128000 (1000 * 128)", value)
-	}
-}
-
-func TestCollectSessions_estimated_transmit_zero_when_empty(t *testing.T) {
-	// With no sessions and zero totalEstimatedKBits, est_transmit should be 0.
-	tracker := sessions.NewTracker()
-
-	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 10)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	estMetrics := byDesc[descKey(metrics.DescEstTransmitBytes)]
-	if len(estMetrics) != 1 {
-		t.Fatalf("expected 1 est_transmit metric, got %d", len(estMetrics))
-	}
-
-	_, value := metricSnapshot(t, estMetrics[0])
-	if value != 0 {
-		t.Errorf("est_transmit = %v, want 0", value)
-	}
-}
-
-func TestCollectSessions_stopped_session_no_additional_estimated(t *testing.T) {
-	// A stopped session must NOT add time.Since(playStarted)*bitrate to the
-	// estimate; only prevPlayedTime contributes via totalEstimatedKBits
-	// (already accumulated at stop time).
-	tracker := sessions.NewTracker()
-	tracker.TotalEstimatedKBits = 500
-
-	meta := testMeta(t, `{
-		"Player":{"device":"TV"},
-		"User":{"title":"user1"},
-		"Media":[{"bitrate":10000}]
-	}`)
-	mediaMeta := testMeta(t, `{"type":"movie","title":"Stopped Movie"}`)
-	tracker.Sessions["s1"] = sessions.Session{
-		PlayStarted:    time.Now().Add(-100 * time.Second),
-		LastUpdate:     time.Now(),
-		State:          sessions.StateStopped,
-		LibName:        "Movies",
-		LibID:          "1",
-		LibType:        library.TypeMovie,
-		Meta:           meta,
-		MediaMeta:      mediaMeta,
-		PrevPlayedTime: 10 * time.Second,
-	}
-
-	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	estMetrics := byDesc[descKey(metrics.DescEstTransmitBytes)]
-	if len(estMetrics) != 1 {
-		t.Fatalf("expected 1 est_transmit metric, got %d", len(estMetrics))
-	}
-
-	_, value := metricSnapshot(t, estMetrics[0])
-	// Only totalEstimatedKBits (500) contributes. Stopped session does NOT add
-	// time.Since(playStarted)*bitrate. So value = 500 * 128 = 64000.
-	if value != 64000 {
-		t.Errorf("est_transmit = %v, want 64000 (stopped session should not add elapsed*bitrate)", value)
-	}
-}
-
-func TestCollectSessions_playing_session_adds_estimated(t *testing.T) {
-	// A playing session SHOULD add time.Since(playStarted)*bitrate to estimated.
-	// This is the complement of the stopped test above.
-	tracker := sessions.NewTracker()
-	tracker.TotalEstimatedKBits = 0
-
-	meta := testMeta(t, `{
-		"Player":{"device":"TV"},
-		"User":{"title":"user1"},
-		"Media":[{"bitrate":10000}]
-	}`)
-	mediaMeta := testMeta(t, `{"type":"movie","title":"Playing Movie"}`)
-	tracker.Sessions["s1"] = sessions.Session{
-		PlayStarted: time.Now().Add(-10 * time.Second),
-		LastUpdate:  time.Now(),
-		State:       sessions.StatePlaying,
-		LibName:     "Movies",
-		LibID:       "1",
-		LibType:     library.TypeMovie,
-		Meta:        meta,
-		MediaMeta:   mediaMeta,
-	}
-
-	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	estMetrics := byDesc[descKey(metrics.DescEstTransmitBytes)]
-	if len(estMetrics) != 1 {
-		t.Fatalf("expected 1 est_transmit metric, got %d", len(estMetrics))
-	}
-
-	_, value := metricSnapshot(t, estMetrics[0])
-	// ~10 seconds * 10000 kbits * 128 bytes/kbit ≈ 12,800,000
-	// Allow some tolerance for timing
-	if value < 1000000 {
-		t.Errorf("est_transmit = %v, want > 1000000 (playing session should add elapsed*bitrate)", value)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -87,6 +88,12 @@ func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing PLEX_SERVER URL: %w", err)
 	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, fmt.Errorf("PLEX_SERVER must use an http or https scheme: %q", serverURL)
+	}
+	if parsed.Host == "" {
+		return nil, fmt.Errorf("PLEX_SERVER must include a host: %q", serverURL)
+	}
 
 	// base stays a nil http.RoundTripper interface when no CA cert is
 	// configured, so the retry round-tripper falls back to
@@ -113,8 +120,15 @@ func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 		Transport: httpx.NewRetryRoundTripper(base,
 			httpx.WithRTMaxAttempts(defaultMaxAttempts),
 			httpx.WithRTBaseDelay(defaultRetryBaseDelay),
-			httpx.WithOnRetry(func(int, *http.Request, *http.Response, error) {
+			httpx.WithOnRetry(func(attempt int, req *http.Request, resp *http.Response, retryErr error) {
 				retries.Add(1)
+				status := 0
+				if resp != nil {
+					status = resp.StatusCode
+				}
+				slog.Debug("retrying plex request",
+					"attempt", attempt, "path", req.URL.Path,
+					"status", status, "error", retryErr)
 			}),
 		),
 		// Plex's API does not issue redirects; refuse to follow any. Go's
@@ -152,12 +166,19 @@ func plexTLSTransport(caCertPath string) (*http.Transport, error) {
 	if !pool.AppendCertsFromPEM(pemBytes) {
 		return nil, fmt.Errorf("PLEX_CA_CERT_PATH=%q: no PEM-encoded certificates found", caCertPath)
 	}
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs:    pool,
-			MinVersion: tls.VersionTLS12,
-		},
-	}, nil
+	// Clone the default transport so the CA-pinned path keeps the same
+	// connection pooling, timeouts, and proxy support the no-CA path gets
+	// from http.DefaultTransport; override only the TLS config.
+	dt, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("http.DefaultTransport is not *http.Transport")
+	}
+	tr := dt.Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    pool,
+		MinVersion: tls.VersionTLS12,
+	}
+	return tr, nil
 }
 
 // Get fetches path and unmarshals the JSON body into result. Returns
@@ -174,11 +195,18 @@ func (c *Client) Get(ctx context.Context, path string, result any) error {
 func (c *Client) GetWithHeaders(ctx context.Context, path string, result any, extra map[string]string) error {
 	ref, err := url.Parse(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("plex GET %s: parsing path: %w", path, err)
+	}
+	// Defense in depth for X-Plex-Token confidentiality: every request must target the
+	// configured Plex host. An absolute ("http://h/..") or scheme-relative ("//h/..")
+	// reference makes ResolveReference override BaseURL's host, which would leak
+	// X-Plex-Token to that origin. All legitimate Plex paths are host-relative.
+	if ref.IsAbs() || ref.Host != "" {
+		return fmt.Errorf("plex request path must be relative to the configured server, got %q", path)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL.ResolveReference(ref).String(), http.NoBody)
 	if err != nil {
-		return err
+		return fmt.Errorf("plex GET %s: building request: %w", path, err)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Plex-Token", c.Token)
@@ -188,24 +216,32 @@ func (c *Client) GetWithHeaders(ctx context.Context, path string, result any, ex
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("plex GET %s: %w", path, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 		return ErrNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 		return &HTTPStatusError{Code: resp.StatusCode, Status: resp.Status, Path: path}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBody))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBody+1))
 	if err != nil {
-		return err
+		return fmt.Errorf("plex GET %s: reading body: %w", path, err)
+	}
+	if int64(len(body)) > MaxResponseBody {
+		return fmt.Errorf("plex API %s: response exceeds %d-byte limit", path, MaxResponseBody)
 	}
 	if len(body) == 0 {
 		return nil
 	}
-	return json.Unmarshal(body, result)
+	if err := json.Unmarshal(body, result); err != nil {
+		return fmt.Errorf("plex GET %s: decoding response: %w", path, err)
+	}
+	return nil
 }
 
 // GetContainerSize fetches a library section with one item and reads the

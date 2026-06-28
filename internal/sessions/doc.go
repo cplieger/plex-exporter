@@ -1,12 +1,14 @@
 // Package sessions maintains the in-memory active-session tracker
 // updated by the session poll loop and snapshotted by the collector.
-// The tracker exposes its mutex, map, and per-session fields so the
-// remaining callers in package main can orchestrate lock scope without
-// a wall of getter methods; when a caller outside this module needs a
-// narrower contract a later cycle can add Snapshot / Apply helpers.
+// The tracker exposes its map and per-session fields (the mutex stays
+// unexported) so package server can orchestrate lock scope without a wall
+// of getter methods; SnapshotSessions and UpdateLibraryLabels are the
+// snapshot/apply helpers callers use for lock-safe access.
 //
-// Exported symbols: State / StatePlaying / StateStopped, the
-// SessionTimeout / StaleSessionTimeout / MaxSessionKeyLen /
-// MaxTrackedSessions bounds, the Session DTO, Tracker with NewTracker,
-// Update, Prune, and RunPruneLoop.
+// Exported symbols: State with ParseState and the StatePlaying /
+// StateStopped / StatePaused / StateOther constants; the MaxSessionKeyLen /
+// MaxTrackedSessions bounds; the Session DTO; PruneConfig; the transcode
+// classifiers TranscodeKind and SubtitleAction; and Tracker with NewTracker,
+// Update, UpdateLibraryLabels, MarkAbsentStopped, SnapshotSessions, Prune,
+// and RunPruneLoop.
 package sessions

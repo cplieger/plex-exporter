@@ -10,7 +10,7 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
@@ -42,7 +42,7 @@ func TestRefreshSessions_basic_playing_session(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
@@ -50,7 +50,7 @@ func TestRefreshSessions_basic_playing_session(t *testing.T) {
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
 		t.Fatalf("expected 1 session, got %d", len(snap))
 	}
@@ -114,7 +114,7 @@ func TestRefreshSessions_with_transcode_session(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
@@ -122,7 +122,7 @@ func TestRefreshSessions_with_transcode_session(t *testing.T) {
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
 		t.Fatalf("expected 1 session, got %d", len(snap))
 	}
@@ -181,12 +181,12 @@ func TestRefreshSessions_both_transcode(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	s := snap["s3"]
 	if s.TranscodeType != metrics.ValBoth {
 		t.Errorf("transcodeType = %q, want %q", s.TranscodeType, metrics.ValBoth)
@@ -220,12 +220,12 @@ func TestRefreshSessions_no_transcode_session(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	s := snap["s4"]
 	// No TranscodeSession → TranscodeType should remain default (empty)
 	if s.TranscodeType != "" {
@@ -247,12 +247,12 @@ func TestRefreshSessions_empty_response(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 0 {
 		t.Errorf("expected 0 sessions, got %d", len(snap))
 	}
@@ -282,12 +282,12 @@ func TestRefreshSessions_invalid_rating_key_skipped(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 0 {
 		t.Errorf("expected 0 sessions (invalid rating key skipped), got %d", len(snap))
 	}
@@ -307,7 +307,7 @@ func TestRefreshSessions_fetch_error_records_error(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.SetSessionsReachable(true) // seed true so the error branch's flip to false is observable
 
@@ -347,13 +347,13 @@ func TestRefreshSessions_metadata_fetch_failure_still_updates_tracker(t *testing
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	srv.RefreshSessions(context.Background())
 
 	// Session should still be tracked even if metadata fetch fails
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
 		t.Fatalf("expected 1 session, got %d", len(snap))
 	}
@@ -403,12 +403,12 @@ func TestRefreshSessions_multiple_sessions(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	srv.RefreshSessions(context.Background())
 
-	snap, _ := srv.Sessions.SnapshotSessions()
+	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 2 {
 		t.Fatalf("expected 2 sessions, got %d", len(snap))
 	}
@@ -431,7 +431,7 @@ func TestRunSessionPollLoop_cancels_cleanly(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -443,5 +443,85 @@ func TestRunSessionPollLoop_cancels_cleanly(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("RunSessionPollLoop did not exit after context cancel")
+	}
+}
+
+func TestFillSessionLibrary(t *testing.T) {
+	libs := []library.Library{{ID: "5", Name: "4K Movies", Type: library.TypeMovie}}
+
+	t.Run("preset libName is preserved", func(t *testing.T) {
+		ss := &sessions.Session{LibName: "Preset", LibID: "1", LibType: "movie"}
+		media := testMeta(t, `{"librarySectionID":"5"}`)
+		fillSessionLibrary(ss, &media, libs)
+		if ss.LibName != "Preset" || ss.LibID != "1" || ss.LibType != "movie" {
+			t.Errorf("preset labels overwritten: got (%q,%q,%q)", ss.LibName, ss.LibID, ss.LibType)
+		}
+	})
+
+	t.Run("matching section sets labels", func(t *testing.T) {
+		ss := &sessions.Session{}
+		media := testMeta(t, `{"librarySectionID":"5"}`)
+		fillSessionLibrary(ss, &media, libs)
+		if ss.LibName != "4K Movies" || ss.LibID != "5" || ss.LibType != library.TypeMovie {
+			t.Errorf("labels = (%q,%q,%q), want (4K Movies,5,movie)", ss.LibName, ss.LibID, ss.LibType)
+		}
+	})
+
+	t.Run("no matching section leaves labels empty", func(t *testing.T) {
+		ss := &sessions.Session{}
+		media := testMeta(t, `{"librarySectionID":"999"}`)
+		fillSessionLibrary(ss, &media, libs)
+		if ss.LibName != "" || ss.LibID != "" || ss.LibType != "" {
+			t.Errorf("labels should be empty on no match: got (%q,%q,%q)", ss.LibName, ss.LibID, ss.LibType)
+		}
+	})
+}
+
+func TestRefreshSessions_vanished_session_marked_stopped(t *testing.T) {
+	var pollCount int
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/status/sessions":
+			pollCount++
+			if pollCount == 1 {
+				fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{"sessionKey":"s1","ratingKey":"100","type":"movie","Player":{"device":"TV","state":"playing"},"User":{"title":"u1"},"Media":[{"bitrate":8000,"Part":[{"decision":"copy"}]}]}]}}`)
+				return
+			}
+			// Second poll: s1 has vanished from /status/sessions.
+			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[]}}`)
+		case "/library/metadata/100":
+			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{"type":"movie","title":"Vanish Test","librarySectionID":"1"}]}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	client := plextest.NewTestClientFromServer(t, ts)
+	srv := NewServer(client)
+	srv.Libraries = []library.Library{
+		{ID: "1", Name: "Movies", Type: library.TypeMovie},
+	}
+
+	// Poll 1: s1 is actively playing.
+	srv.RefreshSessions(context.Background())
+	snap := srv.Sessions.SnapshotSessions()
+	if snap["s1"].State != sessions.StatePlaying {
+		t.Fatalf("after poll 1: s1 state = %q, want playing", snap["s1"].State)
+	}
+
+	// Poll 2: s1 is absent, so RefreshSessions must reconcile the vanished
+	// stream to StateStopped (the MarkAbsentStopped path) so it lands on the
+	// 60s stopped-prune timer instead of lingering as playing until the 5m
+	// stale timeout. It stays tracked because RefreshSessions does not prune.
+	srv.RefreshSessions(context.Background())
+	snap = srv.Sessions.SnapshotSessions()
+	s, ok := snap["s1"]
+	if !ok {
+		t.Fatal("after poll 2: s1 should still be tracked (stopped, not yet pruned)")
+	}
+	if s.State != sessions.StateStopped {
+		t.Errorf("after poll 2: s1 state = %q, want stopped (vanished session must be reconciled)", s.State)
 	}
 }

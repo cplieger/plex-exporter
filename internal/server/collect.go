@@ -3,7 +3,6 @@ package server
 import (
 	"strconv"
 	"time"
-	"unicode/utf8"
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
@@ -51,29 +50,29 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, lib := range snap.Libraries {
+		libName := truncLabel(lib.Name)
 		ch <- prometheus.MustNewConstMetric(metrics.DescLibDuration, prometheus.GaugeValue,
-			float64(lib.DurationTotal), snap.Name, snap.ID, lib.Type, lib.Name, lib.ID)
+			float64(lib.DurationTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
 		ch <- prometheus.MustNewConstMetric(metrics.DescLibStorage, prometheus.GaugeValue,
-			float64(lib.StorageTotal), snap.Name, snap.ID, lib.Type, lib.Name, lib.ID)
+			float64(lib.StorageTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
 		if lib.ItemsCount > 0 {
 			ch <- prometheus.MustNewConstMetric(metrics.DescLibItems, prometheus.GaugeValue,
-				float64(lib.ItemsCount), snap.Name, snap.ID, lib.Type, lib.Name, lib.ID,
+				float64(lib.ItemsCount), snap.Name, snap.ID, lib.Type, libName, lib.ID,
 				library.ContentTypeLabel(lib.Type))
 		}
 	}
 	s.collectSessions(ch, snap.Name, snap.ID, snap.Libraries)
 }
 
-// collectSessions emits per-session Prometheus metrics. Exported so
-// tests in package main can call it directly through the embedded
-// *Server; internal callers use Collect which invokes it after the
-// server-level snapshot.
+// collectSessions emits per-session Prometheus metrics. Collect invokes it
+// after taking the server-level snapshot; it is split out so the session
+// metrics are emitted from a sessions-only snapshot taken under the tracker lock.
 func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID string, libs []library.Library) {
 	// Snapshot under lock so we can emit metrics without blocking
-	// writers (handlePlaying, runPruneLoop, handleTranscodeUpdate)
+	// writers (Update, UpdateLibraryLabels, MarkAbsentStopped, Prune)
 	// behind a slow channel consumer. Matches the snapshot pattern
 	// used by Collect() for s.mu.
-	sessSnaps, estTotal := s.Sessions.SnapshotSessions()
+	sessSnaps := s.Sessions.SnapshotSessions()
 
 	libByID := make(map[string]library.Library, len(libs))
 	for _, l := range libs {
@@ -82,11 +81,6 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 
 	for sessID := range sessSnaps {
 		sess := sessSnaps[sessID]
-		// Accumulate estimated transmit for playing sessions.
-		if sess.State == sessions.StatePlaying && len(sess.Meta.Media) > 0 {
-			estTotal += time.Since(sess.PlayStarted).Seconds() * float64(sess.Meta.Media[0].Bitrate)
-		}
-
 		if sess.PlayStarted.IsZero() {
 			continue
 		}
@@ -107,7 +101,7 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBandwidth, prometheus.GaugeValue,
 				float64(sess.Meta.Session.Bandwidth),
 				srvName, srvID, sessID, truncLabel(sess.Meta.User.Title),
-				truncLabel(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)))
+				metrics.LocationAllowlist.Normalize(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)))
 		}
 
 		// Per-session bitrate (replaces the former stream_bitrate label).
@@ -118,28 +112,16 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBitrate, prometheus.GaugeValue,
 				br,
 				srvName, srvID, sessID, truncLabel(sess.Meta.User.Title),
-				truncLabel(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)))
+				metrics.LocationAllowlist.Normalize(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)))
 		}
 	}
-
-	// Estimated transmit bytes.
-	ch <- prometheus.MustNewConstMetric(metrics.DescEstTransmitBytes, prometheus.CounterValue,
-		estTotal*128, srvName, srvID)
 }
 
 // truncLabel truncates a label value to maxLabelLen bytes to prevent
 // high-cardinality label sets from user-controlled Plex API data. It
 // respects UTF-8 boundaries to avoid splitting multi-byte codepoints.
 func truncLabel(s string) string {
-	if len(s) <= maxLabelLen {
-		return s
-	}
-	// Walk backward from the byte limit to find a valid UTF-8 boundary.
-	i := maxLabelLen
-	for i > 0 && !utf8.RuneStart(s[i]) {
-		i--
-	}
-	return s[:i]
+	return metrics.TruncateLabelValue(s, maxLabelLen)
 }
 
 // streamLabels returns (streamType, resolution) derived from the
@@ -216,7 +198,7 @@ func sessionLabelValues(
 	}
 
 	return []string{
-		srvName, srvID, libName, libID, libType,
+		srvName, srvID, truncLabel(libName), libID, libType,
 		metrics.MediaTypeAllowlist.Normalize(sess.MediaMeta.Type),
 		truncLabel(title), truncLabel(childTitle), truncLabel(grandchildTitle), grandchildIndex,
 		metrics.StreamTypeAllowlist.Normalize(streamType),
@@ -226,7 +208,7 @@ func sessionLabelValues(
 		truncLabel(sess.Meta.User.Title), sessID,
 		ttype,
 		orDefault(sess.SubtitleAction, metrics.ValNone),
-		truncLabel(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)),
+		metrics.LocationAllowlist.Normalize(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)),
 		local,
 	}
 }

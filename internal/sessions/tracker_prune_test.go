@@ -80,7 +80,7 @@ func TestTrackerPrune(t *testing.T) {
 	tracker.mu.Lock()
 	tracker.Sessions["old"] = Session{
 		State:      StateStopped,
-		LastUpdate: time.Now().Add(-2 * SessionTimeout),
+		LastUpdate: time.Now().Add(-2 * defaultSessionTimeout),
 	}
 	tracker.Sessions["recent"] = Session{
 		State:      StateStopped,
@@ -88,16 +88,16 @@ func TestTrackerPrune(t *testing.T) {
 	}
 	tracker.Sessions["playing_fresh"] = Session{
 		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-2 * SessionTimeout),
+		LastUpdate: time.Now().Add(-2 * defaultSessionTimeout),
 	}
 	tracker.Sessions["playing_stale"] = Session{
-		// Non-stopped but silent longer than StaleSessionTimeout — orphaned.
+		// Non-stopped but silent longer than defaultStaleSessionTimeout — orphaned.
 		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
+		LastUpdate: time.Now().Add(-2 * defaultStaleSessionTimeout),
 	}
 	tracker.Sessions["paused_stale"] = Session{
 		State:      State("paused"),
-		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
+		LastUpdate: time.Now().Add(-2 * defaultStaleSessionTimeout),
 	}
 	tracker.mu.Unlock()
 
@@ -113,18 +113,18 @@ func TestTrackerPrune(t *testing.T) {
 		t.Error("recent stopped session should be kept")
 	}
 	if _, ok := tracker.Sessions["playing_fresh"]; !ok {
-		t.Error("playing session idle less than StaleSessionTimeout should be kept")
+		t.Error("playing session idle less than defaultStaleSessionTimeout should be kept")
 	}
 	if _, ok := tracker.Sessions["playing_stale"]; ok {
-		t.Error("playing session idle longer than StaleSessionTimeout should be pruned")
+		t.Error("playing session idle longer than defaultStaleSessionTimeout should be pruned")
 	}
 	if _, ok := tracker.Sessions["paused_stale"]; ok {
-		t.Error("paused session idle longer than StaleSessionTimeout should be pruned")
+		t.Error("paused session idle longer than defaultStaleSessionTimeout should be pruned")
 	}
 }
 
 // TestTrackerPrune_stale_boundary covers the threshold edge: a non-stopped
-// session idle for less than StaleSessionTimeout must NOT be pruned, one
+// session idle for less than defaultStaleSessionTimeout must NOT be pruned, one
 // idle past it must be.
 func TestTrackerPrune_stale_boundary(t *testing.T) {
 	tracker := NewTracker()
@@ -133,12 +133,12 @@ func TestTrackerPrune_stale_boundary(t *testing.T) {
 	// Well under the threshold — should be kept.
 	tracker.Sessions["under_threshold"] = Session{
 		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-StaleSessionTimeout + time.Minute),
+		LastUpdate: time.Now().Add(-defaultStaleSessionTimeout + time.Minute),
 	}
 	// Just past the threshold — should be pruned.
 	tracker.Sessions["past_threshold"] = Session{
 		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-StaleSessionTimeout - time.Second),
+		LastUpdate: time.Now().Add(-defaultStaleSessionTimeout - time.Second),
 	}
 	tracker.mu.Unlock()
 
@@ -148,15 +148,15 @@ func TestTrackerPrune_stale_boundary(t *testing.T) {
 	defer tracker.mu.Unlock()
 
 	if _, ok := tracker.Sessions["under_threshold"]; !ok {
-		t.Error("session idle under StaleSessionTimeout should be kept")
+		t.Error("session idle under defaultStaleSessionTimeout should be kept")
 	}
 	if _, ok := tracker.Sessions["past_threshold"]; ok {
-		t.Error("session idle past StaleSessionTimeout should be pruned")
+		t.Error("session idle past defaultStaleSessionTimeout should be pruned")
 	}
 }
 
 // TestSessionTrackerPrune_exact_timeout_boundary checks the stopped-session
-// timeout edge: a session stopped within SessionTimeout must be kept and one
+// timeout edge: a session stopped within defaultSessionTimeout must be kept and one
 // stopped past it must be pruned (the guard is strictly greater-than, so the
 // boundary itself is retained).
 func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
@@ -166,12 +166,12 @@ func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
 	tracker.mu.Lock()
 	tracker.Sessions["barely_within"] = Session{
 		State:      StateStopped,
-		LastUpdate: time.Now().Add(-SessionTimeout + 100*time.Millisecond),
+		LastUpdate: time.Now().Add(-defaultSessionTimeout + 100*time.Millisecond),
 	}
 	// Session stopped well past the timeout — should be pruned
 	tracker.Sessions["well_past"] = Session{
 		State:      StateStopped,
-		LastUpdate: time.Now().Add(-SessionTimeout - time.Second),
+		LastUpdate: time.Now().Add(-defaultSessionTimeout - time.Second),
 	}
 	tracker.mu.Unlock()
 
@@ -218,7 +218,7 @@ func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 	tracker.mu.Lock()
 	tracker.Sessions["expired"] = Session{
 		State:      StateStopped,
-		LastUpdate: time.Now().Add(-2 * SessionTimeout),
+		LastUpdate: time.Now().Add(-2 * defaultSessionTimeout),
 	}
 	tracker.mu.Unlock()
 
@@ -246,7 +246,7 @@ func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 	tracker.mu.Lock()
 	tracker.Sessions["orphan"] = Session{
 		State:      StatePlaying,
-		LastUpdate: time.Now().Add(-2 * StaleSessionTimeout),
+		LastUpdate: time.Now().Add(-2 * defaultStaleSessionTimeout),
 	}
 	tracker.mu.Unlock()
 
@@ -264,29 +264,15 @@ func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 	}
 }
 
-// TestTrackerPrune_removes_transcode_index_entry verifies that pruning a
-// session that carries a TranscodeKey also evicts its transcodeIndex entry,
-// so a stale index entry is never left behind.
-func TestTrackerPrune_removes_transcode_index_entry(t *testing.T) {
-	tracker := NewTracker()
-	tracker.mu.Lock()
-	tracker.Sessions["s1"] = Session{
-		State:        StateStopped,
-		LastUpdate:   time.Now().Add(-2 * SessionTimeout),
-		TranscodeKey: "tc1",
+// TestPruneTimeouts_match_documented_contract pins the absolute timeout
+// constants to the values the README and tracker.go comments document, so a
+// silent edit to either default fails a test (the offset-based boundary tests
+// would still pass after such a drift).
+func TestPruneTimeouts_match_documented_contract(t *testing.T) {
+	if defaultSessionTimeout != time.Minute {
+		t.Errorf("defaultSessionTimeout = %v, want 1m0s (README: sessions pruned after 60s of inactivity)", defaultSessionTimeout)
 	}
-	tracker.transcodeIndex["tc1"] = "s1"
-	tracker.mu.Unlock()
-
-	tracker.Prune()
-
-	tracker.mu.Lock()
-	defer tracker.mu.Unlock()
-
-	if _, ok := tracker.transcodeIndex["tc1"]; ok {
-		t.Error("transcodeIndex entry for pruned session's TranscodeKey should be deleted")
-	}
-	if _, ok := tracker.Sessions["s1"]; ok {
-		t.Error("stopped expired session should be pruned")
+	if defaultStaleSessionTimeout != 5*time.Minute {
+		t.Errorf("defaultStaleSessionTimeout = %v, want 5m0s (documented 5-minute stale-session timeout)", defaultStaleSessionTimeout)
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/library"
-	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/plextest"
 )
 
 func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
@@ -38,7 +38,7 @@ func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
@@ -78,7 +78,7 @@ func TestRefreshLibraryItems_writeback_boundary(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
@@ -108,7 +108,7 @@ func TestRefreshLibraryItems_no_libraries_is_noop(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = nil
 
@@ -141,7 +141,7 @@ func TestRefreshLibraryItems_artist_fallback_to_type7(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -176,7 +176,7 @@ func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -213,7 +213,7 @@ func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testin
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -249,7 +249,7 @@ func TestRefreshLibraryItems_artist_type7_returns_zero_falls_to_default(t *testi
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -285,7 +285,7 @@ func TestRefreshLibraryItems_artist_both_fail_uses_default_path(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plex.NewTestClientFromServer(t, ts)
+	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -298,5 +298,33 @@ func TestRefreshLibraryItems_artist_both_fail_uses_default_path(t *testing.T) {
 
 	if srv.Libraries[0].ItemsCount != 42 {
 		t.Errorf("Music ItemsCount = %d, want 42 (both type queries failed, default path)", srv.Libraries[0].ItemsCount)
+	}
+}
+
+func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
+	var hit bool
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	client := plextest.NewTestClientFromServer(t, ts)
+	srv := NewServer(client)
+	lb := library.Library{ID: "not-numeric", Name: "Bad Section", Type: library.TypeMovie}
+
+	srv.fillItemCount(context.Background(), &lb)
+
+	if hit {
+		t.Error("fillItemCount issued an HTTP fetch for a non-numeric section ID; the strconv.Atoi guard must short-circuit first")
+	}
+	if lb.ItemsCount != 0 {
+		t.Errorf("ItemsCount = %d, want 0 (non-numeric ID rejected)", lb.ItemsCount)
+	}
+	srv.mu.Lock()
+	got := srv.ErrorCounts["library_items"]
+	srv.mu.Unlock()
+	if got != 1 {
+		t.Errorf("ErrorCounts[library_items] = %v, want 1", got)
 	}
 }

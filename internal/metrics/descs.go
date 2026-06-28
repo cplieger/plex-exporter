@@ -81,9 +81,6 @@ var (
 		"plex_session_bitrate_kbps",
 		"Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.",
 		append(SrvLabels, "session", "user", "location"), nil)
-	DescEstTransmitBytes = prometheus.NewDesc(
-		"plex_estimated_transmit_bytes_total", "Estimated bytes from bitrates",
-		SrvLabels, nil)
 	DescHTTPReachable = prometheus.NewDesc(
 		"plex_http_reachable", "HTTP polling reachability (1=last refresh succeeded, 0=failed)",
 		SrvLabels, nil)
@@ -109,7 +106,6 @@ var AllDescs = []*prometheus.Desc{
 	DescTransmitBytes, DescActiveTranscodes,
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
-	DescEstTransmitBytes,
 	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors,
 }
 
@@ -143,7 +139,7 @@ func (a *LabelAllowlist) Normalize(v string) string {
 var (
 	StreamTypeAllowlist = &LabelAllowlist{
 		Name:     "stream_type",
-		Allowed:  map[string]bool{"copy": true, "transcode": true, "directplay": true, ValUnknown: true},
+		Allowed:  map[string]bool{ValCopy: true, ValTranscode: true, "directplay": true, ValUnknown: true},
 		Fallback: FallbackOther,
 	}
 	MediaTypeAllowlist = &LabelAllowlist{
@@ -154,6 +150,11 @@ var (
 	ResolutionAllowlist = &LabelAllowlist{
 		Name:     "resolution",
 		Allowed:  map[string]bool{"": true, "sd": true, "480": true, "576": true, "720": true, "1080": true, "4k": true, "2160": true},
+		Fallback: FallbackOther,
+	}
+	LocationAllowlist = &LabelAllowlist{
+		Name:     "location",
+		Allowed:  map[string]bool{"lan": true, "wan": true, ValUnknown: true},
 		Fallback: FallbackOther,
 	}
 )
