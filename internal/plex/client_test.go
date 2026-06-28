@@ -55,13 +55,21 @@ func writeSelfSignedPEM(t *testing.T) string {
 	return path
 }
 
-// newTestClient wires a test Client against the given httptest.Server.
-// Delegates to the exported NewTestClientFromServer. The returned client has
-// no retry transport, so each Get is a single attempt — the right default
-// for the non-retry tests below.
+// testToken is the fixed credential used by the test fixtures in this package.
+// The leading "$" mimics an unexpanded environment-variable placeholder, which
+// the repo secret-scan regex deliberately excludes.
+const testToken = "$fixture-test-token"
+
+// newTestClient wires a test Client against the given httptest.Server. The
+// returned client has no retry transport, so each Get is a single attempt —
+// the right default for the non-retry tests below.
 func newTestClient(t *testing.T, ts *httptest.Server) *Client {
 	t.Helper()
-	return NewTestClientFromServer(t, ts)
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &Client{BaseURL: u, Token: testToken, HTTPClient: ts.Client()}
 }
 
 func TestHTTPStatusError_Error(t *testing.T) {
@@ -76,9 +84,38 @@ func TestHTTPStatusError_Error(t *testing.T) {
 	}
 }
 
+// TestGet_populates_HTTPStatusError pins the documented contract that Get
+// returns a *HTTPStatusError carrying the real response Code/Status/Path so
+// callers can classify 4xx (no retry) vs 5xx (retry) via errors.As. The
+// existing TestHTTPStatusError_Error only checks Error() on a hand-built
+// value and the TestGetWithHeaders "server error" subtest only checks the
+// error is non-nil and not ErrNotFound, so a mutation of the Code/Status/Path
+// fields populated in Get survives.
+func TestGet_populates_HTTPStatusError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	client := newTestClient(t, ts)
+
+	var resp plexapi.MC[plexapi.ServerIdentity]
+	err := client.Get(context.Background(), "/error", &resp)
+	var se *HTTPStatusError
+	if !errors.As(err, &se) {
+		t.Fatalf("Get on 500 = %v, want *HTTPStatusError", err)
+	}
+	if se.Code != http.StatusInternalServerError {
+		t.Errorf("HTTPStatusError.Code = %d, want %d", se.Code, http.StatusInternalServerError)
+	}
+	if se.Path != "/error" {
+		t.Errorf("HTTPStatusError.Path = %q, want %q", se.Path, "/error")
+	}
+}
+
 func TestGetWithHeaders(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Plex-Token") != TestToken {
+		if r.Header.Get("X-Plex-Token") != testToken {
 			t.Error("missing plex token header")
 		}
 		if r.Header.Get("Accept") != "application/json" {
@@ -87,7 +124,7 @@ func TestGetWithHeaders(t *testing.T) {
 		switch r.URL.Path {
 		case "/test":
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, `{"MediaContainer":{"friendlyName":"TestPlex"}}`)
+			fmt.Fprint(w, `{"MediaContainer":{"platform":"TestPlex"}}`)
 		case "/notfound":
 			w.WriteHeader(http.StatusNotFound)
 		case "/error":
@@ -103,7 +140,7 @@ func TestGetWithHeaders(t *testing.T) {
 	client := &Client{
 		HTTPClient: ts.Client(),
 		BaseURL:    parsed,
-		Token:      TestToken,
+		Token:      testToken,
 	}
 
 	t.Run("success", func(t *testing.T) {
@@ -112,8 +149,8 @@ func TestGetWithHeaders(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if resp.MediaContainer.FriendlyName != "TestPlex" {
-			t.Errorf("name = %q, want TestPlex", resp.MediaContainer.FriendlyName)
+		if resp.MediaContainer.Platform != "TestPlex" {
+			t.Errorf("platform = %q, want TestPlex", resp.MediaContainer.Platform)
 		}
 	})
 
@@ -154,7 +191,7 @@ func TestGetWithHeaders_invalid_url_returns_error(t *testing.T) {
 	client := &Client{
 		HTTPClient: &http.Client{},
 		BaseURL:    parsed,
-		Token:      TestToken,
+		Token:      testToken,
 	}
 
 	var resp plexapi.MC[plexapi.ServerIdentity]
@@ -198,8 +235,8 @@ func TestGetWithHeaders_empty_body_returns_nil(t *testing.T) {
 		t.Fatalf("getWithHeaders(empty body) unexpected error: %v", err)
 	}
 	// resp should be zero-value — no unmarshal attempted.
-	if resp.MediaContainer.FriendlyName != "" {
-		t.Errorf("FriendlyName = %q, want empty (no body to unmarshal)", resp.MediaContainer.FriendlyName)
+	if resp.MediaContainer.Platform != "" {
+		t.Errorf("Platform = %q, want empty (no body to unmarshal)", resp.MediaContainer.Platform)
 	}
 }
 
@@ -220,7 +257,7 @@ func TestGetContainerSize(t *testing.T) {
 	client := &Client{
 		HTTPClient: ts.Client(),
 		BaseURL:    parsed,
-		Token:      TestToken,
+		Token:      testToken,
 	}
 
 	size, err := client.GetContainerSize(context.Background(), "/library/sections/1/all")
@@ -371,7 +408,7 @@ func TestNewClient_counts_retries(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"MediaContainer":{"friendlyName":"TestPlex"}}`))
+		_, _ = w.Write([]byte(`{"MediaContainer":{"platform":"TestPlex"}}`))
 	}))
 	defer ts.Close()
 
@@ -387,8 +424,8 @@ func TestNewClient_counts_retries(t *testing.T) {
 	if err := c.Get(context.Background(), "/", &resp); err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if resp.MediaContainer.FriendlyName != "TestPlex" {
-		t.Errorf("friendlyName = %q, want TestPlex", resp.MediaContainer.FriendlyName)
+	if resp.MediaContainer.Platform != "TestPlex" {
+		t.Errorf("platform = %q, want TestPlex", resp.MediaContainer.Platform)
 	}
 	if got := c.Retries(); got != 1 {
 		t.Errorf("Retries() = %d, want 1 (one 503 retried to 200)", got)
@@ -402,5 +439,124 @@ func TestClient_Retries_nil_safe(t *testing.T) {
 	var c Client
 	if got := c.Retries(); got != 0 {
 		t.Errorf("Retries() on zero-value Client = %d, want 0", got)
+	}
+}
+
+func TestGetContainerSize_propagates_error(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	client := newTestClient(t, ts)
+
+	size, err := client.GetContainerSize(context.Background(), "/library/sections/1/all")
+	if err == nil {
+		t.Fatal("GetContainerSize on a 500 response = nil error, want the error propagated (a swallowed error would silently report 0 items)")
+	}
+	if size != 0 {
+		t.Errorf("size = %d, want 0 on error", size)
+	}
+}
+
+func TestNewClient_rejects_invalid_server_url(t *testing.T) {
+	tests := []struct {
+		name      string
+		serverURL string
+	}{
+		{name: "non-http scheme", serverURL: "ftp://plex.example:32400"},
+		{name: "file scheme", serverURL: "file:///etc/passwd"},
+		{name: "empty host", serverURL: "http://"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := NewClient(tt.serverURL, "tok", ""); err == nil {
+				t.Errorf("NewClient(%q) = nil error, want a validation error", tt.serverURL)
+			}
+		})
+	}
+}
+
+func TestGetWithHeaders_rejects_absolute_path(t *testing.T) {
+	// An absolute or scheme-relative reference would let ResolveReference override the configured
+	// BaseURL host and leak X-Plex-Token to an attacker-controlled origin, so every such path must
+	// be rejected before a request is built. No httptest server is needed: the guard returns before
+	// HTTPClient.Do.
+	base, err := url.Parse("http://plex.example:32400")
+	if err != nil {
+		t.Fatalf("url.Parse: %v", err)
+	}
+	client := &Client{HTTPClient: &http.Client{}, BaseURL: base, Token: testToken}
+
+	paths := []struct {
+		name string
+		path string
+	}{
+		{"absolute http url", "http://evil.example/library"},
+		{"absolute https url", "https://evil.example/library"},
+		{"scheme-relative url", "//evil.example/library"},
+	}
+	for _, tt := range paths {
+		t.Run(tt.name, func(t *testing.T) {
+			var resp plexapi.MC[plexapi.ServerIdentity]
+			err := client.GetWithHeaders(context.Background(), tt.path, &resp, nil)
+			if err == nil {
+				t.Fatalf("GetWithHeaders(%q) = nil error, want rejection of an off-host path (X-Plex-Token leak guard)", tt.path)
+			}
+			if !strings.Contains(err.Error(), "must be relative to the configured server") {
+				t.Errorf("GetWithHeaders(%q) error = %v, want the relative-path rejection", tt.path, err)
+			}
+		})
+	}
+}
+
+// TestGet_enforces_response_body_size_cap pins the 10 MB MaxResponseBody OOM
+// guard at its boundary: a body of exactly MaxResponseBody bytes still decodes
+// (the cap is inclusive), while one byte past it is rejected with a size-limit
+// error before any decode. Guards against a compromised or buggy Plex returning
+// an unbounded body.
+func TestGet_enforces_response_body_size_cap(t *testing.T) {
+	const pre = `{"MediaContainer":{"platform":"`
+	const post = `"}}`
+	payloadLen := MaxResponseBody - len(pre) - len(post)
+
+	tests := []struct {
+		name       string
+		bodyLen    int
+		wantErr    bool
+		wantErrSub string
+		wantPlat   int
+	}{
+		{name: "exactly at cap decodes", bodyLen: payloadLen, wantErr: false, wantPlat: payloadLen},
+		{name: "one byte over cap rejected", bodyLen: payloadLen + 1, wantErr: true, wantErrSub: "limit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := pre + strings.Repeat("x", tt.bodyLen) + post
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprint(w, body)
+			}))
+			defer ts.Close()
+
+			client := newTestClient(t, ts)
+			var resp plexapi.MC[plexapi.ServerIdentity]
+			err := client.Get(context.Background(), "/identity", &resp)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Get with a %d-byte body = nil error, want a size-limit error", len(body))
+				}
+				if !strings.Contains(err.Error(), tt.wantErrSub) {
+					t.Errorf("Get error = %v, want it to contain %q", err, tt.wantErrSub)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get with a %d-byte body (== cap) = %v, want success (cap is inclusive)", len(body), err)
+			}
+			if got := len(resp.MediaContainer.Platform); got != tt.wantPlat {
+				t.Errorf("decoded Platform length = %d, want %d", got, tt.wantPlat)
+			}
+		})
 	}
 }

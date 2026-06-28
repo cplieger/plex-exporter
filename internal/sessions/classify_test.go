@@ -81,10 +81,8 @@ func TestSubtitleAction(t *testing.T) {
 		{"copying wire variant maps to copy", plexapi.WSTranscodeSession{SubtitleDecision: "copying"}, metrics.ValCopy},
 		{"transcode decision", plexapi.WSTranscodeSession{SubtitleDecision: "transcode"}, metrics.ValTranscode},
 		{"transcoding wire variant maps to transcode", plexapi.WSTranscodeSession{SubtitleDecision: "transcoding"}, metrics.ValTranscode},
-		{"empty decision with srt container copies", plexapi.WSTranscodeSession{Container: "matroska,srt"}, metrics.ValCopy},
-		{"empty decision with uppercase SRT container copies", plexapi.WSTranscodeSession{Container: "SRT"}, metrics.ValCopy},
-		{"empty decision with video transcode burns", plexapi.WSTranscodeSession{Container: "mkv", VideoDecision: "transcode"}, metrics.ValBurn},
-		{"empty decision without srt or video transcode is none", plexapi.WSTranscodeSession{Container: "mkv", VideoDecision: "copy"}, metrics.ValNone},
+		{"empty decision is none", plexapi.WSTranscodeSession{}, metrics.ValNone},
+		{"empty decision ignores video decision", plexapi.WSTranscodeSession{VideoDecision: "transcode"}, metrics.ValNone},
 		{"unknown decision falls back to other", plexapi.WSTranscodeSession{SubtitleDecision: "weird"}, metrics.FallbackOther},
 		{"decision is trimmed and lowercased before matching", plexapi.WSTranscodeSession{SubtitleDecision: "  BURN  "}, metrics.ValBurn},
 	}
@@ -124,7 +122,7 @@ func TestTranscodeKind_returns_known_label(t *testing.T) {
 }
 
 // TestSubtitleAction_returns_known_label is the same bounded-output invariant
-// for the subtitle_action label: any decision/container/video-decision input
+// for the subtitle_action label: any decision/video-decision input
 // must classify to one of the canonical label values.
 func TestSubtitleAction_returns_known_label(t *testing.T) {
 	known := map[string]bool{
@@ -137,7 +135,6 @@ func TestSubtitleAction_returns_known_label(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		ts := plexapi.WSTranscodeSession{
 			SubtitleDecision: rapid.String().Draw(rt, "subtitleDecision"),
-			Container:        rapid.String().Draw(rt, "container"),
 			VideoDecision:    rapid.String().Draw(rt, "videoDecision"),
 		}
 		if got := SubtitleAction(&ts); !known[got] {

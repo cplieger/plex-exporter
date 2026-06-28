@@ -71,7 +71,7 @@ services:
 
 | Variable            | Description                                                                                                                                                                                                                                                                                                                                                                                                                        | Default             | Required |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------- |
-| `PLEX_SERVER`       | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`)                                                                                                                                                                                                                                                                                                                                     | `http://plex:32400` | Yes      |
+| `PLEX_SERVER`       | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`)                                                                                                                                                                                                                                                                                                                                     | -                   | Yes      |
 | `PLEX_TOKEN`        | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken                                                                                                                                                                                                                                                                                                             | -                   | Yes      |
 | `TZ`                | Container timezone                                                                                                                                                                                                                                                                                                                                                                                                                 | `Europe/Paris`      | No       |
 | `LISTEN_ADDRESS`    | Address and port for the metrics HTTP server                                                                                                                                                                                                                                                                                                                                                                                       | `:9594`             | No       |
@@ -110,10 +110,10 @@ Pick the configuration that matches your Plex server:
 | `plex_host_cpu_utilization_ratio`     | Gauge            | `server`, `server_id`                                                         | Host CPU utilization as a ratio (0.0–1.0). Requires Plex Pass.                                                                               |
 | `plex_host_memory_utilization_ratio`  | Gauge            | `server`, `server_id`                                                         | Host memory utilization as a ratio (0.0–1.0). Requires Plex Pass.                                                                            |
 | `plex_transmit_bytes_total`           | Counter          | `server`, `server_id`                                                         | Cumulative bytes transmitted (from Plex bandwidth API). Requires Plex Pass. Resets on container restart — indicative only.                   |
-| `plex_estimated_transmit_bytes_total` | Counter          | `server`, `server_id`                                                         | Estimated bytes transmitted based on session bitrates. Resets on container restart — indicative only.                                        |
 | `plex_active_transcode_sessions`      | Gauge            | `server`, `server_id`                                                         | Number of active video transcode sessions (from root endpoint, no Plex Pass needed)                                                          |
 | `plex_http_reachable`                 | Gauge            | `server`, `server_id`                                                         | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed                                                                        |
 | `plex_session_poll_reachable`         | Gauge            | `server`, `server_id`                                                         | Session poll reachability: `1` = last `/status/sessions` poll succeeded, `0` = failed                                                        |
+| `plex_http_retries_total`             | Counter          | `server`, `server_id`                                                         | Total HTTP retries performed by the Plex client's retry round-tripper across all requests                                                    |
 | `plex_exporter_errors_total`          | Counter          | `server`, `server_id`, `type`                                                 | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
 
 ### Library Metrics
@@ -149,9 +149,17 @@ For episodes: `title` = show name, `child_title` = season,
 number (track number for music). For movies: `title` = movie
 name, others are empty.
 
+Beyond the values above, every user-controlled label value is
+normalized to a bounded set, so an unexpected Plex response can never
+explode Prometheus cardinality: a value outside the documented set
+becomes `other` and missing data becomes `unknown`. This covers
+`stream_type`, `media_type`, `location`, `subtitle_action`, and the
+resolution labels. An empty Plex `subtitleDecision` is reported as
+`subtitle_action="none"`.
+
 ## Healthcheck
 
-The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container becomes unhealthy only if the initial Plex connection fails or the metrics server fails to start.
+The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container exits (and Docker restarts it) only when the initial Plex connection fails with a non-recoverable error — a bad token or other 4xx (except 408 and 429), the wrong server (404), or a TLS/certificate misconfiguration — or when the metrics server fails to start. A _transient_ initial failure (DNS, dial, timeout, a 408 or 429 rate-limit/timeout response, or a 5xx from a Plex that is still starting up) instead brings the exporter up in a degraded-but-healthy state: it binds `/metrics`, reports `plex_http_reachable=0`, and recovers automatically once Plex is reachable again.
 
 ## Security
 

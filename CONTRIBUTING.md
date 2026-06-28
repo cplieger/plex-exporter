@@ -12,8 +12,9 @@ and goroutine launch. Keep behaviour out of it — all logic lives in the
 
 - `internal/plexapi` — pure JSON/XML wire types for the Plex API
   responses. No imports beyond `encoding/json`.
-- `internal/plex` — HTTP client for Plex, including retry semantics and
-  the `httpStatusError` sentinels that let callers tell 4xx from 5xx.
+- `internal/plex` — HTTP client for Plex, including retry semantics, the
+  `ErrNotFound` sentinel, and the `HTTPStatusError` type that lets callers
+  tell 4xx from 5xx.
 - `internal/library` — the `Library` value type plus pure classification
   helpers (`IsType`, `ContentTypeLabel`, `Build`, `ItemCountTypes`).
   Deterministic and side-effect free.
@@ -22,9 +23,9 @@ and goroutine launch. Keep behaviour out of it — all logic lives in the
   the session bounds.
 - `internal/metrics` — the Prometheus descriptor set (labels, descs,
   error-type allowlist). Exports descriptor variables only.
-- `internal/server` — the `plexServer` orchestrator: refresh loop,
+- `internal/server` — the `Server` orchestrator: refresh loop,
   per-subsystem refresh methods, and the Prometheus `Describe`/`Collect`
-  implementation that emits metrics from `plexServer` state.
+  implementation that emits metrics from `Server` state.
 
 Sessions are tracked by polling `/status/sessions` every 5s; a stateful
 tracker reconciles poll snapshots into metric updates (prune after 60s
@@ -73,7 +74,7 @@ full reference.
   `plex_plays_active`/`plex_play_seconds_total` — adaptive streaming
   reports changing bitrates that would otherwise explode label
   cardinality. Don't add high-churn values as labels.
-- **Lock ordering.** When holding both, acquire the `plexServer` mutex
+- **Lock ordering.** When holding both, acquire the `Server` mutex
   before the session tracker's mutex; the reverse risks deadlock.
 - **Plex Pass degrades gracefully.** Host CPU/memory and
   bandwidth-transmission metrics come from undocumented endpoints that

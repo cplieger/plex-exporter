@@ -11,9 +11,6 @@ type MC[T any] struct {
 
 // ServerIdentity models /identity and /:/resources responses.
 type ServerIdentity struct {
-	FriendlyName                  string `json:"friendlyName"`
-	MachineIdentifier             string `json:"machineIdentifier"`
-	Version                       string `json:"version"`
 	Platform                      string `json:"platform"`
 	PlatformVersion               string `json:"platformVersion"`
 	MyPlexSubscription            bool   `json:"myPlexSubscription"`
@@ -53,17 +50,14 @@ type StatisticsBandwidth struct {
 }
 
 // MediaPart describes a single part of a Media entry (video/audio stream
-// decision + key).
+// decision).
 type MediaPart struct {
 	Decision string `json:"decision"`
-	Key      string `json:"key"`
 }
 
 // MediaInfo describes the Media element attached to a session.
 type MediaInfo struct {
 	VideoResolution string      `json:"videoResolution"`
-	VideoCodec      string      `json:"videoCodec"`
-	AudioCodec      string      `json:"audioCodec"`
 	Part            []MediaPart `json:"Part"`
 	Bitrate         int         `json:"bitrate"`
 }
@@ -74,7 +68,6 @@ type SessionMetadata struct {
 	TranscodeSession *WSTranscodeSession `json:"TranscodeSession"`
 	User             struct {
 		Title string `json:"title"`
-		ID    string `json:"id"`
 	} `json:"User"`
 	GrandparentTitle string      `json:"grandparentTitle"`
 	ParentTitle      string      `json:"parentTitle"`
@@ -88,8 +81,6 @@ type SessionMetadata struct {
 		Product string `json:"product"`
 		State   string `json:"state"`
 		Local   bool   `json:"local"`
-		Relayed bool   `json:"relayed"`
-		Secure  bool   `json:"secure"`
 	} `json:"Player"`
 	Session struct {
 		Location  string `json:"location"`
@@ -113,7 +104,6 @@ type MetadataListResponse struct {
 // websocket notification path); it is kept to avoid a rename-churn
 // across consumers.
 type WSTranscodeSession struct {
-	Key              string `json:"key"`
 	VideoDecision    string `json:"videoDecision"`
 	AudioDecision    string `json:"audioDecision"`
 	SubtitleDecision string `json:"subtitleDecision"`
@@ -121,5 +111,4 @@ type WSTranscodeSession struct {
 	SourceAudioCodec string `json:"sourceAudioCodec"`
 	VideoCodec       string `json:"videoCodec"`
 	AudioCodec       string `json:"audioCodec"`
-	Container        string `json:"container"`
 }

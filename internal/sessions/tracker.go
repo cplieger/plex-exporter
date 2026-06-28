@@ -3,10 +3,11 @@ package sessions
 import (
 	"context"
 	"log/slog"
-	"strings"
+	"maps"
 	"sync"
 	"time"
 
+	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/plexapi"
 )
 
@@ -47,13 +48,6 @@ const defaultSessionTimeout = time.Minute
 // prune it.
 const defaultStaleSessionTimeout = 5 * time.Minute
 
-// Exported aliases for test ergonomics (same-package tests reference these
-// directly in session setup).
-const (
-	SessionTimeout      = defaultSessionTimeout
-	StaleSessionTimeout = defaultStaleSessionTimeout
-)
-
 // MaxSessionKeyLen and MaxTrackedSessions bound the session tracker
 // against a compromised or buggy Plex server that streams unbounded
 // distinct sessionKey values. SessionKey is used both as a map key and
@@ -72,7 +66,6 @@ type Session struct {
 	PlayStarted    time.Time
 	LastUpdate     time.Time
 	TranscodeType  string
-	TranscodeKey   string
 	SubtitleAction string
 	LibName        string
 	LibID          string
@@ -116,134 +109,60 @@ func (p PruneConfig) interval() time.Duration {
 // operations are encapsulated as methods; external callers must not
 // access the mutex directly.
 type Tracker struct {
-	Sessions            map[string]Session
-	transcodeIndex      map[string]string // transcodeKey → sessionKey
-	TotalEstimatedKBits float64
-	PruneConf           PruneConfig
-	mu                  sync.Mutex
+	Sessions  map[string]Session
+	PruneConf PruneConfig
+	mu        sync.Mutex
 }
 
 // NewTracker returns an empty session tracker ready for use.
 func NewTracker() *Tracker {
 	return &Tracker{
-		Sessions:       make(map[string]Session),
-		transcodeIndex: make(map[string]string),
+		Sessions: make(map[string]Session),
 	}
 }
 
 // normalizeKey truncates a session key to MaxSessionKeyLen so that
-// write and lookup always use the same map key.
+// write and lookup always use the same map key. It uses
+// metrics.TruncateLabelValue (rune-aware truncation) deliberately: the
+// normalized key is emitted verbatim as the `session` Prometheus label
+// (collectSessions passes sessID through un-truncated), so it must stay
+// valid UTF-8 — a plain byte-slice cut could split a multi-byte rune and
+// make prometheus.MustNewConstMetric panic the collector goroutine.
 func normalizeKey(id string) string {
-	return id[:min(len(id), MaxSessionKeyLen)]
+	return metrics.TruncateLabelValue(id, MaxSessionKeyLen)
 }
 
 // UpdateLibraryLabels applies fn to the session identified by id under
-// the tracker's lock. No-op if the session does not exist. If fn sets
-// TranscodeKey, the transcode index is updated.
+// the tracker's lock. No-op if the session does not exist.
 func (t *Tracker) UpdateLibraryLabels(id string, fn func(*Session)) {
 	id = normalizeKey(id)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if ss, ok := t.Sessions[id]; ok {
-		oldKey := ss.TranscodeKey
 		fn(&ss)
-		if ss.TranscodeKey != "" && ss.TranscodeKey != oldKey {
-			t.transcodeIndex[ss.TranscodeKey] = id
-		}
 		t.Sessions[id] = ss
 	}
 }
 
-// UpdateTranscode correlates a transcode update (by its path-prefixed
-// key) with a tracked session via the transcode index, then applies the
-// classification. Falls back to checking each session's TranscodeKey
-// field and Part-URL match when the index misses.
-// Returns true if a match was found.
-func (t *Tracker) UpdateTranscode(transcodeKey, kind, subtitle string) bool {
+// SnapshotSessions returns a copy of the sessions map under the tracker's lock.
+func (t *Tracker) SnapshotSessions() map[string]Session {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
-	if t.matchTranscodeByIndex(transcodeKey, kind, subtitle) {
-		return true
-	}
-	return t.matchTranscodeByScan(transcodeKey, kind, subtitle)
+	return maps.Clone(t.Sessions)
 }
 
-// matchTranscodeByIndex is the fast path: it resolves transcodeKey through the
-// bareKey→sessionKey index and applies the classification to the indexed
-// session. Returns false when the index misses. Caller must hold t.mu.
-func (t *Tracker) matchTranscodeByIndex(transcodeKey, kind, subtitle string) bool {
-	for bareKey, sessKey := range t.transcodeIndex {
-		if !strings.Contains(transcodeKey, bareKey) {
-			continue
-		}
-		ss, ok := t.Sessions[sessKey]
-		if !ok {
-			continue
-		}
-		ss.TranscodeType = kind
-		ss.SubtitleAction = subtitle
-		t.Sessions[sessKey] = ss
-		return true
-	}
-	return false
-}
-
-// matchTranscodeByScan is the fallback when the index misses: it checks each
-// session's stored TranscodeKey (back-populating the index on a hit) and then
-// its media Part URLs. Caller must hold t.mu.
-func (t *Tracker) matchTranscodeByScan(transcodeKey, kind, subtitle string) bool {
-	for k := range t.Sessions {
-		ss := t.Sessions[k]
-		if ss.TranscodeKey != "" && strings.Contains(transcodeKey, ss.TranscodeKey) {
-			ss.TranscodeType = kind
-			ss.SubtitleAction = subtitle
-			t.Sessions[k] = ss
-			// Populate index for future lookups.
-			t.transcodeIndex[ss.TranscodeKey] = k
-			return true
-		}
-		if mediaPartContains(ss.Meta.Media, transcodeKey) {
-			ss.TranscodeType = kind
-			ss.SubtitleAction = subtitle
-			t.Sessions[k] = ss
-			return true
-		}
-	}
-	return false
-}
-
-// mediaPartContains reports whether any Part URL in media contains
-// transcodeKey as a substring.
-func mediaPartContains(media []plexapi.MediaInfo, transcodeKey string) bool {
-	for _, m := range media {
-		for _, p := range m.Part {
-			if p.Key != "" && strings.Contains(p.Key, transcodeKey) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// SnapshotSessions returns a copy of the sessions map and the current
-// TotalEstimatedKBits under the tracker's lock.
-func (t *Tracker) SnapshotSessions() (sessions map[string]Session, kbits float64) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	sessions = make(map[string]Session, len(t.Sessions))
-	for k := range t.Sessions {
-		sessions[k] = t.Sessions[k]
-	}
-	kbits = t.TotalEstimatedKBits
-	return sessions, kbits
+// bankPlayTime banks a playing session's elapsed play time into
+// PrevPlayedTime, keeping plex_play_seconds_total monotonic. Caller holds the tracker mutex.
+func (s *Session) bankPlayTime(now time.Time) {
+	elapsed := now.Sub(s.PlayStarted)
+	s.PrevPlayedTime += elapsed
 }
 
 // Update records a state transition for the given session key. The meta
 // and mediaMeta arguments may be nil; when non-nil they replace the
 // cached metadata on the tracked session. On a playing→non-playing
-// transition with attached media, the elapsed play time is accumulated
-// into TotalEstimatedKBits for the transmit-bytes estimator.
+// transition the elapsed play time is banked into PrevPlayedTime to keep
+// plex_play_seconds_total monotonic.
 func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.SessionMetadata) {
 	// Bound SessionKey length to prevent high-cardinality label explosion
 	// from a malicious or buggy Plex server.
@@ -268,11 +187,9 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ses
 		s.MediaMeta = *mediaMeta
 	}
 
-	// Accumulate play time and estimated bandwidth on playing→non-playing transition.
-	if s.State == StatePlaying && newState != StatePlaying && len(s.Meta.Media) > 0 {
-		elapsed := time.Since(s.PlayStarted)
-		s.PrevPlayedTime += elapsed
-		t.TotalEstimatedKBits += elapsed.Seconds() * float64(s.Meta.Media[0].Bitrate)
+	// Bank play time on every playing→non-playing transition.
+	if s.State == StatePlaying && newState != StatePlaying {
+		s.bankPlayTime(time.Now())
 	}
 	// Reset play timer on non-playing→playing transition.
 	if s.State != StatePlaying && newState == StatePlaying {
@@ -284,8 +201,40 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ses
 	t.Sessions[id] = s
 }
 
-// Prune reclaims stopped sessions past SessionTimeout and non-stopped
-// sessions idle past StaleSessionTimeout. Safe to call concurrently
+// MarkAbsentStopped transitions every tracked session whose key is not in
+// presentKeys to StateStopped, so a stream that vanished from the poll
+// moves onto the 60s stopped-prune path instead of lingering to the
+// 5-minute stale timeout. A session already stopped is left untouched; a
+// playing session banks its elapsed play time on the implicit
+// playing->stopped transition.
+func (t *Tracker) MarkAbsentStopped(presentKeys []string) {
+	present := make(map[string]bool, len(presentKeys))
+	for _, k := range presentKeys {
+		present[normalizeKey(k)] = true
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := time.Now()
+	for k := range t.Sessions {
+		if present[k] {
+			continue
+		}
+		s := t.Sessions[k]
+		if s.State == StateStopped {
+			continue
+		}
+		// Bank play time on the implicit playing→stopped transition.
+		if s.State == StatePlaying {
+			s.bankPlayTime(now)
+		}
+		s.State = StateStopped
+		s.LastUpdate = now
+		t.Sessions[k] = s
+	}
+}
+
+// Prune reclaims stopped sessions past the session timeout and non-stopped
+// sessions idle past the stale-session timeout. Safe to call concurrently
 // with Update.
 func (t *Tracker) Prune() {
 	t.mu.Lock()
@@ -307,9 +256,6 @@ func (t *Tracker) Prune() {
 			stale++
 		}
 		if remove {
-			if s.TranscodeKey != "" {
-				delete(t.transcodeIndex, s.TranscodeKey)
-			}
 			delete(t.Sessions, k)
 		}
 	}

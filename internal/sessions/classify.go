@@ -59,13 +59,11 @@ func SubtitleAction(ts *plexapi.WSTranscodeSession) string {
 		return v
 	}
 	if sd == "" {
-		ctn := strings.ToLower(strings.TrimSpace(ts.Container))
-		if strings.Contains(ctn, "srt") {
-			return metrics.ValCopy
-		}
-		if strings.ToLower(strings.TrimSpace(ts.VideoDecision)) == metrics.ValTranscode {
-			return metrics.ValBurn
-		}
+		// Plex sets an explicit subtitleDecision (burn/copy/transcode) whenever
+		// a subtitle stream is part of the transcode, so an empty decision means
+		// no subtitle is being handled. Report none rather than guessing burn
+		// from a video transcode or copy from an srt container; the reference
+		// consumer (Tautulli) likewise treats an empty decision as none.
 		return metrics.ValNone
 	}
 	return metrics.FallbackOther

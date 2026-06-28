@@ -19,8 +19,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Server is the Plex orchestrator. Fields are exported so that package
-// main (Describe/Collect code) and tests can read and mutate them under
+// Server is the Plex orchestrator. Fields are exported so that the
+// Describe/Collect code and tests can read and mutate them under
 // mu without a wall of accessor methods. The whole internal/* tree is a
 // single trust boundary.
 type Server struct {
@@ -140,7 +140,13 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 func (s *Server) RunRefreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	var prevFailed bool
+	// Seed prevFailed from the reachability state established at startup so a recovery after a
+	// degraded start logs "refresh recovered", symmetric with main()'s "starting in degraded
+	// state" warning. A normal start has HTTPReachable=true here, so prevFailed=false and no
+	// spurious recovery line fires on the first tick.
+	s.mu.Lock()
+	prevFailed := !s.HTTPReachable
+	s.mu.Unlock()
 	for {
 		select {
 		case <-ticker.C:
@@ -148,18 +154,14 @@ func (s *Server) RunRefreshLoop(ctx context.Context) {
 				continue // previous Refresh still running, skip this tick
 			}
 			if err := s.Refresh(ctx); err != nil {
-				s.mu.Lock()
-				s.HTTPReachable = false
-				s.mu.Unlock()
+				s.SetHTTPReachable(false)
 				s.RecordError("refresh")
 				slog.Warn("refresh failed", "error", err)
 				prevFailed = true
 				s.refreshing.Store(false)
 				continue
 			}
-			s.mu.Lock()
-			s.HTTPReachable = true
-			s.mu.Unlock()
+			s.SetHTTPReachable(true)
 			if prevFailed {
 				slog.Info("refresh recovered")
 				prevFailed = false
@@ -194,7 +196,7 @@ func (s *Server) SnapshotLibraries() []library.Library {
 	return libs
 }
 
-// Snapshot is an immutable view of Server captured under s.Mu for
+// Snapshot is an immutable view of Server captured under s.mu for
 // metric emission. Keeping the snapshot/emit split tight keeps Collect's
 // lock scope to a single block. PlexPass is stored as a string so the
 // caller can emit it directly as a Prometheus label value.
@@ -218,16 +220,16 @@ type Snapshot struct {
 
 // Snapshot returns a consistent point-in-time copy of the server's
 // metric-visible state. Callers emit Prometheus metrics from the
-// snapshot so Collect never holds s.Mu across a channel send.
+// snapshot so Collect never holds s.mu across a channel send.
 func (s *Server) Snapshot() Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	snap := Snapshot{
-		Name:             s.Name,
-		ID:               s.ID,
-		Version:          s.Version,
-		Platform:         s.Platform,
-		PlatformVersion:  s.PlatformVersion,
+		Name:             truncLabel(s.Name),
+		ID:               truncLabel(s.ID),
+		Version:          truncLabel(s.Version),
+		Platform:         truncLabel(s.Platform),
+		PlatformVersion:  truncLabel(s.PlatformVersion),
 		PlexPass:         "false",
 		HostCPU:          s.HostCPU,
 		HostMem:          s.HostMem,
@@ -291,6 +293,12 @@ func (s *Server) refreshLibraryItems(ctx context.Context) {
 // returns a positive result for the library's type. When no query yields a
 // positive count it logs at debug and leaves any existing count untouched.
 func (s *Server) fillItemCount(ctx context.Context, lb *library.Library) {
+	if _, err := strconv.Atoi(lb.ID); err != nil {
+		slog.Warn("library item count: non-numeric section id, skipping",
+			"id", lb.ID, "library", lb.Name)
+		s.RecordError("library_items")
+		return
+	}
 	for _, typ := range library.ItemCountTypes(lb.Type) {
 		if count, ok := s.tryItemCount(ctx, lb.ID, typ); ok {
 			lb.ItemsCount = count
@@ -435,6 +443,19 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	// "no one watching" poll correctly reads 1 rather than going stale.
 	s.SetSessionsReachable(true)
 
+	// Reconcile sessions that vanished from this poll: Plex drops an ended
+	// stream from /status/sessions rather than reporting it "stopped", so
+	// mark any tracked session absent from this poll as stopped. That moves
+	// it onto the 60s stopped-prune path (the documented retention) instead
+	// of the 5-minute stale-orphan path, banking its final play time.
+	present := make([]string, 0, len(sessResp.MediaContainer.Metadata))
+	for i := range sessResp.MediaContainer.Metadata {
+		if k := sessResp.MediaContainer.Metadata[i].SessionKey; k != "" {
+			present = append(present, k)
+		}
+	}
+	s.Sessions.MarkAbsentStopped(present)
+
 	work := s.buildSessionWork(sessResp.MediaContainer.Metadata)
 	if len(work) == 0 {
 		return
@@ -473,10 +494,8 @@ func (s *Server) buildSessionWork(activeSessions []plexapi.SessionMetadata) []se
 // concurrently (at most 4 in flight) and returns the metadata keyed by work
 // index. A fetch error or empty response leaves that index unset, so the
 // caller still applies session state without library labels.
-func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) map[int]*plexapi.SessionMetadata {
-	var mu sync.Mutex
-	results := make(map[int]*plexapi.SessionMetadata, len(work))
-
+func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*plexapi.SessionMetadata {
+	results := make([]*plexapi.SessionMetadata, len(work))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(min(4, len(work)))
 	for i, w := range work {
@@ -491,9 +510,7 @@ func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) map[
 				slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
 				return nil
 			}
-			mu.Lock()
 			results[i] = &metaResp.MediaContainer.Metadata[0]
-			mu.Unlock()
 			return nil
 		})
 	}
@@ -517,9 +534,8 @@ func (s *Server) applySessionUpdate(w *sessionWork, media *plexapi.SessionMetada
 }
 
 // classifyTranscode derives transcode kind and subtitle action from the
-// session's embedded TranscodeSession and writes them to the tracker,
-// preferring a transcode-key index match and falling back to a direct set
-// on the session. No-op when the session carries no TranscodeSession.
+// session's embedded TranscodeSession and writes them to the tracked
+// session by SessionKey. No-op when the session carries no TranscodeSession.
 func (s *Server) classifyTranscode(sess *plexapi.SessionMetadata) {
 	ts := sess.TranscodeSession
 	if ts == nil {
@@ -527,12 +543,6 @@ func (s *Server) classifyTranscode(sess *plexapi.SessionMetadata) {
 	}
 	kind := sessions.TranscodeKind(ts)
 	subtitle := sessions.SubtitleAction(ts)
-
-	// A keyed transcode that matches the index is fully applied there;
-	// otherwise set the classification directly on the session.
-	if ts.Key != "" && s.Sessions.UpdateTranscode(ts.Key, kind, subtitle) {
-		return
-	}
 	s.Sessions.UpdateLibraryLabels(sess.SessionKey, func(ss *sessions.Session) {
 		ss.TranscodeType = kind
 		ss.SubtitleAction = subtitle
