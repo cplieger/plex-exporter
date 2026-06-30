@@ -1,6 +1,6 @@
 # plex-exporter
 
-[![Image Size](https://ghcr-badge.egpl.dev/cplieger/plex-exporter/size)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter)
+[![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/size.json)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter)
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cplieger/plex-exporter)](https://goreportcard.com/report/github.com/cplieger/plex-exporter)
