@@ -1,9 +1,9 @@
+# Example compose for plex-exporter. See the README for all configuration options and hardening.
 services:
   plex-exporter:
     image: ghcr.io/cplieger/plex-exporter:latest
     container_name: plex-exporter
     restart: unless-stopped
-    user: "1000:1000"  # match your host user
 
     environment:
       TZ: "Europe/Paris"
