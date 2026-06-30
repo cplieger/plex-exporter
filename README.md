@@ -31,7 +31,7 @@ Connects to your Plex Media Server and exposes metrics (active sessions, library
 
 - **Polling `/status/sessions` for real-time session tracking** — polls the Plex sessions API on a short interval (5s) for near-instant session detection, with the tracker pruning sessions after 60s of inactivity
 - **Single binary with no runtime dependencies** — minimal direct Go dependencies (`prometheus/client_golang`), everything else is stdlib
-- **Distroless and rootless** — runs on `gcr.io/distroless/static` as UID 65534 with no shell or package manager, minimizing attack surface
+- **Distroless and rootless** — runs on `gcr.io/distroless/static-debian13` as UID 65532 with no shell or package manager, minimizing attack surface
 - **Prometheus-native** — exposes a standard `/metrics` endpoint that works with any Prometheus-compatible scraper and any Grafana dashboard, no custom visualization layer
 
 ### Limitations
