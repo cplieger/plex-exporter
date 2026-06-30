@@ -560,3 +560,34 @@ func TestGet_enforces_response_body_size_cap(t *testing.T) {
 		})
 	}
 }
+
+// TestNewClient_records_retry_on_transport_error exercises the WithOnRetry
+// hook on the transport-error path, where the retry round-tripper invokes the
+// hook with a nil *http.Response because no HTTP reply was ever received. A
+// dial to a closed listener is refused, which the transport classifies as a
+// transient error and retries, so the retry counter advances. This complements
+// TestNewClient_counts_retries, which only drives the 503 path (non-nil resp).
+func TestNewClient_records_retry_on_transport_error(t *testing.T) {
+	// Stand up a server only to obtain a real loopback address, then close it
+	// so every subsequent dial to that port is refused (a transient error).
+	ts := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	closedURL := ts.URL
+	ts.Close()
+
+	c, err := NewClient(closedURL, "tok", "")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var resp plexapi.MC[plexapi.ServerIdentity]
+	err = c.Get(ctx, "/", &resp)
+	if err == nil {
+		t.Fatal("Get against a closed listener = nil error, want a transport error after retries are exhausted")
+	}
+	if got := c.Retries(); got == 0 {
+		t.Errorf("Retries() = 0, want > 0: a transient transport error must be retried and counted")
+	}
+}

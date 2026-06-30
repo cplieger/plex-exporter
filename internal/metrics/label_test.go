@@ -25,6 +25,7 @@ func TestTruncateLabelValue(t *testing.T) {
 		{name: "cut on a rune boundary keeps whole runes", in: "héllo", maxBytes: 3, want: "hé"},
 		{name: "three-byte runes walk back to boundary", in: "日本語", maxBytes: 4, want: "日"},
 		{name: "single rune wider than cap yields empty", in: "𐀀", maxBytes: 2, want: ""},
+		{name: "invalid utf-8 of only continuation bytes yields empty", in: string([]byte{0x80, 0x80, 0x80}), maxBytes: 2, want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
