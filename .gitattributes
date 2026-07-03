@@ -9,7 +9,7 @@
 #
 # Distributed to all releaseable + python repos via cplieger/ci's sync
 # workflow (see scripts/classify-repos.sh). Keep this uniform across repos;
-# repos with extra needs (e.g. homelab's age-encrypted blobs) maintain their
+# repos with extra needs (e.g. age-encrypted secret blobs) maintain their
 # own superset and are excluded from the sync.
 
 # Force LF for all text; auto-detect and leave binary files untouched.
