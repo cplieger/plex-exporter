@@ -3,7 +3,6 @@
 [![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/size.json)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter)
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cplieger/plex-exporter)](https://goreportcard.com/report/github.com/cplieger/plex-exporter)
 [![Test coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/coverage.json)](https://github.com/cplieger/plex-exporter/actions/workflows/coverage.yml)
 [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/mutation.json)](https://github.com/cplieger/plex-exporter/issues?q=label%3Agremlins-tracker)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13216/badge)](https://www.bestpractices.dev/projects/13216)
@@ -177,8 +176,7 @@ The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (
 
 Connects outbound to Plex only. The `/metrics` endpoint serves
 read-only Prometheus data (standard for internal exporters).
-`PLEX_TOKEN` is never logged or exposed in metrics. Runs as
-`nonroot` on a distroless base image with no shell.
+`PLEX_TOKEN` is never logged or exposed in metrics.
 
 **Details for advanced users:** Plex response bodies capped at
 10 MB via `io.LimitReader`. All HTTP clients use explicit 10s
@@ -186,9 +184,7 @@ timeouts; the metrics server sets `ReadHeaderTimeout`,
 `ReadTimeout`, `WriteTimeout`, `IdleTimeout`, and
 `MaxHeaderBytes` (1 MB). Rating keys validated via
 `strconv.Atoi` before URL construction. Explicit
-`MinVersion: tls.VersionTLS12` set on TLS config. Semgrep flags
-the `/tmp/.healthy` marker and the opt-in TLS skip (both
-intentional).
+`MinVersion: tls.VersionTLS12` set on TLS config.
 
 ## Dependencies
 
@@ -205,21 +201,7 @@ All dependencies are updated automatically via [Renovate](https://github.com/ren
 
 ## Credits
 
-This is an original tool that builds upon [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter).
-
-- Grafana Hackathon 2022
-  — the original hackathon project that started it all
-- [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter)
-  by [@jsclayton](https://github.com/jsclayton) — the post-hackathon
-  fork that added graceful shutdown and Go module updates
-- [prometheus-plex-exporter](https://github.com/timothystewart6/prometheus-plex-exporter)
-  by [@timothystewart6](https://github.com/timothystewart6) — the
-  actively maintained upstream with multi-package architecture,
-  transcode tracking, and configurable library refresh
-- [Plex Media Server API](https://developer.plex.tv/pms/) — the
-  official API documentation
-- [prometheus/client_golang](https://github.com/prometheus/client_golang)
-  — Prometheus instrumentation library for Go
+This is an original tool building on the Grafana Hackathon 2022 [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) lineage: the [@jsclayton](https://github.com/jsclayton) post-hackathon fork and the actively maintained [@timothystewart6](https://github.com/timothystewart6) fork. It also uses the [Plex Media Server API](https://developer.plex.tv/pms/) and [prometheus/client_golang](https://github.com/prometheus/client_golang).
 
 ## Contributing
 
@@ -228,7 +210,7 @@ larger changes so the approach can be discussed before implementation.
 
 ## Disclaimer
 
-These images are built with care and follow security best practices, but they are intended for **homelab use**. No guarantees of fitness for production environments. Use at your own risk.
+This project is built with care and follows security best practices, but it is intended for personal / self-hosted use. No guarantees of fitness for production environments. Use at your own risk.
 
 This project was built with AI-assisted tooling using [Claude Opus](https://www.anthropic.com/claude) and [Kiro](https://kiro.dev). The human maintainer defines architecture, supervises implementation, and makes all final decisions.
 
