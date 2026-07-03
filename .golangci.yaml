@@ -66,7 +66,7 @@ linters:
     presets:
       # `comments` preset removed: revive's `exported` (every exported symbol
       # needs a doc comment starting with its name) and `package-comments`
-      # (every package needs a doc comment) are now enforced fleet-wide.
+      # (every package needs a doc comment) are now enforced org-wide.
       # All consumer repos were updated before this change was propagated.
       - std-error-handling
       - common-false-positives
@@ -79,9 +79,9 @@ linters:
       # (gocyclo + gocognit). Both over-fire on idiomatic Go test code: a
       # thorough table-driven / property / fuzz test is a loop + t.Run closures
       # + per-case assertion guards, which gocognit's nesting model scores high
-      # without that being a smell. A 2026-06 fleet scan put clean gold-standard
+      # without that being a smell. A 2026-06 audit put clean gold-standard
       # libraries' flagship tests at cognitive 36-72 (atomicfile TestPendingFile
-      # is 72) and ~320 test funcs fleet-wide over 15; gating those would force
+      # is 72) and ~320 test funcs org-wide over 15; gating those would force
       # ~320 //nolint or the splitting of cohesive table tests, degrading the
       # suites. golangci also can't set a test-only threshold (min-complexity is
       # global), so the prod gate of 15 can't coexist with a lenient test bar.
