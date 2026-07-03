@@ -5,7 +5,7 @@
 # works the moment it is synced — no cplieger/ci tag move required.
 #
 # Push-triggered + branch_protection_rule + manual only — deliberately NO
-# weekly cron: a single shared schedule across the whole fleet would be a
+# weekly cron: a single shared schedule across all repos would be a
 # ~28-job thundering herd against the 20-job account concurrency cap. The score
 # only changes on repo/config/dependency changes, which push-to-main captures.
 name: Scorecard
