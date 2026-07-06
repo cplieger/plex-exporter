@@ -22,14 +22,10 @@ import (
 	"github.com/cplieger/health"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"
+	"github.com/cplieger/webhttp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
-
-// errMetricsServer is the cancellation cause set when the metrics HTTP server
-// fails at runtime, so run() exits non-zero (a crash must not look like a clean
-// shutdown to the restart policy or exit-code alerting).
-var errMetricsServer = errors.New("metrics server failed")
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "health" {
@@ -82,8 +78,8 @@ func run() int {
 			// Shutdown (SIGINT/SIGTERM) arrived during the initial connect -- not a Plex
 			// failure. Exit cleanly instead of logging a misleading "degraded state" warning
 			// for a cancelled startup. ctx.Err() is non-nil here only on signal cancellation
-			// (the Serve goroutine that could cancel with errMetricsServer has not started
-			// yet); the inner Refresh deadline leaves the parent ctx.Err() nil, so a genuinely
+			// (the metrics server has not started yet, so nothing else can cancel ctx);
+			// the inner Refresh deadline leaves the parent ctx.Err() nil, so a genuinely
 			// slow Plex still degrades.
 			slog.Info("shutdown requested during startup", "cause", context.Cause(ctx))
 			return 0
@@ -119,14 +115,16 @@ func run() int {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/api/health", health.Handler(marker))
 
-	httpServer := &http.Server{
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20, // 1 MB
-	}
+	// webhttp.NewServer supplies MaxHeaderBytes (1 MiB) and the streaming-safe
+	// baseline; the exporter re-supplies its explicit read/write bounds because
+	// /metrics is a bounded, non-streaming response and unbounded timeouts would
+	// regress the DoS posture.
+	httpServer := webhttp.NewServer(mux,
+		webhttp.WithReadHeaderTimeout(5*time.Second),
+		webhttp.WithReadTimeout(5*time.Second),
+		webhttp.WithWriteTimeout(10*time.Second),
+		webhttp.WithIdleTimeout(120*time.Second),
+	)
 
 	// Bind the listener before marking healthy so a port-in-use failure is
 	// reported before Docker's healthcheck can observe a stale-true state.
@@ -136,33 +134,29 @@ func run() int {
 		slog.Error("cannot bind listen address", "addr", listenAddr, "error", err)
 		return 1
 	}
-	go func() {
-		slog.Info("starting metrics server", "addr", listener.Addr().String())
-		if srvErr := httpServer.Serve(listener); !errors.Is(srvErr, http.ErrServerClosed) {
-			slog.Error("metrics server failed", "error", srvErr)
-			ps.RecordError("metrics_server")
-			cancel(errMetricsServer)
-		}
-	}()
 
 	marker.Set(true)
 
 	go ps.Sessions.RunPruneLoop(ctx)
 	go ps.RunSessionPollLoop(ctx)
 
-	// Block until context is cancelled (SIGINT/SIGTERM).
-	<-ctx.Done()
+	// Flip the health marker to unhealthy the moment shutdown is signalled,
+	// before webhttp.Run drains, so probes (Docker HEALTHCHECK + HTTP
+	// /api/health) see red during the drain window (Run's teardown runs only
+	// after the drain completes).
+	go func() {
+		<-ctx.Done()
+		marker.Set(false)
+		slog.Info("shutting down", "cause", context.Cause(ctx))
+	}()
 
-	// Flip the health marker to unhealthy before Shutdown drains so probes
-	// (Docker HEALTHCHECK + HTTP /api/health) see red during the drain window.
-	marker.Set(false)
-	slog.Info("shutting down", "cause", context.Cause(ctx))
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer shutdownCancel()
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		slog.Warn("http shutdown error", "error", err)
-	}
-	if errors.Is(context.Cause(ctx), errMetricsServer) {
+	slog.Info("starting metrics server", "addr", listener.Addr().String())
+	if srvErr := webhttp.Run(ctx, httpServer, listener, nil, webhttp.WithShutdownGrace(15*time.Second)); srvErr != nil {
+		// A runtime Serve failure (not a clean shutdown): record it and exit
+		// non-zero so the restart policy / exit-code alerting does not mistake
+		// it for a graceful stop.
+		slog.Error("metrics server failed", "error", srvErr)
+		ps.RecordError("metrics_server")
 		return 1
 	}
 	return 0

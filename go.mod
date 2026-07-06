@@ -10,7 +10,10 @@ require (
 	pgregory.net/rapid v1.3.0
 )
 
-require github.com/cplieger/httpx/v2 v2.1.1
+require (
+	github.com/cplieger/httpx/v2 v2.1.1
+	github.com/cplieger/webhttp v1.1.1
+)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
