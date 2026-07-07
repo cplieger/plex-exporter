@@ -18,10 +18,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	// Embed the IANA tz database so TZ (default Europe/Paris) is honored even
-	// though the distroless static base ships no /usr/share/zoneinfo; without
-	// it time.Local silently falls back to UTC.
-	_ "time/tzdata"
 
 	"github.com/cplieger/health"
 	"github.com/cplieger/plex-exporter/internal/plex"
@@ -43,6 +39,8 @@ func main() {
 }
 
 func run() int {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{ReplaceAttr: utcTimeAttr})))
+
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	ctx, cancel := context.WithCancelCause(sigCtx)
@@ -226,4 +224,16 @@ func isFatalStartupError(err error) bool {
 	// Transport errors (connection refused, DNS failure, timeout): Plex is
 	// unreachable now but may come back.
 	return false
+}
+
+// utcTimeAttr is a slog ReplaceAttr that renders the record's built-in time
+// key in UTC, so log-line timestamps are zone-stable regardless of the
+// container's TZ (the fleet logs-in-UTC standard). It rewrites only the
+// top-level time attribute; a user attribute that happens to share the "time"
+// key inside a group is left untouched.
+func utcTimeAttr(groups []string, a slog.Attr) slog.Attr {
+	if len(groups) == 0 && a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
+		a.Value = slog.TimeValue(a.Value.Time().UTC())
+	}
+	return a
 }

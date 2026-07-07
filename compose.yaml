@@ -6,7 +6,6 @@ services:
     restart: unless-stopped
 
     environment:
-      TZ: "Europe/Paris"
       PLEX_SERVER: "http://plex:32400"  # full URL including scheme and port
       PLEX_TOKEN: "your-plex-token"  # admin token from Plex Web settings
 
