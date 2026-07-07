@@ -37,10 +37,8 @@ func main() {
 func run() int {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{ReplaceAttr: utcTimeAttr})))
 
-	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	ctx, cancel := context.WithCancelCause(sigCtx)
-	defer cancel(nil)
 
 	// Remove stale health file from a previous run that may have crashed
 	// before its defer ran. Without this, the health probe would report
@@ -115,15 +113,39 @@ func run() int {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/api/health", health.Handler(marker))
 
-	// webhttp.NewServer supplies MaxHeaderBytes (1 MiB) and the streaming-safe
-	// baseline; the exporter re-supplies its explicit read/write bounds because
-	// /metrics is a bounded, non-streaming response and unbounded timeouts would
-	// regress the DoS posture.
-	httpServer := webhttp.NewServer(mux,
+	// Standard webhttp middleware chain. Chain is outermost-first, so this is
+	// the fleet's canonical order: Logging outermost (its access line records
+	// the final status), Recoverer inside it (a recovered panic is logged as
+	// its 500, not the StatusRecorder's default 200), and SecurityHeaders
+	// innermost (its nosniff / X-Frame-Options: DENY / Referrer-Policy baseline
+	// is set before the handler runs, so it survives even onto a recovered
+	// 500). No CSP or HSTS: /metrics and /api/health are non-browser,
+	// machine-scraped endpoints, so nosniff is the header that earns its keep.
+	//
+	// Both routine machine paths are skipped from the access line -- Prometheus
+	// scrapes /metrics roughly every 15s and the Docker HEALTHCHECK hits
+	// /api/health every 30s, so logging either would flood the log for no
+	// operational gain. The request id is still minted, echoed, and threaded on
+	// skipped paths, so a panic in either handler is still logged with its id,
+	// and any unexpected path (a 404 from a stray client) is still logged.
+	// Logging and Recoverer default to slog.Default(), which is the logger the
+	// rest of the app already uses.
+	handler := webhttp.Chain(mux,
+		webhttp.Logging(webhttp.WithSkipPaths("/metrics", "/api/health")),
+		webhttp.Recoverer(),
+		webhttp.SecurityHeaders(),
+	)
+
+	// webhttp.NewServer's defaults already supply IdleTimeout 120s and
+	// MaxHeaderBytes 1 MiB, so only the three timeouts the exporter needs are
+	// passed: it tightens ReadHeaderTimeout to 5s and, because /metrics is a
+	// bounded non-streaming response, sets the ReadTimeout/WriteTimeout that
+	// NewServer leaves unset by default (omitting them would drop today's
+	// slow-body/slow-write DoS protection).
+	srv := webhttp.NewServer(handler,
 		webhttp.WithReadHeaderTimeout(5*time.Second),
 		webhttp.WithReadTimeout(5*time.Second),
 		webhttp.WithWriteTimeout(10*time.Second),
-		webhttp.WithIdleTimeout(120*time.Second),
 	)
 
 	// Bind the listener before marking healthy so a port-in-use failure is
@@ -151,7 +173,7 @@ func run() int {
 	}()
 
 	slog.Info("starting metrics server", "addr", listener.Addr().String())
-	if srvErr := webhttp.Run(ctx, httpServer, listener, nil, webhttp.WithShutdownGrace(15*time.Second)); srvErr != nil {
+	if srvErr := webhttp.Run(ctx, srv, listener, nil, webhttp.WithShutdownGrace(15*time.Second)); srvErr != nil {
 		// A runtime Serve failure (not a clean shutdown): record it and exit
 		// non-zero so the restart policy / exit-code alerting does not mistake
 		// it for a graceful stop.
