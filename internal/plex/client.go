@@ -2,8 +2,6 @@ package plex
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -153,30 +151,21 @@ func (c *Client) Retries() int64 {
 	return c.retries.Load()
 }
 
-// plexTLSTransport builds a CA-pinned *http.Transport from caCertPath. TLS
-// verification stays ENABLED (RootCAs pinned, TLS 1.2 minimum,
-// InsecureSkipVerify false). Returns an error for an unreadable file or a
-// PEM that contains no certificates. caCertPath must be non-empty.
+// plexTLSTransport builds a CA-pinned *http.Transport from caCertPath. The
+// PEM read stays here (so the PLEX_CA_CERT_PATH context wraps the error and
+// httpx stays I/O-free); httpx.CATransport does the pinning: it clones
+// http.DefaultTransport and installs a fresh TLS config trusting ONLY the
+// CA(s) in the PEM (RootCAs pinned, TLS 1.2 minimum, verification always on).
+// Returns an error for an unreadable file or a PEM with no certificates
+// (httpx.ErrNoCertsInPEM). caCertPath must be non-empty.
 func plexTLSTransport(caCertPath string) (*http.Transport, error) {
 	pemBytes, err := os.ReadFile(caCertPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
 	}
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(pemBytes) {
-		return nil, fmt.Errorf("PLEX_CA_CERT_PATH=%q: no PEM-encoded certificates found", caCertPath)
-	}
-	// Clone the default transport so the CA-pinned path keeps the same
-	// connection pooling, timeouts, and proxy support the no-CA path gets
-	// from http.DefaultTransport; override only the TLS config.
-	dt, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, errors.New("http.DefaultTransport is not *http.Transport")
-	}
-	tr := dt.Clone()
-	tr.TLSClientConfig = &tls.Config{
-		RootCAs:    pool,
-		MinVersion: tls.VersionTLS12,
+	tr, err := httpx.CATransport(pemBytes)
+	if err != nil {
+		return nil, fmt.Errorf("PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
 	}
 	return tr, nil
 }
