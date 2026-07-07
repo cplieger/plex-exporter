@@ -6,8 +6,8 @@ github.com/cplieger/health v1.1.4 h1:q/6QEffGp+TdJ3tBet5cfIIQH1mDHcyCVBxXkKbDDwg
 github.com/cplieger/health v1.1.4/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
 github.com/cplieger/httpx/v2 v2.1.1 h1:SowDAs8mL3PqfSnFhS025sNLfmYSL+xAHP6M9MB9zwI=
 github.com/cplieger/httpx/v2 v2.1.1/go.mod h1:DffGCIJihiQhVjn481ZYnA2HU26Qpvhd5swi+2rXdck=
-github.com/cplieger/webhttp v1.1.1 h1:HsbT0sZCJE/r6AnRU+IJxxJTmLUepFdd0TdGPyztaSY=
-github.com/cplieger/webhttp v1.1.1/go.mod h1:LQLE9eJNI6RztoQoXsRGUpa+RlaWXE3HnL7q3rdWPsE=
+github.com/cplieger/webhttp v1.2.0 h1:eYOvBubDVcWTOiPPfJlLErxweCi99h6aqd7xfyZzN+Y=
+github.com/cplieger/webhttp v1.2.0/go.mod h1:LQLE9eJNI6RztoQoXsRGUpa+RlaWXE3HnL7q3rdWPsE=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
