@@ -8,6 +8,9 @@ on:
       - package.json
       - package-lock.json
       - Dockerfile
+      - "**/*.sh"
+      - compose.yaml
+      - .trivyignore
       - .github/workflows/security.yml
   workflow_dispatch:
 
