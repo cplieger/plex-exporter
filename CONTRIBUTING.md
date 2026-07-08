@@ -64,7 +64,7 @@ docker build -t plex-exporter .
 It compiles with `CGO_ENABLED=0` and ships on
 `gcr.io/distroless/static:nonroot` — no shell, no package
 manager. Runtime config is via env (`PLEX_SERVER`, `PLEX_TOKEN`,
-`LISTEN_ADDRESS`, `PLEX_CA_CERT_PATH`, `TZ`); see the README for the
+`LISTEN_ADDRESS`, `PLEX_CA_CERT_PATH`); see the README for the
 full reference.
 
 ## Conventions and gotchas
@@ -83,6 +83,9 @@ full reference.
 - **New metrics:** add the descriptor in `internal/metrics`, emit it
   from `Collect` in `internal/server`, and document it in the README's
   metrics tables.
+- **Logs are UTC.** A `utcTimeAttr` slog `ReplaceAttr` forces every
+  record's timestamp to UTC, so the container needs no `TZ` and the binary
+  embeds no `time/tzdata`.
 
 ## Commits and PRs
 
