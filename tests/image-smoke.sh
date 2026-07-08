@@ -12,12 +12,16 @@ set -eu
 
 IMG="${1:?usage: image-smoke.sh <image-ref>}"
 NAME="smoke-plex-exporter-$$"
-TIMEOUT=90
+TIMEOUT=90 # must cover the image's healthcheck start-period + a few intervals
 
 # shellcheck disable=SC2329  # invoked indirectly via trap
 cleanup() {
-  printf '%s\n' "--- container logs (tail) ---"
-  docker logs "$NAME" 2>&1 | tail -40 || true
+  code=$?
+  # Dump container logs only on failure (a passing run stays quiet).
+  if [ "$code" -ne 0 ]; then
+    printf '%s\n' "--- container logs (tail) ---" >&2
+    docker logs "$NAME" 2>&1 | tail -40 >&2 || true
+  fi
   docker rm -f "$NAME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -30,32 +34,35 @@ docker run -d --name "$NAME" \
 i=0
 status=starting
 while [ "$i" -lt "$TIMEOUT" ]; do
+  # Fail fast on an early exit: poll .State.Running before the health status so
+  # a crash-boot is caught by its exit code (more debuggable than "unhealthy")
+  # and the verdict never depends on what health a stopped container reports.
   if [ "$(docker inspect --format '{{ .State.Running }}' "$NAME" 2>/dev/null || echo missing)" != "true" ]; then
-    code=$(docker inspect --format '{{ .State.ExitCode }}' "$NAME" 2>/dev/null || echo '?')
-    printf 'FAIL: plex-exporter container exited early (exit code %s)\n' "$code"
+    ec=$(docker inspect --format '{{ .State.ExitCode }}' "$NAME" 2>/dev/null || echo '?')
+    printf 'FAIL: plex-exporter container exited early (exit code %s)\n' "$ec" >&2
     exit 1
   fi
   status=$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}no-healthcheck{{ end }}' "$NAME" 2>/dev/null || echo gone)
   case "$status" in
     healthy)
-      printf '%s\n' "plex-exporter image smoke: ok (healthy after ${i}s)"
+      printf 'plex-exporter image smoke: ok (healthy after %ss)\n' "$i"
       exit 0
       ;;
     unhealthy)
-      printf '%s\n' "FAIL: plex-exporter reported unhealthy"
+      printf 'FAIL: plex-exporter reported unhealthy\n' >&2
       exit 1
       ;;
     no-healthcheck)
-      printf '%s\n' "FAIL: image has no HEALTHCHECK to assert against"
+      printf 'FAIL: image has no HEALTHCHECK to assert against\n' >&2
       exit 1
       ;;
     gone)
-      printf '%s\n' "FAIL: plex-exporter container exited early"
+      printf 'FAIL: plex-exporter container is gone\n' >&2
       exit 1
       ;;
   esac
   i=$((i + 1))
   sleep 1
 done
-printf '%s\n' "FAIL: plex-exporter did not become healthy within ${TIMEOUT}s (last status: $status)"
+printf 'FAIL: plex-exporter did not become healthy within %ss (last status: %s)\n' "$TIMEOUT" "$status" >&2
 exit 1
