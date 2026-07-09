@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/plex-exporter/internal/library"
-	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plextest"
-	"github.com/cplieger/plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/v2/internal/library"
+	"github.com/cplieger/plex-exporter/v2/internal/metrics"
+	"github.com/cplieger/plex-exporter/v2/internal/plextest"
+	"github.com/cplieger/plex-exporter/v2/internal/sessions"
 )
 
 func TestRefreshSessions_basic_playing_session(t *testing.T) {

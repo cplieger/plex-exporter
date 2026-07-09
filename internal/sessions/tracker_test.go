@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 )
 
 func TestTrackerUpdate(t *testing.T) {

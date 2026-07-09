@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/plex-exporter/internal/library"
-	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plex"
-	"github.com/cplieger/plex-exporter/internal/plexapi"
-	"github.com/cplieger/plex-exporter/internal/sessions"
+	"github.com/cplieger/plex-exporter/v2/internal/library"
+	"github.com/cplieger/plex-exporter/v2/internal/metrics"
+	"github.com/cplieger/plex-exporter/v2/internal/plex"
+	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	"github.com/cplieger/plex-exporter/v2/internal/sessions"
 	"golang.org/x/sync/errgroup"
 )
 

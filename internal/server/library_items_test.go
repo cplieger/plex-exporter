@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/plex-exporter/internal/library"
-	"github.com/cplieger/plex-exporter/internal/plextest"
+	"github.com/cplieger/plex-exporter/v2/internal/library"
+	"github.com/cplieger/plex-exporter/v2/internal/plextest"
 )
 
 func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
