@@ -3,8 +3,8 @@ package sessions
 import (
 	"strings"
 
-	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/v2/internal/metrics"
+	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 )
 
 // TranscodeKind classifies a transcode session by audio/video decision

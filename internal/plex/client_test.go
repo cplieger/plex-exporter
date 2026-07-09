@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v2"
-	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 )
 
 // writeSelfSignedPEM generates an in-memory self-signed CA cert and writes

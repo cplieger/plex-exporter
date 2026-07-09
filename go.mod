@@ -1,4 +1,4 @@
-module github.com/cplieger/plex-exporter
+module github.com/cplieger/plex-exporter/v2
 
 go 1.26.5
 

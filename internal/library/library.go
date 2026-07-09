@@ -3,7 +3,7 @@ package library
 import (
 	"strconv"
 
-	"github.com/cplieger/plex-exporter/internal/plexapi"
+	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 )
 
 // Library types recognised by the exporter. Values match the Plex

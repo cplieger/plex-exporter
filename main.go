@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/cplieger/health"
-	"github.com/cplieger/plex-exporter/internal/plex"
-	"github.com/cplieger/plex-exporter/internal/server"
+	"github.com/cplieger/plex-exporter/v2/internal/plex"
+	"github.com/cplieger/plex-exporter/v2/internal/server"
 	"github.com/cplieger/webhttp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

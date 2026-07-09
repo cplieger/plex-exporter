@@ -3,7 +3,7 @@ package metrics_test
 import (
 	"testing"
 
-	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/v2/internal/metrics"
 	"pgregory.net/rapid"
 )
 
