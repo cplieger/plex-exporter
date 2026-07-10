@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	github.com/cplieger/httpx/v2 v2.2.0
+	github.com/cplieger/httpx/v2 v2.4.0
 	github.com/cplieger/webhttp v1.2.1
 )
 
