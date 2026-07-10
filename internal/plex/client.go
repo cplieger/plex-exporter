@@ -217,12 +217,13 @@ func (c *Client) GetWithHeaders(ctx context.Context, path string, result any, ex
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 		return &HTTPStatusError{Code: resp.StatusCode, Status: resp.Status, Path: path}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBody+1))
+	body, err := httpx.ReadLimitedBody(resp.Body, MaxResponseBody)
 	if err != nil {
+		var tooLarge *httpx.ResponseTooLargeError
+		if errors.As(err, &tooLarge) {
+			return fmt.Errorf("plex API %s: response exceeds %d-byte limit", path, MaxResponseBody)
+		}
 		return fmt.Errorf("plex GET %s: reading body: %w", path, err)
-	}
-	if int64(len(body)) > MaxResponseBody {
-		return fmt.Errorf("plex API %s: response exceeds %d-byte limit", path, MaxResponseBody)
 	}
 	if len(body) == 0 {
 		return nil

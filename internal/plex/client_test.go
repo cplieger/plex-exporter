@@ -2,16 +2,9 @@ package plex
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,37 +16,9 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v2"
+	"github.com/cplieger/httpx/v2/certtest"
 	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 )
-
-// writeSelfSignedPEM generates an in-memory self-signed CA cert and writes
-// it as PEM to a tempfile under t.TempDir(). Returns the path. Used by the
-// CA-pool tests; the cert is never actually validated against, just parsed.
-func writeSelfSignedPEM(t *testing.T) string {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("ecdsa.GenerateKey: %v", err)
-	}
-	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "test-plex-ca"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
-		IsCA:         true,
-		KeyUsage:     x509.KeyUsageCertSign,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("x509.CreateCertificate: %v", err)
-	}
-	path := filepath.Join(t.TempDir(), "ca.pem")
-	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	if err := os.WriteFile(path, pemBytes, 0o600); err != nil {
-		t.Fatalf("os.WriteFile: %v", err)
-	}
-	return path
-}
 
 // testToken is the fixed credential used by the test fixtures in this package.
 // The leading "$" mimics an unexpanded environment-variable placeholder, which
@@ -293,7 +258,7 @@ func TestNewPlexClient_default_no_tls_skip(t *testing.T) {
 
 func TestNewPlexClient_ca_cert_path_sets_root_cas(t *testing.T) {
 	// Generate an in-memory self-signed CA cert + write to a temp file.
-	caPath := writeSelfSignedPEM(t)
+	caPath := certtest.WriteSelfSignedCA(t)
 
 	// NewClient wraps the CA-pinned transport in the retry round-tripper.
 	c, err := NewClient("https://plex.example:32400", "tok", caPath)
