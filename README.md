@@ -154,6 +154,24 @@ becomes `other` and missing data becomes `unknown`. This covers
 resolution labels. An empty Plex `subtitleDecision` is reported as
 `subtitle_action="none"`.
 
+## Alerting
+
+plex-exporter exposes Prometheus metrics on `/metrics` (see
+[Metrics reference](#metrics-reference)). Scrape that endpoint and
+evaluate the rules in [`alerts.yaml`](alerts.yaml) with Prometheus or
+the Mimir ruler; firing alerts deliver through your Alertmanager like
+any other Prometheus alert. They cover:
+
+| Alert | Fires when | Severity |
+| --- | --- | --- |
+| `PlexAPIUnreachable` | the authenticated Plex API poll reports `plex_http_reachable=0` for 10m (often a revoked or invalid `PLEX_TOKEN`) | warning |
+| `PlexExporterCollectionErrors` | the exporter logs collection errors of some `type` continuously for 30m | warning |
+| `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m | warning |
+
+Thresholds, the `for:` windows, and the `severity` labels are starting points;
+add your scrape `job` label to the selectors if you run more than one instance,
+and route by whatever labels your Alertmanager uses.
+
 ## Healthcheck
 
 The container includes an HTTP health endpoint (`/api/health`) and a CLI probe (`/plex-exporter health`) that checks a `/tmp/.healthy` marker file written once the HTTP server is listening — no shell, HTTP client, or open port required. The container exits (and Docker restarts it) only when the initial Plex connection fails with a non-recoverable error — a bad token or other 4xx (except 408 and 429), the wrong server (404), or a TLS/certificate misconfiguration — or when the metrics server fails to start. A _transient_ initial failure (DNS, dial, timeout, a 408 or 429 rate-limit/timeout response, or a 5xx from a Plex that is still starting up) instead brings the exporter up in a degraded-but-healthy state: it binds `/metrics`, reports `plex_http_reachable=0`, and recovers automatically once Plex is reachable again.
