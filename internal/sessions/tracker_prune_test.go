@@ -1,51 +1,12 @@
 package sessions
 
 import (
-	"context"
 	"log/slog"
-	"sync"
 	"testing"
 	"time"
+
+	"github.com/cplieger/slogx/capture"
 )
-
-// recordingHandler is a minimal slog.Handler that captures emitted records
-// in memory so tests can assert on observable log side-effects (the only
-// output of Prune's pruned/stale aggregate counters).
-type recordingHandler struct {
-	records []slog.Record
-	level   slog.Level
-	mu      sync.Mutex
-}
-
-func (h *recordingHandler) Enabled(_ context.Context, l slog.Level) bool { return l >= h.level }
-
-func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.records = append(h.records, r.Clone())
-	return nil
-}
-
-func (h *recordingHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
-func (h *recordingHandler) WithGroup(_ string) slog.Handler      { return h }
-
-// captureSlog redirects slog's default logger to an in-memory handler at the
-// given level for the duration of the test, restoring the previous default on
-// cleanup. The returned function yields a snapshot of captured records.
-func captureSlog(t *testing.T, level slog.Level) func() []slog.Record {
-	t.Helper()
-	prev := slog.Default()
-	h := &recordingHandler{level: level}
-	slog.SetDefault(slog.New(h))
-	t.Cleanup(func() { slog.SetDefault(prev) })
-	return func() []slog.Record {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		out := make([]slog.Record, len(h.records))
-		copy(out, h.records)
-		return out
-	}
-}
 
 // findRecord returns the first captured record whose message matches msg.
 func findRecord(records []slog.Record, msg string) (slog.Record, bool) {
@@ -191,7 +152,7 @@ func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
 // TestTrackerPrune_no_removals_emits_no_summary verifies that when nothing is
 // reclaimed, Prune does NOT emit the "pruned expired sessions" debug summary.
 func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
-	getRecords := captureSlog(t, slog.LevelDebug)
+	logs := capture.Default(t)
 
 	tracker := NewTracker()
 	tracker.mu.Lock()
@@ -204,7 +165,7 @@ func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 
 	tracker.Prune()
 
-	if _, ok := findRecord(getRecords(), prunedSummaryMsg); ok {
+	if _, ok := findRecord(logs.Records(), prunedSummaryMsg); ok {
 		t.Errorf("Prune() with no removals emitted %q summary, want none", prunedSummaryMsg)
 	}
 }
@@ -212,7 +173,7 @@ func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 // TestTrackerPrune_stopped_removal_logs_stopped_count verifies that pruning a
 // single expired stopped session emits the summary with stopped=1, stale=0.
 func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
-	getRecords := captureSlog(t, slog.LevelDebug)
+	logs := capture.Default(t)
 
 	tracker := NewTracker()
 	tracker.mu.Lock()
@@ -224,7 +185,7 @@ func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 
 	tracker.Prune()
 
-	rec, ok := findRecord(getRecords(), prunedSummaryMsg)
+	rec, ok := findRecord(logs.Records(), prunedSummaryMsg)
 	if !ok {
 		t.Fatalf("Prune() removing 1 stopped session emitted no %q summary, want one", prunedSummaryMsg)
 	}
@@ -240,7 +201,7 @@ func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 // single orphaned non-stopped session emits the summary with stale=1,
 // stopped=0.
 func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
-	getRecords := captureSlog(t, slog.LevelDebug)
+	logs := capture.Default(t)
 
 	tracker := NewTracker()
 	tracker.mu.Lock()
@@ -252,7 +213,7 @@ func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 
 	tracker.Prune()
 
-	rec, ok := findRecord(getRecords(), prunedSummaryMsg)
+	rec, ok := findRecord(logs.Records(), prunedSummaryMsg)
 	if !ok {
 		t.Fatalf("Prune() removing 1 stale session emitted no %q summary, want one", prunedSummaryMsg)
 	}

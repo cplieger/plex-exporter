@@ -83,7 +83,7 @@ full reference.
 - **New metrics:** add the descriptor in `internal/metrics`, emit it
   from `Collect` in `internal/server`, and document it in the README's
   metrics tables.
-- **Logs are UTC.** A `utcTimeAttr` slog `ReplaceAttr` forces every
+- **Logs are UTC.** The `slogx` library (its `UTCTime` `ReplaceAttr`) forces every
   record's timestamp to UTC, so the container needs no `TZ` and the binary
   embeds no `time/tzdata`.
 
