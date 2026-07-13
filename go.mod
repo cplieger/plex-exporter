@@ -3,7 +3,7 @@ module github.com/cplieger/plex-exporter/v2
 go 1.26.5
 
 require (
-	github.com/cplieger/health v1.1.6
+	github.com/cplieger/health v1.1.7
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	golang.org/x/sync v0.22.0
