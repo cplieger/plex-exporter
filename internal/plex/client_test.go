@@ -245,14 +245,31 @@ func TestNewPlexClient_default_no_tls_skip(t *testing.T) {
 	if c.Token != "tok" {
 		t.Errorf("token = %q, want tok", c.Token)
 	}
-	if c.HTTPClient.Timeout != 10*time.Second {
-		t.Errorf("timeout = %v, want 10s", c.HTTPClient.Timeout)
+	// No client-level Timeout: it would wrap the retry round-tripper as a
+	// total-across-retries cap and defeat retries on a stall. The per-attempt
+	// bound moved to the base transport's ResponseHeaderTimeout (asserted in
+	// TestNewPlexTransport_perAttemptResponseHeaderTimeout).
+	if c.HTTPClient.Timeout != 0 {
+		t.Errorf("timeout = %v, want 0 (per-attempt bound is on the transport, not a total client timeout)", c.HTTPClient.Timeout)
 	}
 	if _, ok := c.HTTPClient.Transport.(*httpx.RetryRoundTripper); !ok {
 		t.Errorf("Transport = %T, want *httpx.RetryRoundTripper (retry transport installed by NewClient)", c.HTTPClient.Transport)
 	}
 	if c.HTTPClient.CheckRedirect == nil {
 		t.Error("CheckRedirect must be set to prevent token leaks across cross-origin redirects")
+	}
+}
+
+func TestNewPlexTransport_perAttemptResponseHeaderTimeout(t *testing.T) {
+	tr, err := newPlexTransport("")
+	if err != nil {
+		t.Fatalf("newPlexTransport: %v", err)
+	}
+	// The per-attempt bound is the transport's ResponseHeaderTimeout (a
+	// stalled attempt fails as a retryable net.Error), not an
+	// http.Client.Timeout that would cap the whole retry sequence.
+	if tr.ResponseHeaderTimeout != 10*time.Second {
+		t.Errorf("ResponseHeaderTimeout = %v, want 10s", tr.ResponseHeaderTimeout)
 	}
 }
 

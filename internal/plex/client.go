@@ -30,6 +30,16 @@ const MaxResponseBody = 10 << 20 // 10 MB
 const (
 	defaultMaxAttempts    = 3
 	defaultRetryBaseDelay = 100 * time.Millisecond
+	// perAttemptTimeout bounds each individual attempt's wait for response
+	// headers, set on the base transport so a stalled attempt fails as a
+	// retryable net.Error and the retry round-tripper retries it. It replaces
+	// the former http.Client.Timeout, which wrapped the retry round-tripper
+	// and so capped the WHOLE retry sequence, defeating the retries on a stall.
+	perAttemptTimeout = 10 * time.Second
+	// maxRetryElapsed is the total-time ceiling across all retry attempts (the
+	// retry round-tripper's own budget), so the client stays bounded even when
+	// a caller passes no context deadline.
+	maxRetryElapsed = 30 * time.Second
 )
 
 // ErrNotFound is returned by Get/GetWithHeaders when the Plex server
@@ -93,31 +103,33 @@ func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 		return nil, fmt.Errorf("PLEX_SERVER must include a host: %q", serverURL)
 	}
 
-	// base stays a nil http.RoundTripper interface when no CA cert is
-	// configured, so the retry round-tripper falls back to
-	// http.DefaultTransport (OS trust store). Only assign when caCertPath
-	// is set: storing a typed-nil *http.Transport in the interface would
-	// defeat NewRetryRoundTripper's nil check and panic on RoundTrip.
-	var base http.RoundTripper
-	if caCertPath != "" {
-		tr, tErr := plexTLSTransport(caCertPath)
-		if tErr != nil {
-			return nil, tErr
-		}
-		base = tr
+	// Base transport with a PER-ATTEMPT ResponseHeaderTimeout. The per-attempt
+	// bound lives on the transport, not an http.Client.Timeout: the latter
+	// wraps the retry round-tripper below and would cap the whole retry
+	// sequence, defeating the retries on a stall. On the transport a stalled
+	// attempt instead fails as a retryable net.Error timeout, so the
+	// round-tripper retries it.
+	base, err := newPlexTransport(caCertPath)
+	if err != nil {
+		return nil, err
 	}
 
 	// retries counts every retry attempt the round-tripper makes (via the
 	// WithOnRetry hook below); surfaced as the plex_http_retries_total metric.
 	retries := new(atomic.Int64)
 	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
+		// No client-level Timeout: it would be a total-across-retries cap that
+		// defeats retries on a stall. The per-attempt bound is the base
+		// transport's ResponseHeaderTimeout; the total is the caller's context
+		// deadline together with the round-tripper's WithRTMaxElapsedTime.
+		//
 		// Retry transport wraps the (CA-pinned or default) base transport.
 		// It honors Retry-After on 429 and retries 429/502/503/504 +
 		// transient transport errors with jittered exponential backoff.
 		Transport: httpx.NewRetryRoundTripper(base,
 			httpx.WithRTMaxAttempts(defaultMaxAttempts),
 			httpx.WithRTBaseDelay(defaultRetryBaseDelay),
+			httpx.WithRTMaxElapsedTime(maxRetryElapsed),
 			httpx.WithOnRetry(func(attempt int, req *http.Request, resp *http.Response, retryErr error) {
 				retries.Add(1)
 				status := 0
@@ -167,6 +179,32 @@ func plexTLSTransport(caCertPath string) (*http.Transport, error) {
 	if err != nil {
 		return nil, fmt.Errorf("PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
 	}
+	return tr, nil
+}
+
+// newPlexTransport builds the base HTTP transport: the CA-pinned transport
+// when caCertPath is set, otherwise a clone of http.DefaultTransport (OS trust
+// store). Either way it sets a per-attempt ResponseHeaderTimeout so a stalled
+// Plex response fails as a retryable net.Error timeout, letting the retry
+// round-tripper in NewClient retry it. The bound is per-attempt (on the
+// transport), never an http.Client.Timeout that would cap the whole retry
+// sequence.
+func newPlexTransport(caCertPath string) (*http.Transport, error) {
+	var tr *http.Transport
+	if caCertPath != "" {
+		var err error
+		tr, err = plexTLSTransport(caCertPath)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		dt, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			return nil, errors.New("http.DefaultTransport is not *http.Transport; cannot clone base transport")
+		}
+		tr = dt.Clone()
+	}
+	tr.ResponseHeaderTimeout = perAttemptTimeout
 	return tr, nil
 }
 
