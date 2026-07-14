@@ -23,6 +23,14 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on the same ref for PR events only: rapid pushes to a
+# PR branch otherwise stack full CI batteries that compete for the account's
+# 20 concurrent-job budget. Pushes to main queue instead of cancelling, so
+# every main commit keeps a complete validation run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ci:
     uses: cplieger/ci/.github/workflows/ci.yaml@f6ff601c095474ba8a7e19b2fa86900b6cbba288 # v2
