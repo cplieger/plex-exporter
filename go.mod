@@ -13,7 +13,7 @@ require (
 require (
 	github.com/cplieger/httpx/v2 v2.4.0
 	github.com/cplieger/slogx v1.1.1
-	github.com/cplieger/webhttp v1.5.0
+	github.com/cplieger/webhttp v1.6.0
 )
 
 require (
