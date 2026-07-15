@@ -10,7 +10,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-
 	"log/slog"
 	"net"
 	"net/http"
