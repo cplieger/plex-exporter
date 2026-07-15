@@ -9,46 +9,6 @@ type MC[T any] struct {
 	MediaContainer T `json:"MediaContainer"`
 }
 
-// ServerIdentity models /identity and /:/resources responses.
-type ServerIdentity struct {
-	Platform                      string `json:"platform"`
-	PlatformVersion               string `json:"platformVersion"`
-	MyPlexSubscription            bool   `json:"myPlexSubscription"`
-	TranscoderActiveVideoSessions int    `json:"transcoderActiveVideoSessions"`
-}
-
-// MediaProviderResponse models /media/providers.
-type MediaProviderResponse struct {
-	FriendlyName      string `json:"friendlyName"`
-	MachineIdentifier string `json:"machineIdentifier"`
-	Version           string `json:"version"`
-	MediaProviders    []struct {
-		Identifier string `json:"identifier"`
-		Features   []struct {
-			Type        string `json:"type"`
-			Directories []struct {
-				Title         string `json:"title"`
-				ID            string `json:"id"`
-				Type          string `json:"type"`
-				DurationTotal int64  `json:"durationTotal"`
-				StorageTotal  int64  `json:"storageTotal"`
-			} `json:"Directory"`
-		} `json:"Feature"`
-	} `json:"MediaProvider"`
-}
-
-// StatisticsResource models /statistics/resources entries.
-type StatisticsResource struct {
-	HostCPUUtil float64 `json:"hostCpuUtilization"`
-	HostMemUtil float64 `json:"hostMemoryUtilization"`
-}
-
-// StatisticsBandwidth models /statistics/bandwidth entries.
-type StatisticsBandwidth struct {
-	Bytes int64 `json:"bytes"`
-	At    int   `json:"at"`
-}
-
 // MediaPart describes a single part of a Media entry (video/audio stream
 // decision).
 type MediaPart struct {

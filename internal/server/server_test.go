@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -434,13 +433,12 @@ func TestRunRefreshLoop_cancels_cleanly(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer ts.Close()
-	tsURL, _ := url.Parse(ts.URL)
 
-	srv := NewServer(&plex.Client{
-		BaseURL:    tsURL,
-		Token:      "t",
-		HTTPClient: &http.Client{Timeout: time.Second},
-	})
+	client, err := plex.NewClientFromHTTP(ts.URL, "t", &http.Client{Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := NewServer(client)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	plexapi "github.com/cplieger/plexapi"
 	"pgregory.net/rapid"
 )
 
@@ -72,60 +72,27 @@ func TestContentTypeLabel_always_returns_non_empty(t *testing.T) {
 func TestBuild(t *testing.T) {
 	tests := []struct {
 		name      string
-		providers plexapi.MediaProviderResponse
+		providers plexapi.MediaProviders
 		prevItems map[string]int64
 		wantIDs   []string
 	}{
 		{
 			name: "filters non-library provider and non-content feature",
-			providers: plexapi.MediaProviderResponse{
-				MediaProviders: []struct {
-					Identifier string `json:"identifier"`
-					Features   []struct {
-						Type        string `json:"type"`
-						Directories []struct {
-							Title         string `json:"title"`
-							ID            string `json:"id"`
-							Type          string `json:"type"`
-							DurationTotal int64  `json:"durationTotal"`
-							StorageTotal  int64  `json:"storageTotal"`
-						} `json:"Directory"`
-					} `json:"Feature"`
-				}{
+			providers: plexapi.MediaProviders{
+				MediaProviders: []plexapi.MediaProvider{
 					{
 						Identifier: "com.plexapp.plugins.library",
-						Features: []struct {
-							Type        string `json:"type"`
-							Directories []struct {
-								Title         string `json:"title"`
-								ID            string `json:"id"`
-								Type          string `json:"type"`
-								DurationTotal int64  `json:"durationTotal"`
-								StorageTotal  int64  `json:"storageTotal"`
-							} `json:"Directory"`
-						}{
+						Features: []plexapi.ProviderFeature{
 							{
 								Type: "content",
-								Directories: []struct {
-									Title         string `json:"title"`
-									ID            string `json:"id"`
-									Type          string `json:"type"`
-									DurationTotal int64  `json:"durationTotal"`
-									StorageTotal  int64  `json:"storageTotal"`
-								}{
+								Directories: []plexapi.ProviderDirectory{
 									{Title: "Movies", ID: "1", Type: "movie", DurationTotal: 100, StorageTotal: 200},
 									{Title: "Playlists", ID: "2", Type: "playlist"},
 								},
 							},
 							{
 								Type: "timeline",
-								Directories: []struct {
-									Title         string `json:"title"`
-									ID            string `json:"id"`
-									Type          string `json:"type"`
-									DurationTotal int64  `json:"durationTotal"`
-									StorageTotal  int64  `json:"storageTotal"`
-								}{
+								Directories: []plexapi.ProviderDirectory{
 									{Title: "Timeline", ID: "99", Type: "movie"},
 								},
 							},
@@ -133,25 +100,10 @@ func TestBuild(t *testing.T) {
 					},
 					{
 						Identifier: "tv.plex.provider.vod",
-						Features: []struct {
-							Type        string `json:"type"`
-							Directories []struct {
-								Title         string `json:"title"`
-								ID            string `json:"id"`
-								Type          string `json:"type"`
-								DurationTotal int64  `json:"durationTotal"`
-								StorageTotal  int64  `json:"storageTotal"`
-							} `json:"Directory"`
-						}{
+						Features: []plexapi.ProviderFeature{
 							{
 								Type: "content",
-								Directories: []struct {
-									Title         string `json:"title"`
-									ID            string `json:"id"`
-									Type          string `json:"type"`
-									DurationTotal int64  `json:"durationTotal"`
-									StorageTotal  int64  `json:"storageTotal"`
-								}{
+								Directories: []plexapi.ProviderDirectory{
 									{Title: "VOD", ID: "50", Type: "movie"},
 								},
 							},
@@ -163,13 +115,13 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name:      "empty providers returns nil",
-			providers: plexapi.MediaProviderResponse{},
+			providers: plexapi.MediaProviders{},
 			wantIDs:   nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Build(tt.providers, tt.prevItems)
+			got := Build(&tt.providers, tt.prevItems)
 			var gotIDs []string
 			for _, lb := range got {
 				gotIDs = append(gotIDs, lb.ID)
@@ -187,41 +139,14 @@ func TestBuild(t *testing.T) {
 }
 
 func TestBuild_prevItems_preserved(t *testing.T) {
-	providers := plexapi.MediaProviderResponse{
-		MediaProviders: []struct {
-			Identifier string `json:"identifier"`
-			Features   []struct {
-				Type        string `json:"type"`
-				Directories []struct {
-					Title         string `json:"title"`
-					ID            string `json:"id"`
-					Type          string `json:"type"`
-					DurationTotal int64  `json:"durationTotal"`
-					StorageTotal  int64  `json:"storageTotal"`
-				} `json:"Directory"`
-			} `json:"Feature"`
-		}{
+	providers := plexapi.MediaProviders{
+		MediaProviders: []plexapi.MediaProvider{
 			{
 				Identifier: "com.plexapp.plugins.library",
-				Features: []struct {
-					Type        string `json:"type"`
-					Directories []struct {
-						Title         string `json:"title"`
-						ID            string `json:"id"`
-						Type          string `json:"type"`
-						DurationTotal int64  `json:"durationTotal"`
-						StorageTotal  int64  `json:"storageTotal"`
-					} `json:"Directory"`
-				}{
+				Features: []plexapi.ProviderFeature{
 					{
 						Type: "content",
-						Directories: []struct {
-							Title         string `json:"title"`
-							ID            string `json:"id"`
-							Type          string `json:"type"`
-							DurationTotal int64  `json:"durationTotal"`
-							StorageTotal  int64  `json:"storageTotal"`
-						}{
+						Directories: []plexapi.ProviderDirectory{
 							{Title: "Movies", ID: "1", Type: "movie"},
 						},
 					},
@@ -230,7 +155,7 @@ func TestBuild_prevItems_preserved(t *testing.T) {
 		},
 	}
 	prevItems := map[string]int64{"1": 500, "99": 999}
-	got := Build(providers, prevItems)
+	got := Build(&providers, prevItems)
 	if len(got) != 1 {
 		t.Fatalf("Build() returned %d libs, want 1", len(got))
 	}
@@ -268,41 +193,14 @@ func TestItemCountTypes(t *testing.T) {
 }
 
 func TestBuild_skips_non_numeric_section_id(t *testing.T) {
-	providers := plexapi.MediaProviderResponse{
-		MediaProviders: []struct {
-			Identifier string `json:"identifier"`
-			Features   []struct {
-				Type        string `json:"type"`
-				Directories []struct {
-					Title         string `json:"title"`
-					ID            string `json:"id"`
-					Type          string `json:"type"`
-					DurationTotal int64  `json:"durationTotal"`
-					StorageTotal  int64  `json:"storageTotal"`
-				} `json:"Directory"`
-			} `json:"Feature"`
-		}{
+	providers := plexapi.MediaProviders{
+		MediaProviders: []plexapi.MediaProvider{
 			{
 				Identifier: "com.plexapp.plugins.library",
-				Features: []struct {
-					Type        string `json:"type"`
-					Directories []struct {
-						Title         string `json:"title"`
-						ID            string `json:"id"`
-						Type          string `json:"type"`
-						DurationTotal int64  `json:"durationTotal"`
-						StorageTotal  int64  `json:"storageTotal"`
-					} `json:"Directory"`
-				}{
+				Features: []plexapi.ProviderFeature{
 					{
 						Type: "content",
-						Directories: []struct {
-							Title         string `json:"title"`
-							ID            string `json:"id"`
-							Type          string `json:"type"`
-							DurationTotal int64  `json:"durationTotal"`
-							StorageTotal  int64  `json:"storageTotal"`
-						}{
+						Directories: []plexapi.ProviderDirectory{
 							{Title: "Movies", ID: "1", Type: "movie"},
 							{Title: "Injected", ID: "1/all?x=../../etc", Type: "movie"},
 							{Title: "Empty", ID: "", Type: "movie"},
@@ -312,7 +210,7 @@ func TestBuild_skips_non_numeric_section_id(t *testing.T) {
 			},
 		},
 	}
-	got := Build(providers, nil)
+	got := Build(&providers, nil)
 	if len(got) != 1 {
 		t.Fatalf("Build emitted %d libraries, want 1 (non-numeric section IDs must be skipped before URL interpolation)", len(got))
 	}
@@ -321,7 +219,7 @@ func TestBuild_skips_non_numeric_section_id(t *testing.T) {
 	}
 }
 
-func buildNMovieSections(t *testing.T, n int) plexapi.MediaProviderResponse {
+func buildNMovieSections(t *testing.T, n int) plexapi.MediaProviders {
 	t.Helper()
 	dirs := make([]string, 0, n)
 	for i := 1; i <= n; i++ {
@@ -329,7 +227,7 @@ func buildNMovieSections(t *testing.T, n int) plexapi.MediaProviderResponse {
 	}
 	js := fmt.Sprintf(`{"MediaProvider":[{"identifier":%q,"Feature":[{"type":%q,"Directory":[%s]}]}]}`,
 		PluginIdentifier, FeatureContent, strings.Join(dirs, ","))
-	var providers plexapi.MediaProviderResponse
+	var providers plexapi.MediaProviders
 	if err := json.Unmarshal([]byte(js), &providers); err != nil {
 		t.Fatalf("buildNMovieSections: %v", err)
 	}
@@ -349,7 +247,8 @@ func TestBuild_caps_library_count_at_MaxLibraries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Build(buildNMovieSections(t, tt.sections), nil)
+			p := buildNMovieSections(t, tt.sections)
+			got := Build(&p, nil)
 			if len(got) != tt.want {
 				t.Errorf("Build with %d numeric sections returned %d libraries, want %d (MaxLibraries cap)",
 					tt.sections, len(got), tt.want)

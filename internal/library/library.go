@@ -3,7 +3,7 @@ package library
 import (
 	"strconv"
 
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	plexapi "github.com/cplieger/plexapi"
 )
 
 // Library types recognised by the exporter. Values match the Plex
@@ -88,7 +88,7 @@ func isCountableSection(libType, id string) bool {
 
 // Build extracts library entries from the media providers response,
 // preserving existing item counts from prevItems.
-func Build(providers plexapi.MediaProviderResponse, prevItems map[string]int64) []Library {
+func Build(providers *plexapi.MediaProviders, prevItems map[string]int64) []Library {
 	var libs []Library
 	for _, p := range providers.MediaProviders {
 		if p.Identifier != PluginIdentifier {
