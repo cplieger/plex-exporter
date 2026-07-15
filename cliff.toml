@@ -10,7 +10,7 @@ initial_tag = "v1.0.0"
 header = ""
 body = """
 {% for group, commits in commits | group_by(attribute="group") %}
-### {{ group | upper_first }}
+### {{ group | striptags | trim | upper_first }}
 {% for commit in commits %}
 - {{ commit.message | upper_first }}\
 {% endfor %}
@@ -25,6 +25,40 @@ split_commits = false
 protect_breaking_commits = false
 tag_pattern = "v[0-9].*"
 
+# Path-level noise filter: a commit whose changed files ALL match these globs
+# never appears in the changelog and never drives a version bump (exclusions
+# feed --bumped-version, so the release boolean agrees). A commit touching
+# both an excluded and a shipped path is still included. Bare patterns are
+# root-anchored; `**/` matches at any depth (git-cliff v2.13.1, verified).
+#
+# This list mirrors the build gate (EXCLUDE_PATTERNS in the central
+# release.yaml detect job) so "builds" and "releases" agree on significance.
+# Keep it a strict SUBSET of that list: never exclude here a path the build
+# gate treats as significant. Inclusion criterion: only paths that commits
+# with non-skipped types (feat/fix/sec/chore(deps)) realistically touch
+# exclusively — everything else (lint configs, .editorconfig, ...) arrives
+# via skip-typed commits (chore(sync):, lint:, ci:) and is filtered by type.
+exclude_paths = [
+  ".github/",                  # CI workflows + pins: never in the artifact
+  "**/*.md",                   # docs, incl. fix:-typed README-only edits
+  "LICENSE",
+  "alerts.yaml",               # README-companion alert rules (docs artifact)
+  "compose.yaml",              # the root-level example compose
+  "tests/",                    # smoke tests: exercised at build, never shipped
+  "**/testdata/",
+  "**/*_test.go",
+  "**/*.test.ts",
+  "**/*.spec.ts",
+  "**/grafana-dashboard.json", # imported via UI, never in an image
+  "**/package-lock.json",      # lock file maintenance commits
+  # Repo-metadata dotfiles a fix:-typed commit can plausibly touch alone
+  # (e.g. "fix: correct docker build context" editing only .dockerignore).
+  ".dockerignore",
+  ".gitignore",
+  ".gitattributes",
+  ".editorconfig",
+]
+
 commit_parsers = [
   # Order matters: more-specific patterns first.
   { message = "^release:", skip = true },
@@ -34,11 +68,15 @@ commit_parsers = [
   { message = "^chore\\(devdeps\\)", skip = true },
   # Dependency bumps for runtime / peer / Dockerfile / gomod use the default
   # `deps` scope and DO release — base image bumps, runtime lib bumps, etc.
-  # are real artifact changes.
-  { message = "^chore\\(deps\\)", group = "Dependencies" },
+  # are real artifact changes. CI-only pin bumps (workflow SHAs, action
+  # versions) share this commit type but are dropped by exclude_paths above
+  # (.github/) before parsing ever sees them.
+  { message = "^chore\\(deps\\)", group = "<!-- 4 -->Dependencies" },
   # Pure-meta commits never warrant a release. `no_increment_regex` is
   # documented to skip these but doesn't actually prevent the patch fallback
-  # (cliff v2.13.1) — using `skip = true` here is what works.
+  # (cliff v2.13.1; upstream issue #1570, fixed on main after v2.13.1) —
+  # `skip = true` remains correct regardless: it also keeps these out of the
+  # rendered notes, which no_increment_regex does not.
   { message = "^chore", skip = true },
   { message = "^ci", skip = true },
   { message = "^docs", skip = true },
@@ -52,10 +90,13 @@ commit_parsers = [
   { message = "^debug", skip = true },
   # Auto-generated git merge commit subjects (rebase/merge artifacts).
   { message = "^[Mm]erge ", skip = true },
-  # Real changes — bump per cliff.
-  { message = "^feat", group = "Added" },
-  { message = "^fix", group = "Fixed" },
-  { message = "^sec", group = "Security" },
-  { message = "^refactor|^perf", group = "Changed" },
-  { message = ".*", group = "Changed" },
+  # Real changes — bump per cliff. The `<!-- N -->` prefixes are sort keys:
+  # group_by orders sections alphabetically, so without them Dependencies
+  # renders above Fixed/Security. The template's `striptags` removes the
+  # prefix at render time. Order: Added, Fixed, Security, Changed, Dependencies.
+  { message = "^feat", group = "<!-- 0 -->Added" },
+  { message = "^fix", group = "<!-- 1 -->Fixed" },
+  { message = "^sec", group = "<!-- 2 -->Security" },
+  { message = "^refactor|^perf", group = "<!-- 3 -->Changed" },
+  { message = ".*", group = "<!-- 3 -->Changed" },
 ]
