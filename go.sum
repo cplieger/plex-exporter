@@ -8,8 +8,8 @@ github.com/cplieger/health v1.2.0 h1:QQzQuvZ1IjBlH+foq7CqXBN7ClD7WLq62D6MFmA7joA
 github.com/cplieger/health v1.2.0/go.mod h1:15Lm3XhPMU3nCEDfIH2hVAz6TXH06Wwiz9tgBi71vEE=
 github.com/cplieger/httpx/v2 v2.6.0 h1:KPBxno0EY/KcwXiB1Vi94bE4NFNaXxFyqnp02XBn9FY=
 github.com/cplieger/httpx/v2 v2.6.0/go.mod h1:Q3ulXhfiO40EGxIVofnz2KdJY1X3MSKZTwYhv/pL9W0=
-github.com/cplieger/plexapi v1.1.2 h1:NCq4S9GIEvoawxKLbYJoGeH6Kfb2MLii8SYi+wQWxQI=
-github.com/cplieger/plexapi v1.1.2/go.mod h1:cT6WvuQ0iSGhBesgjLLYUA2VrpQB4E7XjJcuzJy1eCI=
+github.com/cplieger/plexapi v1.1.3 h1:KRjMQXOtsVq7JMJL0TqTEuv+wjtqGCD2bj1t8gLzvm4=
+github.com/cplieger/plexapi v1.1.3/go.mod h1:3j5qV/EalEOrq4HIZ1l/sr0wa/wffSFaPDEHpL/GbhQ=
 github.com/cplieger/slogx v1.2.0 h1:z9+DdEsg0JHMv9LJK5pz82Iw1Q/Qfjrrc0dVFH5gmKg=
 github.com/cplieger/slogx v1.2.0/go.mod h1:15KA2NVx725imQe/PYXUmd3oM2oMpYpqwU+hdHtz7Fc=
 github.com/cplieger/webhttp v1.7.0 h1:6IX8F72urpw/+NvJXmO9Eqjehp7MzPqnWUnosN5LdW8=
