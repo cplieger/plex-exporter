@@ -18,6 +18,22 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      # Set by the scheduled staleness rebuild in cplieger/ci
+      # (rebuild-stale.yaml): a dispatched rebuild publishes only when the
+      # rebuilt image's package inventory differs from what :latest already
+      # ships. Deliberately NOT forwarded via `with:` below; the central
+      # pipeline reads it from this run's dispatch context
+      # (github.event.inputs, which inside a reusable workflow is the
+      # caller's), so this stub stays valid even while its pinned SHA predates
+      # the input (a `with:` key the pinned workflow does not declare would
+      # fail every run until Renovate moves the pin). Plain manual dispatches
+      # keep today's always-publish semantics (default false). Docker-type
+      # repos only; go/ts releases ignore it.
+      skip_if_unchanged:
+        description: "Skip publishing when the rebuilt image is package-identical to :latest (used by the scheduled staleness rebuild)."
+        type: boolean
+        default: false
 
 # Top-level permissions are read-only (OpenSSF Scorecard Token-Permissions);
 # the release job declares the write scopes it actually needs. GitHub takes the
