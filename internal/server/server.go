@@ -16,6 +16,7 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
 	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
+	libplex "github.com/cplieger/plexapi"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -81,15 +82,15 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 	defer cancel()
 
 	// Server identity + library list.
-	var providers plexapi.MC[plexapi.MediaProviderResponse]
-	if err := s.Client.Get(ctx, "/media/providers?includeStorage=1", &providers); err != nil {
+	providers, err := s.Client.Providers(ctx)
+	if err != nil {
 		return fmt.Errorf("fetching providers: %w", err)
 	}
 
 	s.mu.Lock()
-	s.ID = providers.MediaContainer.MachineIdentifier
-	s.Name = providers.MediaContainer.FriendlyName
-	s.Version = providers.MediaContainer.Version
+	s.ID = providers.MachineIdentifier
+	s.Name = providers.FriendlyName
+	s.Version = providers.Version
 
 	// Build a lookup of existing item counts so they survive the rebuild.
 	prevItems := make(map[string]int64, len(s.Libraries))
@@ -99,20 +100,20 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 		}
 	}
 
-	s.Libraries = library.Build(providers.MediaContainer, prevItems)
+	s.Libraries = library.Build(providers, prevItems)
 	needItemsRefresh := time.Since(s.LastItemsRefresh) > 15*time.Minute
 	s.mu.Unlock()
 
 	// Server info from root endpoint.
-	var info plexapi.MC[plexapi.ServerIdentity]
-	if err := s.Client.Get(ctx, "/", &info); err != nil {
+	info, err := s.Client.Identity(ctx)
+	if err != nil {
 		return fmt.Errorf("fetching server info: %w", err)
 	}
 	s.mu.Lock()
-	s.Platform = info.MediaContainer.Platform
-	s.PlatformVersion = info.MediaContainer.PlatformVersion
-	s.PlexPass = info.MediaContainer.MyPlexSubscription
-	s.ActiveTranscodes = info.MediaContainer.TranscoderActiveVideoSessions
+	s.Platform = info.Platform
+	s.PlatformVersion = info.PlatformVersion
+	s.PlexPass = info.MyPlexSubscription
+	s.ActiveTranscodes = info.TranscoderActiveVideoSessions
 	s.mu.Unlock()
 
 	// Library item counts (every 15 minutes).
@@ -344,10 +345,8 @@ func (s *Server) tryItemCount(ctx context.Context, libID, typeParam string) (int
 }
 
 func (s *Server) refreshResources(ctx context.Context) {
-	var resp plexapi.MC[struct {
-		StatisticsResources []plexapi.StatisticsResource `json:"StatisticsResources"`
-	}]
-	if err := s.Client.Get(ctx, "/statistics/resources?timespan=6", &resp); err != nil {
+	stats, err := s.Client.StatisticsResources(ctx, 6)
+	if err != nil {
 		if ctx.Err() != nil {
 			slog.Warn("resources fetch skipped, context deadline exceeded", "error", err)
 		} else {
@@ -355,22 +354,19 @@ func (s *Server) refreshResources(ctx context.Context) {
 		}
 		return
 	}
-	stats := resp.MediaContainer.StatisticsResources
 	if len(stats) == 0 {
 		return
 	}
 	latest := stats[len(stats)-1]
 	s.mu.Lock()
-	s.HostCPU = latest.HostCPUUtil / 100
-	s.HostMem = latest.HostMemUtil / 100
+	s.HostCPU = latest.HostCPUUtilization / 100
+	s.HostMem = latest.HostMemoryUtilization / 100
 	s.mu.Unlock()
 }
 
 func (s *Server) refreshBandwidth(ctx context.Context) {
-	var resp plexapi.MC[struct {
-		StatisticsBandwidth []plexapi.StatisticsBandwidth `json:"StatisticsBandwidth"`
-	}]
-	if err := s.Client.Get(ctx, "/statistics/bandwidth?timespan=6", &resp); err != nil {
+	samples, err := s.Client.StatisticsBandwidth(ctx, 6)
+	if err != nil {
 		if ctx.Err() != nil {
 			slog.Warn("bandwidth fetch skipped, context deadline exceeded", "error", err)
 		} else {
@@ -378,8 +374,8 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 		}
 		return
 	}
-	updates := resp.MediaContainer.StatisticsBandwidth
-	slices.SortFunc(updates, func(a, b plexapi.StatisticsBandwidth) int { return a.At - b.At })
+	updates := samples
+	slices.SortFunc(updates, func(a, b libplex.StatisticsBandwidth) int { return a.At - b.At })
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

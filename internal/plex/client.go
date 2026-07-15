@@ -1,161 +1,92 @@
+// Package plex adapts the shared github.com/cplieger/plexapi client for the
+// exporter. The transport — header-borne token, refuse-all redirects,
+// same-origin path guard, CA pinning, transparent retry with Retry-After
+// honoring, bounded reads — is the library's; this package owns the
+// exporter's construction shape (env-derived CA path, retry counter metric)
+// and re-exports the error types the startup classifier keys on.
 package plex
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/httpx/v2"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	"github.com/cplieger/plexapi"
 )
 
-// MaxResponseBody caps the bytes we read from a Plex HTTP response to
-// prevent OOM on unexpected payloads. 10 MiB covers the largest realistic
-// /status/sessions and /library responses with headroom.
-const MaxResponseBody = 10 << 20 // 10 MB
-
-// Retry transport defaults installed by NewClient. defaultMaxAttempts is the
-// TOTAL number of attempts including the first, so 3 == initial attempt + 2
-// retries. (httpx v2's WithRTMaxAttempts counts total attempts, replacing v1's
-// WithMaxRetries, which counted retries-beyond-first.) defaultRetryBaseDelay
-// matches the prior hand-rolled retryBaseDelay default.
+// Retry defaults preserved from the pre-library client: total attempts
+// including the first, and the base backoff between them. The library adds
+// a per-attempt response-header timeout so a stalled attempt fails as a
+// retryable error.
 const (
 	defaultMaxAttempts    = 3
 	defaultRetryBaseDelay = 100 * time.Millisecond
-	// perAttemptTimeout bounds each individual attempt's wait for response
-	// headers, set on the base transport so a stalled attempt fails as a
-	// retryable net.Error and the retry round-tripper retries it. It replaces
-	// the former http.Client.Timeout, which wrapped the retry round-tripper
-	// and so capped the WHOLE retry sequence, defeating the retries on a stall.
-	perAttemptTimeout = 10 * time.Second
-	// maxRetryElapsed is the total-time ceiling across all retry attempts (the
-	// retry round-tripper's own budget), so the client stays bounded even when
-	// a caller passes no context deadline.
-	maxRetryElapsed = 30 * time.Second
+	// defaultRequestTimeout bounds a request when the caller's context has
+	// no deadline (the library never undercuts a caller deadline). Mirrors
+	// the old 30s total-retry ceiling.
+	defaultRequestTimeout = 30 * time.Second
 )
 
-// ErrNotFound is returned by Get/GetWithHeaders when the Plex server
-// responds 404. Callers can classify it via errors.Is(err, ErrNotFound).
-var ErrNotFound = errors.New("not found")
+// ErrNotFound is the library's 404 sentinel, re-exported so call sites and
+// the Plex Pass graceful-degradation path keep reading plex.ErrNotFound.
+var ErrNotFound = plexapi.ErrNotFound
 
-// HTTPStatusError is returned by Get for non-200, non-404 responses. Kept
-// distinct from a bare error so callers can classify 4xx (do not retry)
-// vs 5xx (retry) via errors.As / errors.AsType.
-type HTTPStatusError struct {
-	Status string
-	Path   string
-	Code   int
-}
+// HTTPStatusError is the library's non-200 error, aliased so the startup
+// fatal-vs-transient classifier keeps matching with errors.As.
+type HTTPStatusError = plexapi.StatusError
 
-func (e *HTTPStatusError) Error() string {
-	return fmt.Sprintf("plex API %s: %s", e.Path, e.Status)
-}
-
-// Client is the Plex HTTP client. Fields are exported so the internal
-// composition root (package main, package server) can construct test
-// fixtures and read configuration without accessor noise; the whole
-// internal/* tree is a single trust boundary.
+// Client is the exporter's Plex client: the library client plus the
+// cumulative retry counter surfaced as plex_http_retries_total.
 type Client struct {
-	HTTPClient *http.Client
-	BaseURL    *url.URL
-	retries    *atomic.Int64
-	Token      string
+	*plexapi.Client
+	retries *atomic.Int64
 }
 
-// NewClient parses serverURL and returns a Client configured with a safe
-// default HTTP transport. When caCertPath is non-empty, the PEM file at
-// that path is loaded into the TLS RootCAs pool — TLS verification stays
-// ENABLED, pinned to that CA. This is the recommended setup for users
-// running Plex with a self-signed certificate.
-//
-// The transport is wrapped in an httpx retry round-tripper that retries
-// 429/502/503/504 responses and transient transport errors with jittered
-// exponential backoff, HONORING the Retry-After header on 429. Retry count
-// and base delay are fixed at construction (see defaultMaxAttempts /
-// defaultRetryBaseDelay); every Get on the returned Client benefits from
-// this without a per-call retry loop.
-//
-// When caCertPath is empty:
-//   - For "https://hash.plex.direct:32400" URLs, Plex's public Let's
-//     Encrypt cert validates against the OS trust store. No env var needed.
-//   - For "https://<self-signed-host>:32400" URLs, the connection will
-//     FAIL on cert verification. Set PLEX_CA_CERT_PATH to the server's
-//     CA cert.
-//   - For "http://..." URLs, TLS isn't in play; this transport config is
-//     a no-op.
+// NewClient parses serverURL and returns a Client. When caCertPath is
+// non-empty, the PEM file at that path is pinned as the sole TLS trust
+// anchor (verification stays ON) — the recommended setup for a self-signed
+// Plex. An empty caCertPath uses the OS trust store (right for
+// *.plex.direct and plain http URLs).
 func NewClient(serverURL, token, caCertPath string) (*Client, error) {
-	parsed, err := url.Parse(serverURL)
-	if err != nil {
-		return nil, fmt.Errorf("parsing PLEX_SERVER URL: %w", err)
+	retries := new(atomic.Int64)
+	opts := []plexapi.Option{
+		plexapi.WithMaxAttempts(defaultMaxAttempts),
+		plexapi.WithBaseDelay(defaultRetryBaseDelay),
+		plexapi.WithTimeout(defaultRequestTimeout),
+		plexapi.WithOnRetry(func(int, *http.Request, *http.Response, error) {
+			retries.Add(1)
+		}),
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, fmt.Errorf("PLEX_SERVER must use an http or https scheme: %q", serverURL)
+	if caCertPath != "" {
+		pemBytes, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
+		}
+		opts = append(opts, plexapi.WithCACertPEM(pemBytes))
 	}
-	if parsed.Host == "" {
-		return nil, fmt.Errorf("PLEX_SERVER must include a host: %q", serverURL)
-	}
-
-	// Base transport with a PER-ATTEMPT ResponseHeaderTimeout. The per-attempt
-	// bound lives on the transport, not an http.Client.Timeout: the latter
-	// wraps the retry round-tripper below and would cap the whole retry
-	// sequence, defeating the retries on a stall. On the transport a stalled
-	// attempt instead fails as a retryable net.Error timeout, so the
-	// round-tripper retries it.
-	base, err := newPlexTransport(caCertPath)
+	api, err := plexapi.New(serverURL, token, opts...)
 	if err != nil {
 		return nil, err
 	}
-
-	// retries counts every retry attempt the round-tripper makes (via the
-	// WithOnRetry hook below); surfaced as the plex_http_retries_total metric.
-	retries := new(atomic.Int64)
-	httpClient := &http.Client{
-		// No client-level Timeout: it would be a total-across-retries cap that
-		// defeats retries on a stall. The per-attempt bound is the base
-		// transport's ResponseHeaderTimeout; the total is the caller's context
-		// deadline together with the round-tripper's WithRTMaxElapsedTime.
-		//
-		// Retry transport wraps the (CA-pinned or default) base transport.
-		// It honors Retry-After on 429 and retries 429/502/503/504 +
-		// transient transport errors with jittered exponential backoff.
-		Transport: httpx.NewRetryRoundTripper(base,
-			httpx.WithRTMaxAttempts(defaultMaxAttempts),
-			httpx.WithRTBaseDelay(defaultRetryBaseDelay),
-			httpx.WithRTMaxElapsedTime(maxRetryElapsed),
-			httpx.WithOnRetry(func(attempt int, req *http.Request, resp *http.Response, retryErr error) {
-				retries.Add(1)
-				status := 0
-				if resp != nil {
-					status = resp.StatusCode
-				}
-				slog.Debug("retrying plex request",
-					"attempt", attempt, "path", req.URL.Path,
-					"status", status, "error", retryErr)
-			}),
-		),
-		// Plex's API does not issue redirects; refuse to follow any. Go's
-		// default CheckRedirect forwards custom headers (including
-		// X-Plex-Token) on cross-origin redirects, which would leak the
-		// token to an attacker-controlled host if Plex ever served a 302.
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	return &Client{BaseURL: parsed, Token: token, HTTPClient: httpClient, retries: retries}, nil
+	return &Client{Client: api, retries: retries}, nil
 }
 
-// Retries returns the cumulative number of HTTP retry attempts the retry
-// round-tripper has performed across all requests on this client; it is
-// surfaced as the plex_http_retries_total metric. Returns 0 for clients not
-// built by NewClient (e.g. test fixtures), which install no retry hook.
+// NewClientFromHTTP builds a Client over a caller-supplied *http.Client —
+// the test-fixture path (httptest servers). No retry transport or counter
+// is installed; Retries() reports 0.
+func NewClientFromHTTP(serverURL, token string, hc *http.Client) (*Client, error) {
+	api, err := plexapi.New(serverURL, token, plexapi.WithHTTPClient(hc))
+	if err != nil {
+		return nil, err
+	}
+	return &Client{Client: api, retries: new(atomic.Int64)}, nil
+}
+
+// Retries returns the cumulative number of HTTP retry attempts across all
+// requests on this client (the plex_http_retries_total metric).
 func (c *Client) Retries() int64 {
 	if c.retries == nil {
 		return 0
@@ -163,128 +94,9 @@ func (c *Client) Retries() int64 {
 	return c.retries.Load()
 }
 
-// plexTLSTransport builds a CA-pinned *http.Transport from caCertPath. The
-// PEM read stays here (so the PLEX_CA_CERT_PATH context wraps the error and
-// httpx stays I/O-free); httpx.CATransport does the pinning: it clones
-// http.DefaultTransport and installs a fresh TLS config trusting ONLY the
-// CA(s) in the PEM (RootCAs pinned, TLS 1.2 minimum, verification always on).
-// Returns an error for an unreadable file or a PEM with no certificates
-// (httpx.ErrNoCertsInPEM). caCertPath must be non-empty.
-func plexTLSTransport(caCertPath string) (*http.Transport, error) {
-	pemBytes, err := os.ReadFile(caCertPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
-	}
-	tr, err := httpx.CATransport(pemBytes)
-	if err != nil {
-		return nil, fmt.Errorf("PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
-	}
-	return tr, nil
-}
-
-// newPlexTransport builds the base HTTP transport: the CA-pinned transport
-// when caCertPath is set, otherwise a clone of http.DefaultTransport (OS trust
-// store). Either way it sets a per-attempt ResponseHeaderTimeout so a stalled
-// Plex response fails as a retryable net.Error timeout, letting the retry
-// round-tripper in NewClient retry it. The bound is per-attempt (on the
-// transport), never an http.Client.Timeout that would cap the whole retry
-// sequence.
-func newPlexTransport(caCertPath string) (*http.Transport, error) {
-	var tr *http.Transport
-	if caCertPath != "" {
-		var err error
-		tr, err = plexTLSTransport(caCertPath)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		dt, ok := http.DefaultTransport.(*http.Transport)
-		if !ok {
-			return nil, errors.New("http.DefaultTransport is not *http.Transport; cannot clone base transport")
-		}
-		tr = dt.Clone()
-	}
-	tr.ResponseHeaderTimeout = perAttemptTimeout
-	return tr, nil
-}
-
-// Get fetches path and unmarshals the JSON body into result. Returns
-// ErrNotFound for 404, *HTTPStatusError for other non-2xx. When the Client
-// was built by NewClient, transient failures (429/502/503/504 + transport
-// errors) are retried transparently by the retry transport, honoring
-// Retry-After on 429.
-func (c *Client) Get(ctx context.Context, path string, result any) error {
-	return c.GetWithHeaders(ctx, path, result, nil)
-}
-
-// GetWithHeaders is Get with additional request headers merged on top of
-// the defaults (Accept, X-Plex-Token).
-func (c *Client) GetWithHeaders(ctx context.Context, path string, result any, extra map[string]string) error {
-	ref, err := url.Parse(path)
-	if err != nil {
-		return fmt.Errorf("plex GET %s: parsing path: %w", path, err)
-	}
-	// Defense in depth for X-Plex-Token confidentiality: every request must target the
-	// configured Plex host. An absolute ("http://h/..") or scheme-relative ("//h/..")
-	// reference makes ResolveReference override BaseURL's host, which would leak
-	// X-Plex-Token to that origin. All legitimate Plex paths are host-relative.
-	if ref.IsAbs() || ref.Host != "" {
-		return fmt.Errorf("plex request path must be relative to the configured server, got %q", path)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL.ResolveReference(ref).String(), http.NoBody)
-	if err != nil {
-		return fmt.Errorf("plex GET %s: building request: %w", path, err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Plex-Token", c.Token)
-	for k, v := range extra {
-		req.Header.Set(k, v)
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("plex GET %s: %w", path, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-		return ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-		return &HTTPStatusError{Code: resp.StatusCode, Status: resp.Status, Path: path}
-	}
-	body, err := httpx.ReadLimitedBody(resp.Body, MaxResponseBody)
-	if err != nil {
-		var tooLarge *httpx.ResponseTooLargeError
-		if errors.As(err, &tooLarge) {
-			return fmt.Errorf("plex API %s: response exceeds %d-byte limit", path, MaxResponseBody)
-		}
-		return fmt.Errorf("plex GET %s: reading body: %w", path, err)
-	}
-	if len(body) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(body, result); err != nil {
-		return fmt.Errorf("plex GET %s: decoding response: %w", path, err)
-	}
-	return nil
-}
-
-// GetContainerSize fetches a library section with one item and reads the
-// totalSize field from the JSON body. This is more reliable than the
-// X-Plex-Container-Total-Size header, which doesn't work for type-filtered
-// queries (e.g. ?type=4 for episodes).
+// GetContainerSize reports the totalSize of the container at path, used
+// for type-filtered library counts. Kept under its historical name; the
+// implementation is the library's ContainerTotalSize.
 func (c *Client) GetContainerSize(ctx context.Context, path string) (int64, error) {
-	var resp plexapi.MC[struct {
-		TotalSize int64 `json:"totalSize"`
-	}]
-	if err := c.GetWithHeaders(ctx, path, &resp, map[string]string{
-		"X-Plex-Container-Start": "0",
-		"X-Plex-Container-Size":  "1",
-	}); err != nil {
-		return 0, err
-	}
-	return resp.MediaContainer.TotalSize, nil
+	return c.ContainerTotalSize(ctx, path)
 }

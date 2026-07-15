@@ -10,7 +10,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
+
 	"log/slog"
 	"net"
 	"net/http"
@@ -19,9 +19,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cplieger/envx"
 	"github.com/cplieger/health"
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
 	"github.com/cplieger/plex-exporter/v2/internal/server"
+	"github.com/cplieger/plexapi"
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/webhttp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -48,17 +50,17 @@ func run() int {
 	marker.Set(false)
 	defer marker.Cleanup()
 
-	serverAddr, err := requireEnv("PLEX_SERVER")
+	serverAddr, err := envx.Require("PLEX_SERVER")
 	if err != nil {
 		slog.Error("startup config error", "error", err)
 		return 1
 	}
-	plexToken, err := requireEnv("PLEX_TOKEN")
+	plexToken, err := envx.Require("PLEX_TOKEN")
 	if err != nil {
 		slog.Error("startup config error", "error", err)
 		return 1
 	}
-	listenAddr := envOr("LISTEN_ADDRESS", ":9594")
+	listenAddr := envx.String("LISTEN_ADDRESS", ":9594")
 
 	caCertPath := os.Getenv("PLEX_CA_CERT_PATH")
 	slog.Info("starting plex-exporter",
@@ -185,21 +187,6 @@ func run() int {
 	return 0
 }
 
-func requireEnv(key string) (string, error) {
-	v := os.Getenv(key)
-	if v == "" {
-		return "", fmt.Errorf("%s environment variable must be specified", key)
-	}
-	return v, nil
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
 // isFatalStartupError reports whether an initial Plex Refresh error is a
 // configuration or authentication problem that will not resolve without
 // operator action (so run() should fail fast) rather than a transient
@@ -208,21 +195,12 @@ func envOr(key, fallback string) string {
 // TLS/certificate errors are fatal; dial/DNS/timeout errors and 5xx
 // responses (a Plex still starting up) are treated as transient.
 func isFatalStartupError(err error) bool {
-	// Plex returned an HTTP status: a 4xx means it reached us and rejected the
-	// request (bad token or wrong endpoint); a 5xx means it is up but not ready
-	// yet, which can clear on its own.
-	var statusErr *plex.HTTPStatusError
-	if errors.As(err, &statusErr) {
-		// 429 (Too Many Requests) and 408 (Request Timeout) are rate-limit / timeout signals, not
-		// config/auth errors: the retry round-tripper already treats 429 as transient (retries it,
-		// honoring Retry-After), and a request timeout is the same class as the transport timeouts
-		// already handled as transient below. Treat them as transient at startup too, so a
-		// throttling/slow Plex starts degraded and backs off rather than exiting and crash-looping
-		// under the restart policy.
-		if statusErr.Code == http.StatusTooManyRequests || statusErr.Code == http.StatusRequestTimeout {
-			return false
-		}
-		return statusErr.Code < 500
+	// Plex returned an HTTP status: the shared classifier treats a 4xx —
+	// except 429 (rate limit, retried with Retry-After honored) and 408
+	// (request timeout, same class as the transport timeouts below) — as
+	// fatal config/auth, and a 5xx (Plex up but not ready) as transient.
+	if plexapi.IsConfigError(err) {
+		return true
 	}
 	// 404 on the providers/identity endpoint: reached Plex, wrong server.
 	if errors.Is(err, plex.ErrNotFound) {

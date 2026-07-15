@@ -5,7 +5,6 @@ package plextest
 
 import (
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
@@ -20,9 +19,9 @@ const TestToken = "$fixture-test-token"
 // server's own HTTP client for proper TLS/transport handling.
 func NewTestClientFromServer(t testing.TB, ts *httptest.Server) *plex.Client {
 	t.Helper()
-	u, err := url.Parse(ts.URL)
+	c, err := plex.NewClientFromHTTP(ts.URL, TestToken, ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &plex.Client{BaseURL: u, Token: TestToken, HTTPClient: ts.Client()}
+	return c
 }
