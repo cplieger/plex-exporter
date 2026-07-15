@@ -10,8 +10,8 @@ github.com/cplieger/httpx/v2 v2.5.0 h1:lTFxDAT/4ijZ7wzaFPipipEpnHvv7ABKswB0NuUjL
 github.com/cplieger/httpx/v2 v2.5.0/go.mod h1:Q3ulXhfiO40EGxIVofnz2KdJY1X3MSKZTwYhv/pL9W0=
 github.com/cplieger/plexapi v1.1.2 h1:NCq4S9GIEvoawxKLbYJoGeH6Kfb2MLii8SYi+wQWxQI=
 github.com/cplieger/plexapi v1.1.2/go.mod h1:cT6WvuQ0iSGhBesgjLLYUA2VrpQB4E7XjJcuzJy1eCI=
-github.com/cplieger/slogx v1.1.1 h1:GNlwUtowLx1BbRAVpaYFlMcTMKW7q+Heh2guay1wDhI=
-github.com/cplieger/slogx v1.1.1/go.mod h1:15KA2NVx725imQe/PYXUmd3oM2oMpYpqwU+hdHtz7Fc=
+github.com/cplieger/slogx v1.2.0 h1:z9+DdEsg0JHMv9LJK5pz82Iw1Q/Qfjrrc0dVFH5gmKg=
+github.com/cplieger/slogx v1.2.0/go.mod h1:15KA2NVx725imQe/PYXUmd3oM2oMpYpqwU+hdHtz7Fc=
 github.com/cplieger/webhttp v1.7.0 h1:6IX8F72urpw/+NvJXmO9Eqjehp7MzPqnWUnosN5LdW8=
 github.com/cplieger/webhttp v1.7.0/go.mod h1:RYtweYFUohqE5DIOt06Ypr0j9VHXjxSPBLIG3vM0H44=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
