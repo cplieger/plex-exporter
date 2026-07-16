@@ -27,7 +27,7 @@
 #                    string, e.g. "-e FOO=bar --tmpfs /input". Values must not
 #                    contain spaces (these are controlled test configs).
 #
-# The harness also exports $SMOKE_DIR (this script's own absolute directory)
+# The harness also sets $SMOKE_DIR (this script's own absolute directory)
 # before sourcing the .conf, so an app that needs a config/fixture file on disk
 # can bind-mount a committed fixture dir, e.g.:
 #   SMOKE_RUN_ARGS="-e SYNC_INTERVAL=off -v ${SMOKE_DIR}/fixtures:/config:ro"
