@@ -53,7 +53,6 @@ services:
     image: ghcr.io/cplieger/plex-exporter:latest
     container_name: plex-exporter
     restart: unless-stopped
-    user: "1000:1000"  # match your host user
 
     environment:
       PLEX_SERVER: "http://plex:32400"  # full URL including scheme and port

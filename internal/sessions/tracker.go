@@ -39,14 +39,17 @@ func ParseState(raw string) State {
 	}
 }
 
-// defaultSessionTimeout bounds how long a stopped session may remain in the
+// sessionTimeout bounds how long a stopped session may remain in the
 // tracker map before prune reclaims it.
-const defaultSessionTimeout = time.Minute
+const sessionTimeout = time.Minute
 
-// defaultStaleSessionTimeout bounds how long a session can sit in a non-stopped
+// staleSessionTimeout bounds how long a session can sit in a non-stopped
 // state without receiving any update before we consider it orphaned and
 // prune it.
-const defaultStaleSessionTimeout = 5 * time.Minute
+const staleSessionTimeout = 5 * time.Minute
+
+// pruneInterval is how often RunPruneLoop sweeps the tracker.
+const pruneInterval = time.Minute
 
 // MaxSessionKeyLen and MaxTrackedSessions bound the session tracker
 // against a compromised or buggy Plex server that streams unbounded
@@ -70,48 +73,23 @@ type Session struct {
 	LibName        string
 	LibID          string
 	LibType        string
+	// MediaKey is the rating key MediaMeta was fetched for; empty until a
+	// successful /library/metadata fetch lands. It lets the session poll
+	// skip refetching immutable per-key metadata while the session stays
+	// on the same item (see Tracker.MediaResolved).
+	MediaKey       string
 	State          State
 	Meta           plexapi.SessionMetadata
 	MediaMeta      plexapi.SessionMetadata
 	PrevPlayedTime time.Duration
 }
 
-// PruneConfig holds prune timing parameters. Zero values mean "use
-// package defaults".
-type PruneConfig struct {
-	SessionTimeout time.Duration
-	StaleTimeout   time.Duration
-	Interval       time.Duration
-}
-
-func (p PruneConfig) sessionTimeout() time.Duration {
-	if p.SessionTimeout != 0 {
-		return p.SessionTimeout
-	}
-	return defaultSessionTimeout
-}
-
-func (p PruneConfig) staleTimeout() time.Duration {
-	if p.StaleTimeout != 0 {
-		return p.StaleTimeout
-	}
-	return defaultStaleSessionTimeout
-}
-
-func (p PruneConfig) interval() time.Duration {
-	if p.Interval != 0 {
-		return p.Interval
-	}
-	return time.Minute
-}
-
 // Tracker is the in-memory active-session map. All lock-protected
 // operations are encapsulated as methods; external callers must not
 // access the mutex directly.
 type Tracker struct {
-	Sessions  map[string]Session
-	PruneConf PruneConfig
-	mu        sync.Mutex
+	Sessions map[string]Session
+	mu       sync.Mutex
 }
 
 // NewTracker returns an empty session tracker ready for use.
@@ -151,6 +129,20 @@ func (t *Tracker) SnapshotSessions() map[string]Session {
 	return maps.Clone(t.Sessions)
 }
 
+// MediaResolved reports whether the tracked session id already carries
+// library metadata fetched for exactly ratingKey AND resolved library
+// labels, so the session poll can skip the /library/metadata refetch.
+// MediaMeta is immutable per rating key; a rating-key change (episode
+// auto-advance within one session) or unresolved labels (a degraded start
+// before the library list is known) returns false and forces a refetch.
+func (t *Tracker) MediaResolved(id, ratingKey string) bool {
+	id = normalizeKey(id)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	s, ok := t.Sessions[id]
+	return ok && ratingKey != "" && s.MediaKey == ratingKey && s.LibName != ""
+}
+
 // bankPlayTime banks a playing session's elapsed play time into
 // PrevPlayedTime, keeping plex_play_seconds_total monotonic. Caller holds the tracker mutex.
 func (s *Session) bankPlayTime(now time.Time) {
@@ -185,6 +177,11 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ses
 	}
 	if mediaMeta != nil {
 		s.MediaMeta = *mediaMeta
+		if meta != nil {
+			// Record which rating key this metadata belongs to so
+			// MediaResolved can skip refetches until the key changes.
+			s.MediaKey = meta.RatingKey
+		}
 	}
 
 	// Bank play time on every playing→non-playing transition.
@@ -239,17 +236,15 @@ func (t *Tracker) MarkAbsentStopped(presentKeys []string) {
 func (t *Tracker) Prune() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	sessionTO := t.PruneConf.sessionTimeout()
-	staleTO := t.PruneConf.staleTimeout()
 	var pruned, stale int
 	for k := range t.Sessions {
 		s := t.Sessions[k]
 		remove := false
 		switch {
-		case s.State == StateStopped && time.Since(s.LastUpdate) > sessionTO:
+		case s.State == StateStopped && time.Since(s.LastUpdate) > sessionTimeout:
 			remove = true
 			pruned++
-		case s.State != StateStopped && time.Since(s.LastUpdate) > staleTO:
+		case s.State != StateStopped && time.Since(s.LastUpdate) > staleSessionTimeout:
 			slog.Warn("pruning stale non-stopped session",
 				"id", k, "state", s.State, "idle", time.Since(s.LastUpdate))
 			remove = true
@@ -265,9 +260,9 @@ func (t *Tracker) Prune() {
 	}
 }
 
-// RunPruneLoop invokes Prune on a configurable interval until ctx is cancelled.
+// RunPruneLoop invokes Prune every pruneInterval until ctx is cancelled.
 func (t *Tracker) RunPruneLoop(ctx context.Context) {
-	ticker := time.NewTicker(t.PruneConf.interval())
+	ticker := time.NewTicker(pruneInterval)
 	defer ticker.Stop()
 	for {
 		select {

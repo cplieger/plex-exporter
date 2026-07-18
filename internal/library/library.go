@@ -125,15 +125,16 @@ func appendLibrary(libs []Library, lib Library) []Library {
 	return append(libs, lib)
 }
 
-// ItemCountTypes returns the `type=` query params to try in order for
-// the given library type. Empty string means no filter (default path).
-func ItemCountTypes(libType string) []string {
+// ItemCountTypes returns the Plex metadata-type IDs to try in order for
+// the given library type's item count. 0 means no type filter (the
+// default path), matching plexapi.ContainerTotalSize's contract.
+func ItemCountTypes(libType string) []int {
 	switch libType {
 	case TypeShow:
-		return []string{"4"} // episodes
+		return []int{4} // episodes
 	case TypeArtist:
-		return []string{"10", "7", ""} // tracks, fallback, default
+		return []int{10, 7, 0} // tracks, fallback, default
 	default:
-		return []string{""}
+		return []int{0}
 	}
 }

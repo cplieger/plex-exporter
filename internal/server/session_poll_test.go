@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -523,5 +524,163 @@ func TestRefreshSessions_vanished_session_marked_stopped(t *testing.T) {
 	}
 	if s.State != sessions.StateStopped {
 		t.Errorf("after poll 2: s1 state = %q, want stopped (vanished session must be reconciled)", s.State)
+	}
+}
+
+// TestRefreshSessions_metadata_cached_per_rating_key pins the per-key
+// metadata cache: while a session stays on the same rating key the
+// /library/metadata fetch happens exactly once (the tracked MediaMeta is
+// reused), and a rating-key change (episode auto-advance within one
+// session) invalidates the cache and refetches.
+func TestRefreshSessions_metadata_cached_per_rating_key(t *testing.T) {
+	var (
+		mu        sync.Mutex
+		metaHits  = map[string]int{}
+		pollCount int
+	)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/status/sessions":
+			mu.Lock()
+			pollCount++
+			key := "100"
+			if pollCount >= 3 {
+				key = "101" // episode auto-advance: same session, new rating key
+			}
+			mu.Unlock()
+			fmt.Fprintf(w, `{"MediaContainer":{"Metadata":[{
+				"sessionKey":"s1",
+				"ratingKey":"%s",
+				"type":"episode",
+				"Player":{"device":"TV","state":"playing"},
+				"User":{"title":"u1"},
+				"Media":[{"Part":[{"decision":"directplay"}]}]
+			}]}}`, key)
+		case "/library/metadata/100":
+			mu.Lock()
+			metaHits["100"]++
+			mu.Unlock()
+			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{
+				"type":"episode","title":"Episode One","librarySectionID":"1"
+			}]}}`)
+		case "/library/metadata/101":
+			mu.Lock()
+			metaHits["101"]++
+			mu.Unlock()
+			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{
+				"type":"episode","title":"Episode Two","librarySectionID":"1"
+			}]}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	client := plextest.NewTestClientFromServer(t, ts)
+	srv := NewServer(client)
+	srv.Libraries = []library.Library{
+		{ID: "1", Name: "Shows", Type: library.TypeShow},
+	}
+
+	// Poll 1: first sight of s1/100 fetches metadata.
+	srv.RefreshSessions(context.Background())
+	mu.Lock()
+	got := metaHits["100"]
+	mu.Unlock()
+	if got != 1 {
+		t.Fatalf("after poll 1: metadata/100 hits = %d, want 1", got)
+	}
+
+	// Poll 2: same session, same rating key -- cached, no refetch.
+	srv.RefreshSessions(context.Background())
+	mu.Lock()
+	got = metaHits["100"]
+	mu.Unlock()
+	if got != 1 {
+		t.Errorf("after poll 2: metadata/100 hits = %d, want 1 (cached)", got)
+	}
+	snap := srv.Sessions.SnapshotSessions()
+	if title := snap["s1"].MediaMeta.Title; title != "Episode One" {
+		t.Errorf("after poll 2: MediaMeta.Title = %q, want Episode One (cache preserved)", title)
+	}
+
+	// Poll 3: rating key advances to 101 -- cache invalidated, refetch.
+	srv.RefreshSessions(context.Background())
+	mu.Lock()
+	h100, h101 := metaHits["100"], metaHits["101"]
+	mu.Unlock()
+	if h100 != 1 || h101 != 1 {
+		t.Errorf("after poll 3: metadata hits = 100:%d 101:%d, want 100:1 101:1", h100, h101)
+	}
+	snap = srv.Sessions.SnapshotSessions()
+	if title := snap["s1"].MediaMeta.Title; title != "Episode Two" {
+		t.Errorf("after poll 3: MediaMeta.Title = %q, want Episode Two (refetched on key change)", title)
+	}
+	if lib := snap["s1"].LibName; lib != "Shows" {
+		t.Errorf("after poll 3: LibName = %q, want Shows", lib)
+	}
+}
+
+// TestRefreshSessions_unresolved_library_refetches_metadata pins the
+// degraded-start recovery contract: a session whose library labels could
+// not resolve at first fetch (library list not yet known) keeps refetching
+// metadata until the labels resolve, instead of caching the unresolved state
+// for the session's lifetime.
+func TestRefreshSessions_unresolved_library_refetches_metadata(t *testing.T) {
+	var (
+		mu       sync.Mutex
+		metaHits int
+	)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/status/sessions":
+			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{
+				"sessionKey":"s1",
+				"ratingKey":"100",
+				"type":"movie",
+				"Player":{"device":"TV","state":"playing"},
+				"User":{"title":"u1"},
+				"Media":[{"Part":[{"decision":"directplay"}]}]
+			}]}}`)
+		case "/library/metadata/100":
+			mu.Lock()
+			metaHits++
+			mu.Unlock()
+			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{
+				"type":"movie","title":"M","librarySectionID":"1"
+			}]}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	client := plextest.NewTestClientFromServer(t, ts)
+	srv := NewServer(client)
+	// Degraded start: the library list is not known yet.
+
+	srv.RefreshSessions(context.Background())
+	snap := srv.Sessions.SnapshotSessions()
+	if lib := snap["s1"].LibName; lib != "" {
+		t.Fatalf("after poll 1: LibName = %q, want empty (no libraries known)", lib)
+	}
+
+	// Refresh recovered: the library list is now known. The next poll must
+	// refetch (unresolved labels are not cached) and resolve the labels.
+	srv.Libraries = []library.Library{
+		{ID: "1", Name: "Movies", Type: library.TypeMovie},
+	}
+	srv.RefreshSessions(context.Background())
+	mu.Lock()
+	got := metaHits
+	mu.Unlock()
+	if got != 2 {
+		t.Errorf("metadata hits = %d, want 2 (unresolved labels force refetch)", got)
+	}
+	snap = srv.Sessions.SnapshotSessions()
+	if lib := snap["s1"].LibName; lib != "Movies" {
+		t.Errorf("after poll 2: LibName = %q, want Movies (labels resolved on refetch)", lib)
 	}
 }

@@ -169,13 +169,13 @@ func TestBuild_prevItems_preserved(t *testing.T) {
 func TestItemCountTypes(t *testing.T) {
 	tests := []struct {
 		libType string
-		want    []string
+		want    []int
 	}{
-		{TypeShow, []string{"4"}},
-		{TypeArtist, []string{"10", "7", ""}},
-		{TypeMovie, []string{""}},
-		{"photo", []string{""}},
-		{"unknown", []string{""}},
+		{TypeShow, []int{4}},
+		{TypeArtist, []int{10, 7, 0}},
+		{TypeMovie, []int{0}},
+		{"photo", []int{0}},
+		{"unknown", []int{0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.libType, func(t *testing.T) {
@@ -185,7 +185,7 @@ func TestItemCountTypes(t *testing.T) {
 			}
 			for i := range got {
 				if got[i] != tt.want[i] {
-					t.Errorf("ItemCountTypes(%q)[%d] = %q, want %q", tt.libType, i, got[i], tt.want[i])
+					t.Errorf("ItemCountTypes(%q)[%d] = %d, want %d", tt.libType, i, got[i], tt.want[i])
 				}
 			}
 		})

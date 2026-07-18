@@ -3,3 +3,7 @@
 **/.judgement/
 **/.refactor/
 **/.steering-maintenance/
+
+# Go workspace
+go.work
+go.work.sum
