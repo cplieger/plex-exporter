@@ -124,10 +124,10 @@ func run() int {
 	// 500). No CSP or HSTS: /metrics and /api/health are non-browser,
 	// machine-scraped endpoints, so nosniff is the header that earns its keep.
 	//
-	// Both routine machine paths are skipped from the access line -- Prometheus
-	// scrapes /metrics roughly every 15s and the Docker HEALTHCHECK hits
-	// /api/health every 30s, so logging either would flood the log for no
-	// operational gain. The request id is still minted, echoed, and threaded on
+	// Both routine machine paths are skipped from the access line -- scrapers
+	// hit /metrics on their own interval (60s in the reference deployment)
+	// and the Docker HEALTHCHECK hits /api/health every 30s, so logging
+	// either would flood the log for no operational gain. The request id is still minted, echoed, and threaded on
 	// skipped paths, so a panic in either handler is still logged with its id,
 	// and any unexpected path (a 404 from a stray client) is still logged.
 	// Logging and Recoverer default to slog.Default(), which is the logger the

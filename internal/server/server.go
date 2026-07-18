@@ -25,26 +25,27 @@ import (
 // mu without a wall of accessor methods. The whole internal/* tree is a
 // single trust boundary.
 type Server struct {
-	LastItemsRefresh  time.Time
-	ErrorCounts       map[string]float64
-	Client            *plex.Client
-	Sessions          *sessions.Tracker
-	ID                string
-	Name              string
-	Version           string
-	Platform          string
-	PlatformVersion   string
-	Libraries         []library.Library
-	HostCPU           float64
-	HostMem           float64
-	TransmitBytes     float64
-	LastBandwidthAt   int
-	ActiveTranscodes  int
-	mu                sync.Mutex
-	refreshing        atomic.Bool
-	HTTPReachable     bool
-	SessionsReachable bool
-	PlexPass          bool
+	LastItemsRefresh     time.Time
+	LastProvidersRefresh time.Time
+	ErrorCounts          map[string]float64
+	Client               *plex.Client
+	Sessions             *sessions.Tracker
+	ID                   string
+	Name                 string
+	Version              string
+	Platform             string
+	PlatformVersion      string
+	Libraries            []library.Library
+	HostCPU              float64
+	HostMem              float64
+	TransmitBytes        float64
+	LastBandwidthAt      int
+	ActiveTranscodes     int
+	mu                   sync.Mutex
+	refreshing           atomic.Bool
+	HTTPReachable        bool
+	SessionsReachable    bool
+	PlexPass             bool
 }
 
 // NewServer returns an initialised Server for the given Plex HTTP client.
@@ -74,33 +75,53 @@ func (s *Server) RecordError(typ string) {
 	s.mu.Unlock()
 }
 
+// providersRefreshInterval is the cadence for the /media/providers fetch.
+// Providers metadata (server name/version, the library list and its
+// duration/storage totals) changes on upgrade/library-edit timescales and
+// the known scrapers read at 60s, so refetching it on every 5s tick bought
+// nothing. Identity, resources, and bandwidth stay on the tick: they carry
+// live state (active transcodes, host CPU/mem, bandwidth samples).
+const providersRefreshInterval = time.Minute
+
 // Refresh polls Plex for server identity, library list, host resources,
 // and bandwidth. Intended to be called both from startup (to establish
-// initial state) and from RunRefreshLoop on a ticker.
+// initial state) and from RunRefreshLoop on a ticker. The providers fetch
+// runs at providersRefreshInterval rather than every call; the first call
+// (zero LastProvidersRefresh) always fetches it, so startup fail-fast
+// classification still keys on the providers endpoint.
 func (s *Server) Refresh(outerCtx context.Context) error {
 	ctx, cancel := context.WithTimeout(outerCtx, 45*time.Second)
 	defer cancel()
 
-	// Server identity + library list.
-	providers, err := s.Client.Providers(ctx)
-	if err != nil {
-		return fmt.Errorf("fetching providers: %w", err)
+	// Server identity + library list, at the slower providers cadence.
+	s.mu.Lock()
+	needProviders := time.Since(s.LastProvidersRefresh) > providersRefreshInterval
+	s.mu.Unlock()
+	if needProviders {
+		providers, err := s.Client.Providers(ctx)
+		if err != nil {
+			return fmt.Errorf("fetching providers: %w", err)
+		}
+
+		s.mu.Lock()
+		s.ID = providers.MachineIdentifier
+		s.Name = providers.FriendlyName
+		s.Version = providers.Version
+
+		// Build a lookup of existing item counts so they survive the rebuild.
+		prevItems := make(map[string]int64, len(s.Libraries))
+		for _, lib := range s.Libraries {
+			if lib.ItemsCount > 0 {
+				prevItems[lib.ID] = lib.ItemsCount
+			}
+		}
+
+		s.Libraries = library.Build(providers, prevItems)
+		s.LastProvidersRefresh = time.Now()
+		s.mu.Unlock()
 	}
 
 	s.mu.Lock()
-	s.ID = providers.MachineIdentifier
-	s.Name = providers.FriendlyName
-	s.Version = providers.Version
-
-	// Build a lookup of existing item counts so they survive the rebuild.
-	prevItems := make(map[string]int64, len(s.Libraries))
-	for _, lib := range s.Libraries {
-		if lib.ItemsCount > 0 {
-			prevItems[lib.ID] = lib.ItemsCount
-		}
-	}
-
-	s.Libraries = library.Build(providers, prevItems)
 	needItemsRefresh := time.Since(s.LastItemsRefresh) > 15*time.Minute
 	s.mu.Unlock()
 
@@ -329,15 +350,13 @@ func (s *Server) writeBackItemCounts(libs []library.Library) {
 // Returns (count, true) on a positive result; (0, false) on error or zero.
 // Zero is treated as "try the next fallback" to match pre-refactor behaviour
 // where a zero result falls through to the default path for music libraries.
-func (s *Server) tryItemCount(ctx context.Context, libID, typeParam string) (int64, bool) {
-	path := "/library/sections/" + libID + "/all"
-	if typeParam != "" {
-		path += "?type=" + typeParam
-	}
-	count, err := s.Client.GetContainerSize(ctx, path)
+// The section path and container params are built by the plexapi library
+// (metadataType 0 = unfiltered).
+func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType int) (int64, bool) {
+	count, err := s.Client.ContainerTotalSize(ctx, libplex.RatingKey(libID), metadataType)
 	if err != nil {
 		slog.Warn("library item count fetch failed",
-			"library_id", libID, "type_param", typeParam, "error", err)
+			"library_id", libID, "type_param", metadataType, "error", err)
 		s.RecordError("library_items")
 		return 0, false
 	}
@@ -377,6 +396,12 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 	updates := samples
 	slices.SortFunc(updates, func(a, b libplex.StatisticsBandwidth) int { return a.At - b.At })
 
+	// Watermark accumulation: only samples newer than LastBandwidthAt are
+	// added. Correctness assumes the 5s refresh cadence never exceeds the
+	// sample window the undocumented /statistics/bandwidth endpoint returns
+	// (unverifiable without a Plex Pass instance); a missed window would
+	// undercount plex_transmit_bytes_total, which the README already labels
+	// indicative-only (reset on restart).
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	highest := s.LastBandwidthAt
@@ -428,8 +453,8 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	var sessResp plexapi.MC[plexapi.MetadataListResponse]
-	if err := s.Client.Get(fetchCtx, "/status/sessions", &sessResp); err != nil {
+	activeSessions, err := libplex.FetchMetadata[plexapi.SessionMetadata](fetchCtx, s.Client.Client, libplex.SessionsPath())
+	if err != nil {
 		slog.Warn("session poll: failed to fetch sessions", "error", err)
 		s.RecordError("sessions_fetch")
 		s.SetSessionsReachable(false)
@@ -444,15 +469,15 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	// mark any tracked session absent from this poll as stopped. That moves
 	// it onto the 60s stopped-prune path (the documented retention) instead
 	// of the 5-minute stale-orphan path, banking its final play time.
-	present := make([]string, 0, len(sessResp.MediaContainer.Metadata))
-	for i := range sessResp.MediaContainer.Metadata {
-		if k := sessResp.MediaContainer.Metadata[i].SessionKey; k != "" {
+	present := make([]string, 0, len(activeSessions))
+	for i := range activeSessions {
+		if k := activeSessions[i].SessionKey; k != "" {
 			present = append(present, k)
 		}
 	}
 	s.Sessions.MarkAbsentStopped(present)
 
-	work := s.buildSessionWork(sessResp.MediaContainer.Metadata)
+	work := s.buildSessionWork(activeSessions)
 	if len(work) == 0 {
 		return
 	}
@@ -486,27 +511,40 @@ func (s *Server) buildSessionWork(activeSessions []plexapi.SessionMetadata) []se
 	return work
 }
 
-// fetchSessionMedia fetches /library/metadata/<ratingKey> for each work item
-// concurrently (at most 4 in flight) and returns the metadata keyed by work
-// index. A fetch error or empty response leaves that index unset, so the
-// caller still applies session state without library labels.
+// fetchSessionMedia fetches each work item's library metadata concurrently
+// (at most 4 in flight) and returns it keyed by work index. The metadata
+// path is the plexapi builder's (rating keys were validated in
+// buildSessionWork, so the builder cannot reject them). A fetch error or
+// empty response leaves that index unset, so the caller still applies
+// session state without library labels. A session whose tracked state
+// already carries metadata for its current rating key is skipped
+// (MediaMeta is immutable per key): the nil result makes applySessionUpdate
+// keep the cached MediaMeta, saving one /library/metadata round-trip per
+// session per poll.
 func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*plexapi.SessionMetadata {
 	results := make([]*plexapi.SessionMetadata, len(work))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(min(4, len(work)))
 	for i, w := range work {
+		if s.Sessions.MediaResolved(w.sess.SessionKey, w.sess.RatingKey) {
+			continue
+		}
 		g.Go(func() error {
-			var metaResp plexapi.MC[plexapi.MetadataListResponse]
-			if err := s.Client.Get(gctx, "/library/metadata/"+w.sess.RatingKey, &metaResp); err != nil {
-				slog.Warn("session poll: metadata fetch failed", "key", w.sess.RatingKey, "error", err)
-				s.RecordError("metadata_fetch")
-				return nil
+			path, err := libplex.MetadataPath(libplex.RatingKey(w.sess.RatingKey))
+			if err == nil {
+				var items []plexapi.SessionMetadata
+				items, err = libplex.FetchMetadata[plexapi.SessionMetadata](gctx, s.Client.Client, path)
+				if err == nil {
+					if len(items) == 0 {
+						slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
+						return nil
+					}
+					results[i] = &items[0]
+					return nil
+				}
 			}
-			if len(metaResp.MediaContainer.Metadata) == 0 {
-				slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
-				return nil
-			}
-			results[i] = &metaResp.MediaContainer.Metadata[0]
+			slog.Warn("session poll: metadata fetch failed", "key", w.sess.RatingKey, "error", err)
+			s.RecordError("metadata_fetch")
 			return nil
 		})
 	}

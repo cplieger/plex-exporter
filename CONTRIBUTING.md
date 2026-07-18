@@ -12,9 +12,9 @@ and goroutine launch. Keep behaviour out of it — all logic lives in the
 
 - `internal/plexapi` — pure JSON/XML wire types for the Plex API
   responses. No imports beyond `encoding/json`.
-- `internal/plex` — HTTP client for Plex, including retry semantics, the
-  `ErrNotFound` sentinel, and the `HTTPStatusError` type that lets callers
-  tell 4xx from 5xx.
+- `internal/plex` — HTTP client for Plex, including retry semantics and
+  the `ErrNotFound` sentinel; status-code classification uses the shared
+  `plexapi` library's `StatusError` directly.
 - `internal/library` — the `Library` value type plus pure classification
   helpers (`IsType`, `ContentTypeLabel`, `Build`, `ItemCountTypes`).
   Deterministic and side-effect free.
@@ -29,7 +29,12 @@ and goroutine launch. Keep behaviour out of it — all logic lives in the
 
 Sessions are tracked by polling `/status/sessions` every 5s; a stateful
 tracker reconciles poll snapshots into metric updates (prune after 60s
-idle). Library item counts are cached and refreshed every 15 minutes.
+idle). Per-session library metadata is cached by rating key after the
+first successful fetch (a rating-key change, e.g. episode auto-advance,
+refetches). Server identity/library metadata (`/media/providers`)
+refreshes every 60s, library item counts every 15 minutes; the root
+identity, resources, and bandwidth endpoints stay on the 5s tick because
+they carry live state.
 
 ## Local development
 

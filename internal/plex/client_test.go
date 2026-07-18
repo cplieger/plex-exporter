@@ -20,7 +20,8 @@ import (
 // caps, status mapping) is github.com/cplieger/plexapi and is tested there.
 // These tests pin the exporter's adapter: construction (CA path handling),
 // the retry-counter metric, the error re-exports the startup classifier
-// keys on, and the GetContainerSize passthrough.
+// keys on, and the library's ContainerTotalSize reached through the
+// embedded client.
 
 func TestNewClient_invalid_url_returns_error(t *testing.T) {
 	for _, u := range []string{"ftp://plex:32400", "http://", "://bad"} {
@@ -101,9 +102,10 @@ func TestClient_Retries_nil_safe(t *testing.T) {
 	}
 }
 
-// TestGet_populates_HTTPStatusError pins the alias: a non-200 surfaces as
-// the type main.go's fatal-vs-transient startup classifier matches.
-func TestGet_populates_HTTPStatusError(t *testing.T) {
+// TestGet_populates_StatusError pins error transparency through the
+// adapter: a non-200 surfaces as the library's StatusError, the type
+// main.go's fatal-vs-transient startup classifier matches.
+func TestGet_populates_StatusError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
@@ -113,9 +115,9 @@ func TestGet_populates_HTTPStatusError(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := c.Get(t.Context(), "/x", nil)
-	var statusErr *HTTPStatusError
+	var statusErr *plexapi.StatusError
 	if !errors.As(got, &statusErr) || statusErr.Code != http.StatusUnauthorized {
-		t.Errorf("err = %v, want *HTTPStatusError 401", got)
+		t.Errorf("err = %v, want *plexapi.StatusError 401", got)
 	}
 	// And the lib's classifier agrees it is fatal.
 	if !plexapi.IsConfigError(got) {
@@ -135,7 +137,11 @@ func TestGet_not_found_is_ErrNotFound(t *testing.T) {
 	}
 }
 
-func TestGetContainerSize(t *testing.T) {
+// The ContainerTotalSize tests exercise the library method through the
+// adapter's embedded client — the app's former GetContainerSize rename
+// wrapper was inlined away (callers convert the section id with
+// plexapi.RatingKey at the call site).
+func TestContainerTotalSize(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		if q.Get("X-Plex-Container-Size") != "1" || q.Get("X-Plex-Container-Start") != "0" || q.Get("type") != "4" {
@@ -148,13 +154,13 @@ func TestGetContainerSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := c.GetContainerSize(t.Context(), "/library/sections/1/all?type=4")
+	got, err := c.ContainerTotalSize(t.Context(), plexapi.RatingKey("1"), 4)
 	if err != nil || got != 4360 {
-		t.Errorf("GetContainerSize = (%d, %v), want 4360", got, err)
+		t.Errorf("ContainerTotalSize = (%d, %v), want 4360", got, err)
 	}
 }
 
-func TestGetContainerSize_propagates_error(t *testing.T) {
+func TestContainerTotalSize_propagates_error(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
@@ -163,8 +169,18 @@ func TestGetContainerSize_propagates_error(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.GetContainerSize(t.Context(), "/library/sections/1/all"); err == nil {
+	if _, err := c.ContainerTotalSize(t.Context(), plexapi.RatingKey("1"), 0); err == nil {
 		t.Error("nil error on 502")
+	}
+}
+
+func TestContainerTotalSize_rejects_non_numeric_section(t *testing.T) {
+	c, err := NewClientFromHTTP("http://plex:32400", "tok", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.ContainerTotalSize(t.Context(), plexapi.RatingKey("1; DROP"), 4); err == nil {
+		t.Error("non-numeric section id accepted")
 	}
 }
 

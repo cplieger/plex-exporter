@@ -2,13 +2,6 @@ package plexapi
 
 import "encoding/json"
 
-// MC is the generic Plex media-container envelope. Most Plex JSON
-// responses wrap the real payload inside a top-level "MediaContainer"
-// object, so callers decode into MC[ConcretePayload].
-type MC[T any] struct {
-	MediaContainer T `json:"MediaContainer"`
-}
-
 // MediaPart describes a single part of a Media entry (video/audio stream
 // decision).
 type MediaPart struct {
@@ -48,12 +41,6 @@ type SessionMetadata struct {
 	} `json:"Session"`
 	Media []MediaInfo `json:"Media"`
 	Index int         `json:"index"`
-}
-
-// MetadataListResponse is shared by /status/sessions and
-// /library/metadata/<id>.
-type MetadataListResponse struct {
-	Metadata []SessionMetadata `json:"Metadata"`
 }
 
 // WSTranscodeSession is a TranscodeSession element embedded in the

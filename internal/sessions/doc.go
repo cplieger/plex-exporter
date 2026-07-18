@@ -7,8 +7,8 @@
 //
 // Exported symbols: State with ParseState and the StatePlaying /
 // StateStopped / StatePaused / StateOther constants; the MaxSessionKeyLen /
-// MaxTrackedSessions bounds; the Session DTO; PruneConfig; the transcode
-// classifiers TranscodeKind and SubtitleAction; and Tracker with NewTracker,
-// Update, UpdateLibraryLabels, MarkAbsentStopped, SnapshotSessions, Prune,
-// and RunPruneLoop.
+// MaxTrackedSessions bounds; the Session DTO; the transcode classifiers
+// TranscodeKind and SubtitleAction; and Tracker with NewTracker, Update,
+// UpdateLibraryLabels, MarkAbsentStopped, SnapshotSessions, MediaResolved,
+// Prune, and RunPruneLoop.
 package sessions
