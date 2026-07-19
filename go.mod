@@ -12,7 +12,7 @@ require (
 
 require (
 	github.com/cplieger/envx v1.2.1
-	github.com/cplieger/plexapi v1.3.0
+	github.com/cplieger/plexapi v1.3.1
 	github.com/cplieger/slogx v1.3.0
 	github.com/cplieger/webhttp v1.10.0
 )
