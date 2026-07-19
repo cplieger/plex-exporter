@@ -35,6 +35,19 @@ on:
         type: boolean
         default: false
 
+# Serialize release runs per repo. Two merges seconds apart otherwise race:
+# the losing run can 403 even on the git-refs tag create and strand a
+# releasable commit behind a root_changed=false skip (observed on
+# web-terminal-server, 2026-07-19). Queued, never cancelled — when GitHub
+# replaces a superseded queued run with a newer one, the newer run's cliff
+# window covers the superseded run's commits, so nothing is lost. Lives here
+# and not in the reusable workflow: workflow-level concurrency only takes
+# effect in the workflow GitHub actually schedules (the caller); the called
+# workflow supports it at job level only.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 # Top-level permissions are read-only (OpenSSF Scorecard Token-Permissions);
 # the release job declares the write scopes it actually needs. GitHub takes the
 # intersection of these job-level grants and what the called reusable workflow
