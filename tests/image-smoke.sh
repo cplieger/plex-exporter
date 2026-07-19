@@ -53,6 +53,12 @@ fi
 
 APP="${SMOKE_APP_NAME:-image}"
 TIMEOUT="${SMOKE_TIMEOUT:-120}"
+case "$TIMEOUT" in
+  '' | *[!0-9]*)
+    printf 'FAIL: SMOKE_TIMEOUT must be a non-negative integer, got "%s"\n' "$TIMEOUT" >&2
+    exit 1
+    ;;
+esac
 NAME="smoke-${APP}-$$"
 
 # shellcheck disable=SC2317,SC2329  # invoked indirectly via trap
