@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/cplieger/health v1.4.0
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.24.0
 	github.com/prometheus/client_model v0.6.2
 	golang.org/x/sync v0.22.0
 	pgregory.net/rapid v1.3.0
