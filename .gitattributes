@@ -8,7 +8,7 @@
 # untouched; `eol=lf` pins text checkouts to LF on every platform.
 #
 # Distributed to all releaseable + python repos via cplieger/ci's sync
-# workflow (see scripts/classify-repos.sh). Keep this uniform across repos;
+# workflow (see scripts/classify-repos.py). Keep this uniform across repos;
 # repos with extra needs (e.g. age-encrypted secret blobs) maintain their
 # own superset and are excluded from the sync.
 
