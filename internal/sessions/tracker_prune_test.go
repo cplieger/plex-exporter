@@ -1,37 +1,11 @@
 package sessions
 
 import (
-	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/cplieger/slogx/capture"
 )
-
-// findRecord returns the first captured record whose message matches msg.
-func findRecord(records []slog.Record, msg string) (slog.Record, bool) {
-	for _, r := range records {
-		if r.Message == msg {
-			return r, true
-		}
-	}
-	return slog.Record{}, false
-}
-
-// recordInt64 extracts the int64 value of attribute key from r.
-func recordInt64(r slog.Record, key string) (int64, bool) {
-	var v int64
-	found := false
-	r.Attrs(func(a slog.Attr) bool {
-		if a.Key == key {
-			v = a.Value.Int64()
-			found = true
-			return false
-		}
-		return true
-	})
-	return v, found
-}
 
 const prunedSummaryMsg = "pruned expired sessions"
 
@@ -165,7 +139,7 @@ func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 
 	tracker.Prune()
 
-	if _, ok := findRecord(logs.Records(), prunedSummaryMsg); ok {
+	if logs.Contains(prunedSummaryMsg) {
 		t.Errorf("Prune() with no removals emitted %q summary, want none", prunedSummaryMsg)
 	}
 }
@@ -185,15 +159,14 @@ func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 
 	tracker.Prune()
 
-	rec, ok := findRecord(logs.Records(), prunedSummaryMsg)
-	if !ok {
+	if !logs.Contains(prunedSummaryMsg) {
 		t.Fatalf("Prune() removing 1 stopped session emitted no %q summary, want one", prunedSummaryMsg)
 	}
-	if stopped, _ := recordInt64(rec, "stopped"); stopped != 1 {
-		t.Errorf("summary stopped count = %d, want 1", stopped)
+	if got, ok := logs.AttrValue(prunedSummaryMsg, "stopped"); !ok || got != "1" {
+		t.Errorf("summary stopped count = %q (found=%v), want 1", got, ok)
 	}
-	if stale, _ := recordInt64(rec, "stale"); stale != 0 {
-		t.Errorf("summary stale count = %d, want 0", stale)
+	if got, ok := logs.AttrValue(prunedSummaryMsg, "stale"); !ok || got != "0" {
+		t.Errorf("summary stale count = %q (found=%v), want 0", got, ok)
 	}
 }
 
@@ -213,15 +186,14 @@ func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 
 	tracker.Prune()
 
-	rec, ok := findRecord(logs.Records(), prunedSummaryMsg)
-	if !ok {
+	if !logs.Contains(prunedSummaryMsg) {
 		t.Fatalf("Prune() removing 1 stale session emitted no %q summary, want one", prunedSummaryMsg)
 	}
-	if stale, _ := recordInt64(rec, "stale"); stale != 1 {
-		t.Errorf("summary stale count = %d, want 1", stale)
+	if got, ok := logs.AttrValue(prunedSummaryMsg, "stale"); !ok || got != "1" {
+		t.Errorf("summary stale count = %q (found=%v), want 1", got, ok)
 	}
-	if stopped, _ := recordInt64(rec, "stopped"); stopped != 0 {
-		t.Errorf("summary stopped count = %d, want 0", stopped)
+	if got, ok := logs.AttrValue(prunedSummaryMsg, "stopped"); !ok || got != "0" {
+		t.Errorf("summary stopped count = %q (found=%v), want 0", got, ok)
 	}
 }
 
