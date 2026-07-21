@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runtime image smoke-test harness — CANONICAL COPY in cplieger/ci
 # (configs/image-smoke.sh), synced to each serving app's tests/image-smoke.sh
-# by scripts/classify-repos.sh (a repo enrolls by committing a
+# by scripts/classify-repos.py (a repo enrolls by committing a
 # tests/image-smoke.conf; see below). DO NOT edit the synced copy in an app
 # repo — change it here and let the sync land it.
 #
