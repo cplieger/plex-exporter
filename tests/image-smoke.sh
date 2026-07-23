@@ -77,9 +77,10 @@ trap cleanup EXIT
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" $SMOKE_RUN_ARGS "$IMG" >/dev/null
 
-i=0
+start=$(date +%s)
+deadline=$((start + TIMEOUT))
 status=starting
-while [ "$i" -lt "$TIMEOUT" ]; do
+while [ "$(date +%s)" -lt "$deadline" ]; do
   # Fail fast on an early exit: poll .State.Running before the health status so
   # a crash-boot is caught by its exit code (more debuggable than "unhealthy")
   # and the verdict never depends on what health a stopped container reports.
@@ -91,7 +92,7 @@ while [ "$i" -lt "$TIMEOUT" ]; do
   status=$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}no-healthcheck{{ end }}' "$NAME" 2>/dev/null || echo gone)
   case "$status" in
     healthy)
-      printf '%s image smoke: ok (healthy after %ss)\n' "$APP" "$i"
+      printf '%s image smoke: ok (healthy after %ss)\n' "$APP" "$(($(date +%s) - start))"
       exit 0
       ;;
     unhealthy)
@@ -107,7 +108,6 @@ while [ "$i" -lt "$TIMEOUT" ]; do
       exit 1
       ;;
   esac
-  i=$((i + 1))
   sleep 1
 done
 printf 'FAIL: %s did not become healthy within %ss (last status: %s)\n' "$APP" "$TIMEOUT" "$status" >&2
