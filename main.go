@@ -164,18 +164,19 @@ func run() int {
 	go ps.Sessions.RunPruneLoop(ctx)
 	go ps.RunSessionPollLoop(ctx)
 
-	// Flip the health marker to unhealthy the moment shutdown is signalled,
-	// before webhttp.Run drains, so probes (Docker HEALTHCHECK + HTTP
-	// /api/health) see red during the drain window (Run's teardown runs only
-	// after the drain completes).
-	go func() {
-		<-ctx.Done()
+	slog.Info("starting metrics server", "addr", listener.Addr().String())
+	// The pre-drain phase flips the health marker to unhealthy strictly
+	// BEFORE webhttp.Run drains, so probes (Docker HEALTHCHECK + HTTP
+	// /api/health) see red during the drain window — the marker is a FILE the
+	// healthcheck CLI reads, which listener closure does not cover. (This was
+	// a goroutine racing the drain start; WithPreDrain makes the ordering a
+	// contract.) On a serve-error exit Run returns without invoking it, and
+	// the deferred marker.Cleanup covers that path, unchanged.
+	preDrain := webhttp.WithPreDrain(func(context.Context) {
 		marker.Set(false)
 		slog.Info("shutting down", "cause", context.Cause(ctx))
-	}()
-
-	slog.Info("starting metrics server", "addr", listener.Addr().String())
-	if srvErr := webhttp.Run(ctx, srv, listener, nil, webhttp.WithShutdownGrace(15*time.Second)); srvErr != nil {
+	})
+	if srvErr := webhttp.Run(ctx, srv, listener, nil, webhttp.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
 		// A runtime Serve failure (not a clean shutdown): record it and exit
 		// non-zero so the restart policy / exit-code alerting does not mistake
 		// it for a graceful stop.
