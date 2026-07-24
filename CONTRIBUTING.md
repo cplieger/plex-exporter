@@ -7,23 +7,23 @@ covers what a contributor needs beyond what the code makes obvious.
 
 `main.go` is the composition root and holds wiring only: env parsing,
 constructing the concrete types from `internal/*`, the HTTP listener,
-and goroutine launch. Keep behaviour out of it — all logic lives in the
+and goroutine launch. Keep behaviour out of it; all logic lives in the
 `internal/` packages:
 
-- `internal/plexapi` — pure JSON/XML wire types for the Plex API
+- `internal/plexapi`: pure JSON/XML wire types for the Plex API
   responses. No imports beyond `encoding/json`.
-- `internal/plex` — HTTP client for Plex, including retry semantics and
+- `internal/plex`: HTTP client for Plex, including retry semantics and
   the `ErrNotFound` sentinel; status-code classification uses the shared
   `plexapi` library's `StatusError` directly.
-- `internal/library` — the `Library` value type plus pure classification
+- `internal/library`: the `Library` value type plus pure classification
   helpers (`IsType`, `ContentTypeLabel`, `Build`, `ItemCountTypes`).
   Deterministic and side-effect free.
-- `internal/sessions` — in-memory active-session tracker, updated by the
+- `internal/sessions`: in-memory active-session tracker, updated by the
   poll loop and snapshotted by the collector. Owns the prune logic and
   the session bounds.
-- `internal/metrics` — the Prometheus descriptor set (labels, descs,
+- `internal/metrics`: the Prometheus descriptor set (labels, descs,
   error-type allowlist). Exports descriptor variables only.
-- `internal/server` — the `Server` orchestrator: refresh loop,
+- `internal/server`: the `Server` orchestrator: refresh loop,
   per-subsystem refresh methods, and the Prometheus `Describe`/`Collect`
   implementation that emits metrics from `Server` state.
 
@@ -39,7 +39,7 @@ they carry live state.
 ## Local development
 
 The module targets the Go version pinned in `go.mod`. There is no
-Makefile — use the standard Go toolchain:
+Makefile; use the standard Go toolchain:
 
 ```sh
 go build ./...        # compile
@@ -57,7 +57,7 @@ import ordering (standard → third-party → local). `sloglint` is
 Tests are property-based (`pgregory.net/rapid`) plus table-driven, and
 live beside the code they test. Cover pure functions with properties;
 the poll path is covered by `session_poll_test.go`. Not tested: main
-event loop, ticker scheduling (I/O-bound runtime paths — monitored via
+event loop, ticker scheduling (I/O-bound runtime paths, monitored via
 `plex_http_reachable`).
 
 The container build is reproducible and rootless:
@@ -67,7 +67,7 @@ docker build -t plex-exporter .
 ```
 
 It compiles with `CGO_ENABLED=0` and ships on
-`gcr.io/distroless/static:nonroot` — no shell, no package
+`gcr.io/distroless/static-debian13:nonroot`: no shell, no package
 manager. Runtime config is via env (`PLEX_SERVER`, `PLEX_TOKEN`,
 `LISTEN_ADDRESS`, `PLEX_CA_CERT_PATH`); see the README for the
 full reference.
@@ -76,14 +76,14 @@ full reference.
 
 - **Metric cardinality is load-bearing.** Per-session bitrate lives in
   its own `plex_session_bitrate_kbps` gauge, _not_ as a label on
-  `plex_plays_active`/`plex_play_seconds_total` — adaptive streaming
+  `plex_plays_active`/`plex_play_seconds_total`; adaptive streaming
   reports changing bitrates that would otherwise explode label
   cardinality. Don't add high-churn values as labels.
 - **Lock ordering.** When holding both, acquire the `Server` mutex
   before the session tracker's mutex; the reverse risks deadlock.
 - **Plex Pass degrades gracefully.** Host CPU/memory and
   bandwidth-transmission metrics come from undocumented endpoints that
-  404 without Plex Pass. Those paths must stay non-fatal — the exporter
+  404 without Plex Pass. Those paths must stay non-fatal; the exporter
   keeps serving every other metric.
 - **New metrics:** add the descriptor in `internal/metrics`, emit it
   from `Collect` in `internal/server`, and document it in the README's
