@@ -124,16 +124,16 @@ func run() int {
 	// 500). No CSP or HSTS: /metrics and /api/health are non-browser,
 	// machine-scraped endpoints, so nosniff is the header that earns its keep.
 	//
-	// Both routine machine paths are skipped from the access line -- scrapers
-	// hit /metrics on their own interval (60s in the reference deployment)
-	// and the Docker HEALTHCHECK hits /api/health every 30s, so logging
-	// either would flood the log for no operational gain. The request id is still minted, echoed, and threaded on
-	// skipped paths, so a panic in either handler is still logged with its id,
-	// and any unexpected path (a 404 from a stray client) is still logged.
+	// Both routine machine paths ride the fleet-standard ProbeLogLevel --
+	// scrapers hit /metrics on their own interval (60s in the reference
+	// deployment) and the Docker HEALTHCHECK hits /api/health every 30s, so
+	// a healthy probe logs at Debug (out of the shipped stream) while a
+	// FAILING probe surfaces at Warn/Error with its status and request id
+	// (the former skip idiom hid the failure signal along with the noise).
 	// Logging and Recoverer default to slog.Default(), which is the logger the
 	// rest of the app already uses.
 	handler := webhttp.Chain(mux,
-		webhttp.Logging(webhttp.WithSkipPaths("/metrics", "/api/health")),
+		webhttp.Logging(webhttp.ProbeLogLevel("/metrics", "/api/health")),
 		webhttp.Recoverer(),
 		webhttp.SecurityHeaders(),
 	)
