@@ -12,7 +12,7 @@ require (
 
 require (
 	github.com/cplieger/envx v1.3.0
-	github.com/cplieger/plexapi v1.3.3
+	github.com/cplieger/plexapi v1.3.4
 	github.com/cplieger/slogx v1.4.0
 	github.com/cplieger/webhttp v1.16.0
 )
@@ -20,7 +20,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cplieger/httpx/v3 v3.2.0 // indirect
+	github.com/cplieger/httpx/v4 v4.1.0 // indirect
 	github.com/cplieger/xmlx v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
