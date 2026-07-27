@@ -26,6 +26,15 @@
 #   SMOKE_RUN_ARGS   extra `docker run` args (env, tmpfs, ...) as a word-split
 #                    string, e.g. "-e FOO=bar --tmpfs /input". Values must not
 #                    contain spaces (these are controlled test configs).
+#   SMOKE_LOG_PATTERN  optional post-start assertion: a fixed string that must
+#                    appear in the container log before the run passes (default:
+#                    empty = health alone is the verdict). For an app whose
+#                    HEALTHCHECK deliberately does not cover a surface - a
+#                    listener started asynchronously, a feature whose failure is
+#                    logged without flipping health - the log line it emits on
+#                    success is the only evidence available to the harness. The
+#                    wait shares the SMOKE_TIMEOUT deadline: the container must
+#                    be healthy AND have logged the pattern before it expires.
 #
 # The harness also sets $SMOKE_DIR (this script's own absolute directory)
 # before sourcing the .conf, so an app that needs a config/fixture file on disk
@@ -45,6 +54,13 @@ SMOKE_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 SMOKE_APP_NAME=""
 SMOKE_TIMEOUT=""
 SMOKE_RUN_ARGS=""
+SMOKE_LOG_PATTERN=""
+# Initialised because both post-loop verdicts read it, and the wait loop's body is
+# skippable: SMOKE_TIMEOUT="0" passes the non-negative-integer check above, so the
+# deadline can already have passed at the first test and `status` would be unbound
+# under set -u. An empty value reports honestly ("last status: ") instead of dying
+# with an unbound-variable error that names nothing useful.
+status=""
 CONF="$SMOKE_DIR/image-smoke.conf"
 if [ -f "$CONF" ]; then
   # shellcheck disable=SC1090  # per-app config path, resolved at runtime
@@ -96,6 +112,13 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   status=$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}no-healthcheck{{ end }}' "$NAME" 2>/dev/null || echo gone)
   case "$status" in
     healthy)
+      # An app-specific post-start assertion (SMOKE_LOG_PATTERN) keeps waiting
+      # inside the same deadline: healthy alone does not prove a surface the
+      # HEALTHCHECK deliberately does not cover actually came up.
+      if [ -n "$SMOKE_LOG_PATTERN" ] && ! docker logs "$NAME" 2>&1 | grep -qF -- "$SMOKE_LOG_PATTERN"; then
+        sleep 1
+        continue
+      fi
       printf '%s image smoke: ok (healthy after %ss)\n' "$APP" "$(($(date +%s) - start))"
       exit 0
       ;;
@@ -114,5 +137,9 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   esac
   sleep 1
 done
+if [ -n "$SMOKE_LOG_PATTERN" ] && [ "$status" = healthy ]; then
+  printf 'FAIL: %s became healthy but never logged "%s" within %ss\n' "$APP" "$SMOKE_LOG_PATTERN" "$TIMEOUT" >&2
+  exit 1
+fi
 printf 'FAIL: %s did not become healthy within %ss (last status: %s)\n' "$APP" "$TIMEOUT" "$status" >&2
 exit 1
