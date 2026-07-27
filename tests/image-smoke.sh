@@ -68,6 +68,10 @@ cleanup() {
   if [ "$code" -ne 0 ]; then
     printf '%s\n' "--- container logs (tail) ---" >&2
     docker logs "$NAME" 2>&1 | tail -40 >&2 || true
+    # The HEALTHCHECK's own output is the direct evidence for an "unhealthy"
+    # verdict; a shell-less image often logs nothing about its probe.
+    printf '%s\n' "--- healthcheck probe log ---" >&2
+    docker inspect --format '{{ if .State.Health }}{{ range .State.Health.Log }}exit={{ .ExitCode }}: {{ .Output }}{{ end }}{{ end }}' "$NAME" 2>/dev/null >&2 || true
   fi
   docker rm -f "$NAME" >/dev/null 2>&1 || true
 }
