@@ -1,0 +1,21 @@
+# punused findings adjudicated as false positives. One literal substring per
+# line, matched against punused's output line; full-line `#` comments carry the
+# reason. Invalid-by-construction classes: `.kiro/steering/tools.md`.
+#
+# prometheus.Collector is exactly Describe(chan<- *Desc) + Collect(chan<- Metric).
+# main.go's run() builds the Server and hands it to prometheus.MustRegister --
+# the only registration site in the repo -- so *Server becomes a Collector
+# interface value there and promhttp's handler invokes both methods on
+# registration and on every scrape. Collect is what emits all 16 descriptors on
+# /metrics, i.e. the app's entire purpose. A successful `go build` is itself the
+# compiler's proof that *Server satisfies the interface. Upstream: bep/punused#3.
+method (*Server).Describe
+method (*Server).Collect
+#
+# internal/plextest builds a plex.Client wired to an httptest.Server. It is a
+# separate package on purpose (its doc: kept out of package plex so the
+# production binary never links testing/httptest), and it imports internal/plex,
+# so package plex's own in-package tests cannot use it -- which is why the
+# indirection exists. 35 call sites across three test files in internal/server.
+# EU1001 is the correct terminal state for a fixture builder.
+function NewTestClientFromServer
