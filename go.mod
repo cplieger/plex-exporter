@@ -11,10 +11,10 @@ require (
 )
 
 require (
-	github.com/cplieger/envx v1.4.0
+	github.com/cplieger/envx v1.5.0
 	github.com/cplieger/plexapi v1.3.6
-	github.com/cplieger/slogx v1.4.0
-	github.com/cplieger/webhttp v1.19.0
+	github.com/cplieger/slogx v1.5.0
+	github.com/cplieger/webhttp v1.20.0
 )
 
 require (
