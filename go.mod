@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	github.com/cplieger/envx v1.5.0
+	github.com/cplieger/envx v1.5.1
 	github.com/cplieger/plexapi v1.3.6
 	github.com/cplieger/slogx v1.5.0
 	github.com/cplieger/webhttp v1.20.0
@@ -21,6 +21,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cplieger/httpx/v4 v4.2.1 // indirect
+	github.com/cplieger/pathinside v1.0.0 // indirect
 	github.com/cplieger/xmlx v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
