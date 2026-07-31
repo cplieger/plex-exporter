@@ -36,6 +36,12 @@
 #                    wait shares the SMOKE_TIMEOUT deadline: the container must
 #                    be healthy AND have logged the pattern before it expires.
 #
+# A .conf that creates host state of its own (a `mktemp -d` fixture dir, a
+# generated key) overrides the smoke_cleanup() function to remove it; the
+# harness's EXIT trap calls it after removing the container, so acquisition and
+# release live side by side in the .conf and every invocation - local or CI -
+# leaves nothing behind.
+#
 # The harness also sets $SMOKE_DIR (this script's own absolute directory)
 # before sourcing the .conf, so an app that needs a config/fixture file on disk
 # can bind-mount a committed fixture dir, e.g.:
@@ -55,12 +61,13 @@ SMOKE_APP_NAME=""
 SMOKE_TIMEOUT=""
 SMOKE_RUN_ARGS=""
 SMOKE_LOG_PATTERN=""
-# Initialised because both post-loop verdicts read it, and the wait loop's body is
-# skippable: SMOKE_TIMEOUT="0" passes the non-negative-integer check above, so the
-# deadline can already have passed at the first test and `status` would be unbound
-# under set -u. An empty value reports honestly ("last status: ") instead of dying
-# with an unbound-variable error that names nothing useful.
-status=""
+# Default app cleanup hook: a .conf that creates host state overrides it. Defined
+# BEFORE the source so the EXIT trap can always call it, and so a .conf that
+# creates nothing needs no boilerplate.
+# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap's cleanup()
+smoke_cleanup() {
+  :
+}
 CONF="$SMOKE_DIR/image-smoke.conf"
 if [ -f "$CONF" ]; then
   # shellcheck disable=SC1090  # per-app config path, resolved at runtime
@@ -90,6 +97,9 @@ cleanup() {
     docker inspect --format '{{ if .State.Health }}{{ range .State.Health.Log }}exit={{ .ExitCode }}: {{ .Output }}{{ end }}{{ end }}' "$NAME" 2>/dev/null >&2 || true
   fi
   docker rm -f "$NAME" >/dev/null 2>&1 || true
+  # The app's own fixture teardown, after the container that consumed it is gone.
+  # Never allowed to change the run's verdict.
+  smoke_cleanup || true
 }
 trap cleanup EXIT
 
@@ -99,6 +109,8 @@ docker run -d --name "$NAME" $SMOKE_RUN_ARGS "$IMG" >/dev/null
 
 start=$(date +%s)
 deadline=$((start + TIMEOUT))
+# Pre-set so both post-loop verdicts have a state to name: a SMOKE_TIMEOUT of 0
+# skips the loop body entirely.
 status=starting
 while [ "$(date +%s)" -lt "$deadline" ]; do
   # Fail fast on an early exit: poll .State.Running before the health status so
