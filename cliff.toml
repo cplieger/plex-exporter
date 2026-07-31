@@ -63,6 +63,16 @@ exclude_paths = [
   ".gitignore",
   ".gitattributes",
   ".editorconfig",
+  # punused adjudications: the repo-owned whitelist the go-ci unused-export gate
+  # reads. Dev-only, never in an artifact, and an adjudication-only commit ships
+  # nothing — but it is the one dotfile here a `refactor:`-typed commit plausibly
+  # touches alone (deleting dead code and recording the survivors is one change;
+  # recording them alone is the follow-up), and `refactor:` is a RELEASING type.
+  # `**/` not bare: go-ci reads this file relative to its working-directory, so a
+  # nested Go module's copy lives at <dir>/.punused-ignore and the root-anchored
+  # form would miss it (measured on the pinned cliff v2.13.1 — bare excludes the
+  # root file only, `**/` excludes both, and a real code commit still bumps).
+  "**/.punused-ignore",
 ]
 
 commit_parsers = [
