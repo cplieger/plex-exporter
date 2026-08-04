@@ -36,6 +36,15 @@
 #                    wait shares the SMOKE_TIMEOUT deadline: the container must
 #                    be healthy AND have logged the pattern before it expires.
 #
+# A .conf may also override smoke_verify() (default: no-op) for app-specific
+# assertions that need the RUNNING healthy container - e.g. asserting that
+# every target of a served importmap answers 200, which no static check can
+# prove because the targets are produced during the image build. It runs once,
+# after health (and SMOKE_LOG_PATTERN, when set), with $SMOKE_CONTAINER holding
+# the container name; a non-zero return fails the smoke test. The harness never
+# publishes ports, so probe from INSIDE the container (`docker exec
+# "$SMOKE_CONTAINER" curl ...`) rather than assuming host reachability.
+#
 # A .conf that creates host state of its own (a `mktemp -d` fixture dir, a
 # generated key) overrides the smoke_cleanup() function to remove it; the
 # harness's EXIT trap calls it after removing the container, so acquisition and
@@ -66,6 +75,13 @@ SMOKE_LOG_PATTERN=""
 # creates nothing needs no boilerplate.
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap's cleanup()
 smoke_cleanup() {
+  :
+}
+# Default post-health verification hook: a .conf overrides it for assertions
+# that need the running healthy container (see the header). Same
+# define-before-source shape as smoke_cleanup.
+# shellcheck disable=SC2329  # invoked only when health is reached
+smoke_verify() {
   :
 }
 CONF="$SMOKE_DIR/image-smoke.conf"
@@ -130,6 +146,15 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       if [ -n "$SMOKE_LOG_PATTERN" ] && ! docker logs "$NAME" 2>&1 | grep -qF -- "$SMOKE_LOG_PATTERN"; then
         sleep 1
         continue
+      fi
+      # App-specific verification against the running container, once, after
+      # health. A failure is a real verdict, not a retry: health said up, so
+      # anything smoke_verify finds missing is missing from the image.
+      # shellcheck disable=SC2034  # consumed by the sourced .conf's smoke_verify
+      SMOKE_CONTAINER="$NAME"
+      if ! smoke_verify; then
+        printf 'FAIL: %s smoke_verify failed (see output above)\n' "$APP" >&2
+        exit 1
       fi
       printf '%s image smoke: ok (healthy after %ss)\n' "$APP" "$(($(date +%s) - start))"
       exit 0
