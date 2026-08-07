@@ -16,4 +16,4 @@ jobs:
       security-events: write
       contents: read
       actions: read
-    uses: cplieger/ci/.github/workflows/codeql.yaml@06e673c8341ac85645a7cafb6911eb01d5816f3d # v2
+    uses: cplieger/ci/.github/workflows/codeql.yaml@d072f88e5845f2c49a47317fe61378786bbe4154 # v2
