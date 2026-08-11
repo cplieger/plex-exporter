@@ -41,7 +41,8 @@
 # every target of a served importmap answers 200, which no static check can
 # prove because the targets are produced during the image build. It runs once,
 # after health (and SMOKE_LOG_PATTERN, when set), with $SMOKE_CONTAINER holding
-# the container name; a non-zero return fails the smoke test. The harness never
+# the container name; it runs in a subshell under `set -e`, so the first failing
+# command fails the smoke test (a non-zero return does too). The harness never
 # publishes ports, so probe from INSIDE the container (`docker exec
 # "$SMOKE_CONTAINER" curl ...`) rather than assuming host reachability.
 #
@@ -117,6 +118,10 @@ cleanup() {
   # Never allowed to change the run's verdict.
   smoke_cleanup || true
 }
+# An EXIT trap runs on SIGINT but NOT on SIGTERM/SIGHUP (measured under dash and sh),
+# so convert those into a normal exit and let the one EXIT trap below remove the
+# container and call smoke_cleanup exactly once.
+trap 'exit 143' TERM HUP
 trap cleanup EXIT
 
 # SMOKE_RUN_ARGS is intentionally word-split (simple test args, no spaces).
@@ -152,7 +157,20 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       # anything smoke_verify finds missing is missing from the image.
       # shellcheck disable=SC2034  # consumed by the sourced .conf's smoke_verify
       SMOKE_CONTAINER="$NAME"
-      if ! smoke_verify; then
+      # Run the hook in a child shell that CARRIES errexit, capturing its status
+      # outside any condition context. `if ! smoke_verify` puts the whole hook body
+      # in an errexit-ignored context (verified in dash and bash), so a hook whose
+      # early probe fails but whose last command succeeds would PASS. The subshell
+      # also contains a hook that installs its own EXIT trap, which in-process would
+      # REPLACE the harness's cleanup trap and leak the container.
+      set +e
+      (
+        set -e
+        smoke_verify
+      )
+      verify_rc=$?
+      set -e
+      if [ "$verify_rc" -ne 0 ]; then
         printf 'FAIL: %s smoke_verify failed (see output above)\n' "$APP" >&2
         exit 1
       fi
