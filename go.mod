@@ -1,6 +1,6 @@
 module github.com/cplieger/plex-exporter/v2
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/cplieger/health v1.5.0
