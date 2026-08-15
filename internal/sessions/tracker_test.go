@@ -85,7 +85,7 @@ func TestTrackerNilMeta(t *testing.T) {
 
 func TestRunPruneLoopCancellation(t *testing.T) {
 	tracker := NewTracker()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	done := make(chan struct{})
 	go func() {
