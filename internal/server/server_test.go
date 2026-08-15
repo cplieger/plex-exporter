@@ -32,7 +32,7 @@ func TestRefreshResources_updates_host_metrics(t *testing.T) {
 
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
-	srv.refreshResources(context.Background())
+	srv.refreshResources(t.Context())
 
 	srv.mu.Lock()
 	cpu := srv.HostCPU
@@ -62,7 +62,7 @@ func TestRefreshResources_empty_stats_no_update(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 	srv.HostCPU = 0.99
-	srv.refreshResources(context.Background())
+	srv.refreshResources(t.Context())
 
 	srv.mu.Lock()
 	cpu := srv.HostCPU
@@ -84,7 +84,7 @@ func TestRefreshResources_404_no_update(t *testing.T) {
 	srv := NewServer(client)
 	srv.HostCPU = 0.11
 	srv.HostMem = 0.22
-	srv.refreshResources(context.Background())
+	srv.refreshResources(t.Context())
 
 	srv.mu.Lock()
 	cpu := srv.HostCPU
@@ -185,7 +185,7 @@ func TestRefreshBandwidth(t *testing.T) {
 				srv.TransmitBytes = 999
 			}
 
-			srv.refreshBandwidth(context.Background())
+			srv.refreshBandwidth(t.Context())
 
 			srv.mu.Lock()
 			transmit := srv.TransmitBytes
@@ -238,7 +238,7 @@ func TestRefresh_populates_server_state(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err != nil {
 		t.Fatalf("refresh() error: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestRefresh_preserves_item_counts(t *testing.T) {
 	// Set lastItemsRefresh to recent so it won't re-fetch items
 	srv.LastItemsRefresh = time.Now()
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err != nil {
 		t.Fatalf("refresh() error: %v", err)
 	}
@@ -359,7 +359,7 @@ func TestRefresh_filters_non_library_providers(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err != nil {
 		t.Fatalf("refresh() error: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestRefresh_provider_error_returns_error(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err == nil {
 		t.Fatal("refresh() should return error on provider failure")
 	}
@@ -413,7 +413,7 @@ func TestRefresh_server_info_error_returns_error(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := NewServer(client)
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err == nil {
 		t.Fatal("refresh() should return error when server info fetch fails")
 	}
@@ -440,7 +440,7 @@ func TestRunRefreshLoop_cancels_cleanly(t *testing.T) {
 	}
 	srv := NewServer(client)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() { srv.RunRefreshLoop(ctx); close(done) }()
 
@@ -586,7 +586,7 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	srv.LastBandwidthAt = 1000
 
 	// First call: at=2000 (100 bytes)
-	srv.refreshBandwidth(context.Background())
+	srv.refreshBandwidth(t.Context())
 
 	srv.mu.Lock()
 	if srv.TransmitBytes != 100 {
@@ -598,7 +598,7 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	srv.mu.Unlock()
 
 	// Second call: at=2000 already seen, only at=3000 (200 bytes) is new
-	srv.refreshBandwidth(context.Background())
+	srv.refreshBandwidth(t.Context())
 
 	srv.mu.Lock()
 	if srv.TransmitBytes != 300 {
@@ -648,7 +648,7 @@ func TestRefresh_prevItems_preserves_positive_counts_only(t *testing.T) {
 	}
 	srv.LastItemsRefresh = time.Now() // skip items refresh
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err != nil {
 		t.Fatalf("refresh() error: %v", err)
 	}
@@ -703,7 +703,7 @@ func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 	// Set lastItemsRefresh to 20 minutes ago — should trigger refresh
 	srv.LastItemsRefresh = time.Now().Add(-20 * time.Minute)
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err != nil {
 		t.Fatalf("refresh() error: %v", err)
 	}
@@ -750,7 +750,7 @@ func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
 	// Set lastItemsRefresh to 5 minutes ago — should NOT trigger refresh
 	srv.LastItemsRefresh = time.Now().Add(-5 * time.Minute)
 
-	err := srv.Refresh(context.Background())
+	err := srv.Refresh(t.Context())
 	if err != nil {
 		t.Fatalf("refresh() error: %v", err)
 	}

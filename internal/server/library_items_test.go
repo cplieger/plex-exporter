@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -46,7 +45,7 @@ func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
 		{ID: "3", Name: "Music", Type: library.TypeArtist},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -85,7 +84,7 @@ func TestRefreshLibraryItems_writeback_boundary(t *testing.T) {
 		{ID: "2", Name: "TV", Type: library.TypeShow},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -112,7 +111,7 @@ func TestRefreshLibraryItems_no_libraries_is_noop(t *testing.T) {
 	srv := NewServer(client)
 	srv.Libraries = nil
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	if hit {
 		t.Error("refreshLibraryItems made an HTTP call with no libraries")
@@ -147,7 +146,7 @@ func TestRefreshLibraryItems_artist_fallback_to_type7(t *testing.T) {
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -182,7 +181,7 @@ func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -219,7 +218,7 @@ func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testin
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -255,7 +254,7 @@ func TestRefreshLibraryItems_artist_type7_returns_zero_falls_to_default(t *testi
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -291,7 +290,7 @@ func TestRefreshLibraryItems_artist_both_fail_uses_default_path(t *testing.T) {
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
 
-	srv.refreshLibraryItems(context.Background())
+	srv.refreshLibraryItems(t.Context())
 
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -313,7 +312,7 @@ func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
 	srv := NewServer(client)
 	lb := library.Library{ID: "not-numeric", Name: "Bad Section", Type: library.TypeMovie}
 
-	srv.fillItemCount(context.Background(), &lb)
+	srv.fillItemCount(t.Context(), &lb)
 
 	if hit {
 		t.Error("fillItemCount issued an HTTP fetch for a non-numeric section ID; the strconv.Atoi guard must short-circuit first")
