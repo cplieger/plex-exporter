@@ -6,6 +6,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -59,9 +60,9 @@ func run() int {
 		slog.Error("startup config error", "error", err)
 		return 1
 	}
-	listenAddr := envx.String("LISTEN_ADDRESS", ":9594")
+	listenAddr := cmp.Or(envx.String("LISTEN_ADDRESS"), ":9594")
 
-	caCertPath := envx.String("PLEX_CA_CERT_PATH", "")
+	caCertPath := envx.String("PLEX_CA_CERT_PATH")
 	slog.Info("starting plex-exporter",
 		"server", serverAddr, "listen", listenAddr,
 		"ca_cert_path", caCertPath)
