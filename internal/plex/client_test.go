@@ -20,7 +20,7 @@ import (
 // caps, status mapping) is github.com/cplieger/plexapi/v2 and is tested there.
 // These tests pin the exporter's adapter: construction (CA path handling),
 // the retry-counter metric, the error re-exports the startup classifier
-// keys on, and the library's ContainerTotalSize reached through the
+// keys on, and the library's CountSectionItems reached through the
 // embedded client.
 
 func TestNewClient_invalid_url_returns_error(t *testing.T) {
@@ -143,11 +143,11 @@ func TestGet_not_found_is_ErrNotFound(t *testing.T) {
 	}
 }
 
-// The ContainerTotalSize tests exercise the library method through the
+// The CountSectionItems tests exercise the library method through the
 // adapter's embedded client — the app's former GetContainerSize rename
 // wrapper was inlined away (callers convert the section id with
 // plexapi.RatingKey at the call site).
-func TestContainerTotalSize(t *testing.T) {
+func TestCountSectionItems(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		if q.Get("X-Plex-Container-Size") != "1" || q.Get("X-Plex-Container-Start") != "0" || q.Get("type") != "4" {
@@ -160,13 +160,13 @@ func TestContainerTotalSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := c.ContainerTotalSize(t.Context(), plexapi.RatingKey("1"), 4)
+	got, err := c.CountSectionItems(t.Context(), plexapi.RatingKey("1"), 4)
 	if err != nil || got != 4360 {
-		t.Errorf("ContainerTotalSize = (%d, %v), want 4360", got, err)
+		t.Errorf("CountSectionItems = (%d, %v), want 4360", got, err)
 	}
 }
 
-func TestContainerTotalSize_propagates_error(t *testing.T) {
+func TestCountSectionItems_propagates_error(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
@@ -175,17 +175,17 @@ func TestContainerTotalSize_propagates_error(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.ContainerTotalSize(t.Context(), plexapi.RatingKey("1"), 0); err == nil {
+	if _, err := c.CountSectionItems(t.Context(), plexapi.RatingKey("1"), 0); err == nil {
 		t.Error("nil error on 502")
 	}
 }
 
-func TestContainerTotalSize_rejects_non_numeric_section(t *testing.T) {
+func TestCountSectionItems_rejects_non_numeric_section(t *testing.T) {
 	c, err := NewClientFromHTTP("http://plex:32400", "tok", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.ContainerTotalSize(t.Context(), plexapi.RatingKey("1; DROP"), 4); err == nil {
+	if _, err := c.CountSectionItems(t.Context(), plexapi.RatingKey("1; DROP"), 4); err == nil {
 		t.Error("non-numeric section id accepted")
 	}
 }

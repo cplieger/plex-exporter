@@ -127,7 +127,7 @@ func appendLibrary(libs []Library, lib Library) []Library {
 
 // ItemCountTypes returns the Plex metadata-type IDs to try in order for
 // the given library type's item count. 0 means no type filter (the
-// default path), matching plexapi.ContainerTotalSize's contract.
+// default path), matching plexapi.CountSectionItems's contract.
 func ItemCountTypes(libType string) []int {
 	switch libType {
 	case TypeShow:
