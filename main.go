@@ -50,7 +50,7 @@ func run() int {
 	marker.Set(false)
 	defer marker.Cleanup()
 
-	serverAddr, err := envx.Require("PLEX_SERVER")
+	plexURL, err := envx.Require("PLEX_URL")
 	if err != nil {
 		slog.Error("startup config error", "error", err)
 		return 1
@@ -60,14 +60,14 @@ func run() int {
 		slog.Error("startup config error", "error", err)
 		return 1
 	}
-	listenAddr := cmp.Or(envx.String("LISTEN_ADDRESS"), ":9594")
+	listenAddr := cmp.Or(envx.String("LISTEN_ADDR"), ":9594")
 
 	caCertPath := envx.String("PLEX_CA_CERT_PATH")
 	slog.Info("starting plex-exporter",
-		"server", serverAddr, "listen", listenAddr,
+		"server", plexURL, "listen", listenAddr,
 		"ca_cert_path", caCertPath)
 
-	client, err := plex.NewClient(plex.Options{ServerURL: serverAddr, Token: plexToken, CACertPath: caCertPath})
+	client, err := plex.NewClient(plex.Options{ServerURL: plexURL, Token: plexToken, CACertPath: caCertPath})
 	if err != nil {
 		slog.Error("cannot create plex client", "error", err)
 		return 1

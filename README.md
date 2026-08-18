@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
 
     environment:
-      PLEX_SERVER: "http://plex:32400"  # full URL including scheme and port
+      PLEX_URL: "http://plex:32400"  # full URL including scheme and port
       PLEX_TOKEN: "your-plex-token"  # admin token from Plex Web settings
 
     ports:
@@ -67,16 +67,16 @@ services:
 
 | Variable | Description | Default | Required |
 | --- | --- | --- | --- |
-| `PLEX_SERVER` | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`) | _none_ | Yes |
+| `PLEX_URL` | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`) | _none_ | Yes |
 | `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken | _none_ | Yes |
-| `LISTEN_ADDRESS` | Address and port for the metrics HTTP server | `:9594` | No |
+| `LISTEN_ADDR` | Address and port for the metrics HTTP server | `:9594` | No |
 | `PLEX_CA_CERT_PATH` | Path to a PEM file with the CA that signed your Plex server's certificate; TLS verification stays on, pinned to that CA. See [TLS / certificate setup](#tls--certificate-setup). | _(unset)_ | No |
 
 ### TLS / certificate setup
 
 Pick the configuration that matches your Plex server:
 
-| Your `PLEX_SERVER` looks like | What to do |
+| Your `PLEX_URL` looks like | What to do |
 | --- | --- |
 | `http://plex:32400` (Docker network, LAN, etc.) | nothing; TLS isn't in use |
 | `https://<hash>.plex.direct:32400` (Plex's official cert) | nothing; Let's Encrypt is trusted by default |
