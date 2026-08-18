@@ -8,8 +8,8 @@ import (
 
 	"github.com/cplieger/plex-exporter/v2/internal/library"
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
+	"github.com/cplieger/plexapi/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -18,13 +18,13 @@ func benchServer(n int) *Server {
 	tracker := sessions.NewTracker()
 	for i := range n {
 		id := fmt.Sprintf("s%d", i)
-		meta := plexapi.SessionMetadata{
+		meta := plexapi.Item{
 			Type:  "movie",
 			Title: "Bench Movie",
-			Media: []plexapi.MediaInfo{{
+			Media: []plexapi.Media{{
 				VideoResolution: "1080",
 				Bitrate:         8000,
-				Part:            []plexapi.MediaPart{{Decision: "copy"}},
+				Part:            []plexapi.Part{{Decision: "copy"}},
 			}},
 		}
 		meta.Player.Device = "Chrome"
@@ -34,10 +34,10 @@ func benchServer(n int) *Server {
 		meta.Session.Bandwidth = 5000
 		meta.User.Title = "benchuser"
 
-		mediaMeta := plexapi.SessionMetadata{
+		mediaMeta := plexapi.Item{
 			Type:  "movie",
 			Title: "Bench Movie",
-			Media: []plexapi.MediaInfo{{VideoResolution: "1080"}},
+			Media: []plexapi.Media{{VideoResolution: "1080"}},
 		}
 
 		tracker.Sessions[id] = sessions.Session{

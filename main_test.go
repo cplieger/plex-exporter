@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
-	"github.com/cplieger/plexapi"
+	"github.com/cplieger/plexapi/v2"
 )
 
 func TestIsFatalStartupError(t *testing.T) {

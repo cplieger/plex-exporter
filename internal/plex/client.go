@@ -1,4 +1,4 @@
-// Package plex adapts the shared github.com/cplieger/plexapi client for the
+// Package plex adapts the shared github.com/cplieger/plexapi/v2 client for the
 // exporter. The transport — header-borne token, refuse-all redirects,
 // same-origin path guard, CA pinning, transparent retry with Retry-After
 // honoring, bounded reads — is the library's; this package owns the
@@ -8,13 +8,14 @@
 package plex
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/plexapi"
+	"github.com/cplieger/plexapi/v2"
 )
 
 // Retry defaults preserved from the pre-library client: total attempts
@@ -43,14 +44,34 @@ type Client struct {
 	retries *atomic.Int64
 }
 
-// NewClient parses serverURL and returns a Client. When caCertPath is
-// non-empty, the PEM file at that path is pinned as the sole TLS trust
-// anchor (verification stays ON) — the recommended setup for a self-signed
-// Plex. An empty caCertPath uses the OS trust store (right for
-// *.plex.direct and plain http URLs).
-func NewClient(serverURL, token, caCertPath string) (*Client, error) {
+// Options configures NewClient. The old signature was three adjacent
+// strings; a transposed pair compiled, and one transposition (the token into
+// the cert-path slot) would have echoed the credential into the startup
+// error. Named fields make every assignment say which string it is.
+type Options struct {
+	// ServerURL is the Plex server base URL. Required; plexapi.New
+	// validates it at construction, so a URL/token transposition fails
+	// loudly before any request.
+	ServerURL string
+	// Token authenticates every request (X-Plex-Token).
+	Token string
+	// CACertPath, when non-empty, pins the PEM file at that path as the
+	// sole TLS trust anchor (verification stays ON) — the recommended
+	// setup for a self-signed Plex. Empty uses the OS trust store (right
+	// for *.plex.direct and plain http URLs).
+	CACertPath string
+}
+
+// NewClient returns a Client configured by opts.
+func NewClient(opts Options) (*Client, error) {
+	// The old positional signature made a forgotten token a compile error;
+	// the struct must not soften that into a zero value that authenticates
+	// nothing and 401s on every scrape.
+	if opts.Token == "" {
+		return nil, errors.New("plex: Options.Token must not be empty")
+	}
 	retries := new(atomic.Int64)
-	opts := []plexapi.Option{
+	apiOpts := []plexapi.Option{
 		plexapi.WithMaxAttempts(defaultMaxAttempts),
 		plexapi.WithBaseDelay(defaultRetryBaseDelay),
 		plexapi.WithTimeout(defaultRequestTimeout),
@@ -58,14 +79,14 @@ func NewClient(serverURL, token, caCertPath string) (*Client, error) {
 			retries.Add(1)
 		}),
 	}
-	if caCertPath != "" {
-		pemBytes, err := os.ReadFile(caCertPath)
+	if opts.CACertPath != "" {
+		pemBytes, err := os.ReadFile(opts.CACertPath)
 		if err != nil {
-			return nil, fmt.Errorf("reading PLEX_CA_CERT_PATH=%q: %w", caCertPath, err)
+			return nil, fmt.Errorf("reading PLEX_CA_CERT_PATH=%q: %w", opts.CACertPath, err)
 		}
-		opts = append(opts, plexapi.WithCACertPEM(pemBytes))
+		apiOpts = append(apiOpts, plexapi.WithCACertPEM(pemBytes))
 	}
-	api, err := plexapi.New(serverURL, token, opts...)
+	api, err := plexapi.New(opts.ServerURL, opts.Token, apiOpts...)
 	if err != nil {
 		return nil, err
 	}

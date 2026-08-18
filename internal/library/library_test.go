@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	plexapi "github.com/cplieger/plexapi"
+	plexapi "github.com/cplieger/plexapi/v2"
 	"pgregory.net/rapid"
 )
 

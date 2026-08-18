@@ -18,13 +18,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/envx"
+	"github.com/cplieger/envx/v2"
 	"github.com/cplieger/health"
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
 	"github.com/cplieger/plex-exporter/v2/internal/server"
-	"github.com/cplieger/plexapi"
+	"github.com/cplieger/plexapi/v2"
 	"github.com/cplieger/slogx"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -61,17 +61,17 @@ func run() int {
 	}
 	listenAddr := envx.String("LISTEN_ADDRESS", ":9594")
 
-	caCertPath := os.Getenv("PLEX_CA_CERT_PATH")
+	caCertPath := envx.String("PLEX_CA_CERT_PATH", "")
 	slog.Info("starting plex-exporter",
 		"server", serverAddr, "listen", listenAddr,
 		"ca_cert_path", caCertPath)
 
-	client, err := plex.NewClient(serverAddr, plexToken, caCertPath)
+	client, err := plex.NewClient(plex.Options{ServerURL: serverAddr, Token: plexToken, CACertPath: caCertPath})
 	if err != nil {
 		slog.Error("cannot create plex client", "error", err)
 		return 1
 	}
-	ps := server.NewServer(client)
+	ps := server.New(client)
 
 	if refreshErr := ps.Refresh(ctx); refreshErr != nil {
 		if ctx.Err() != nil {

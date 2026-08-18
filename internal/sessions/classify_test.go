@@ -4,59 +4,59 @@ import (
 	"testing"
 
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	"github.com/cplieger/plexapi/v2"
 	"pgregory.net/rapid"
 )
 
 func TestTranscodeKind(t *testing.T) {
 	tests := []struct {
 		name string
-		ts   plexapi.WSTranscodeSession
+		ts   plexapi.TranscodeSession
 		want string
 	}{
 		{
 			name: "video decision transcode only",
-			ts:   plexapi.WSTranscodeSession{VideoDecision: "transcode", AudioDecision: "copy"},
+			ts:   plexapi.TranscodeSession{VideoDecision: "transcode", AudioDecision: "copy"},
 			want: metrics.ValVideo,
 		},
 		{
 			name: "audio decision transcode only",
-			ts:   plexapi.WSTranscodeSession{VideoDecision: "copy", AudioDecision: "transcode"},
+			ts:   plexapi.TranscodeSession{VideoDecision: "copy", AudioDecision: "transcode"},
 			want: metrics.ValAudio,
 		},
 		{
 			name: "both decisions transcode",
-			ts:   plexapi.WSTranscodeSession{VideoDecision: "transcode", AudioDecision: "transcode"},
+			ts:   plexapi.TranscodeSession{VideoDecision: "transcode", AudioDecision: "transcode"},
 			want: metrics.ValBoth,
 		},
 		{
 			name: "direct play with no codec change",
-			ts:   plexapi.WSTranscodeSession{VideoDecision: "copy", AudioDecision: "copy"},
+			ts:   plexapi.TranscodeSession{VideoDecision: "copy", AudioDecision: "copy"},
 			want: metrics.ValNone,
 		},
 		{
 			name: "video codec change implies a video transcode",
-			ts:   plexapi.WSTranscodeSession{SourceVideoCodec: "hevc", VideoCodec: "h264"},
+			ts:   plexapi.TranscodeSession{SourceVideoCodec: "hevc", VideoCodec: "h264"},
 			want: metrics.ValVideo,
 		},
 		{
 			name: "unchanged video codec is not a transcode",
-			ts:   plexapi.WSTranscodeSession{SourceVideoCodec: "h264", VideoCodec: "h264"},
+			ts:   plexapi.TranscodeSession{SourceVideoCodec: "h264", VideoCodec: "h264"},
 			want: metrics.ValNone,
 		},
 		{
 			name: "audio codec change implies an audio transcode",
-			ts:   plexapi.WSTranscodeSession{SourceAudioCodec: "eac3", AudioCodec: "aac"},
+			ts:   plexapi.TranscodeSession{SourceAudioCodec: "eac3", AudioCodec: "aac"},
 			want: metrics.ValAudio,
 		},
 		{
 			name: "video codec change plus audio transcode decision is both",
-			ts:   plexapi.WSTranscodeSession{SourceVideoCodec: "hevc", VideoCodec: "h264", AudioDecision: "transcode"},
+			ts:   plexapi.TranscodeSession{SourceVideoCodec: "hevc", VideoCodec: "h264", AudioDecision: "transcode"},
 			want: metrics.ValBoth,
 		},
 		{
 			name: "decision is trimmed and lowercased before matching",
-			ts:   plexapi.WSTranscodeSession{VideoDecision: "  Transcode  "},
+			ts:   plexapi.TranscodeSession{VideoDecision: "  Transcode  "},
 			want: metrics.ValVideo,
 		},
 	}
@@ -72,19 +72,19 @@ func TestTranscodeKind(t *testing.T) {
 func TestSubtitleAction(t *testing.T) {
 	tests := []struct {
 		name string
-		ts   plexapi.WSTranscodeSession
+		ts   plexapi.TranscodeSession
 		want string
 	}{
-		{"burn decision", plexapi.WSTranscodeSession{SubtitleDecision: "burn"}, metrics.ValBurn},
-		{"burn-in wire variant maps to burn", plexapi.WSTranscodeSession{SubtitleDecision: "burn-in"}, metrics.ValBurn},
-		{"copy decision", plexapi.WSTranscodeSession{SubtitleDecision: "copy"}, metrics.ValCopy},
-		{"copying wire variant maps to copy", plexapi.WSTranscodeSession{SubtitleDecision: "copying"}, metrics.ValCopy},
-		{"transcode decision", plexapi.WSTranscodeSession{SubtitleDecision: "transcode"}, metrics.ValTranscode},
-		{"transcoding wire variant maps to transcode", plexapi.WSTranscodeSession{SubtitleDecision: "transcoding"}, metrics.ValTranscode},
-		{"empty decision is none", plexapi.WSTranscodeSession{}, metrics.ValNone},
-		{"empty decision ignores video decision", plexapi.WSTranscodeSession{VideoDecision: "transcode"}, metrics.ValNone},
-		{"unknown decision falls back to other", plexapi.WSTranscodeSession{SubtitleDecision: "weird"}, metrics.FallbackOther},
-		{"decision is trimmed and lowercased before matching", plexapi.WSTranscodeSession{SubtitleDecision: "  BURN  "}, metrics.ValBurn},
+		{"burn decision", plexapi.TranscodeSession{SubtitleDecision: "burn"}, metrics.ValBurn},
+		{"burn-in wire variant maps to burn", plexapi.TranscodeSession{SubtitleDecision: "burn-in"}, metrics.ValBurn},
+		{"copy decision", plexapi.TranscodeSession{SubtitleDecision: "copy"}, metrics.ValCopy},
+		{"copying wire variant maps to copy", plexapi.TranscodeSession{SubtitleDecision: "copying"}, metrics.ValCopy},
+		{"transcode decision", plexapi.TranscodeSession{SubtitleDecision: "transcode"}, metrics.ValTranscode},
+		{"transcoding wire variant maps to transcode", plexapi.TranscodeSession{SubtitleDecision: "transcoding"}, metrics.ValTranscode},
+		{"empty decision is none", plexapi.TranscodeSession{}, metrics.ValNone},
+		{"empty decision ignores video decision", plexapi.TranscodeSession{VideoDecision: "transcode"}, metrics.ValNone},
+		{"unknown decision falls back to other", plexapi.TranscodeSession{SubtitleDecision: "weird"}, metrics.FallbackOther},
+		{"decision is trimmed and lowercased before matching", plexapi.TranscodeSession{SubtitleDecision: "  BURN  "}, metrics.ValBurn},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestTranscodeKind_returns_known_label(t *testing.T) {
 		metrics.ValNone:  true,
 	}
 	rapid.Check(t, func(rt *rapid.T) {
-		ts := plexapi.WSTranscodeSession{
+		ts := plexapi.TranscodeSession{
 			VideoDecision:    rapid.String().Draw(rt, "videoDecision"),
 			AudioDecision:    rapid.String().Draw(rt, "audioDecision"),
 			SourceVideoCodec: rapid.String().Draw(rt, "sourceVideoCodec"),
@@ -133,7 +133,7 @@ func TestSubtitleAction_returns_known_label(t *testing.T) {
 		metrics.FallbackOther: true,
 	}
 	rapid.Check(t, func(rt *rapid.T) {
-		ts := plexapi.WSTranscodeSession{
+		ts := plexapi.TranscodeSession{
 			SubtitleDecision: rapid.String().Draw(rt, "subtitleDecision"),
 			VideoDecision:    rapid.String().Draw(rt, "videoDecision"),
 		}

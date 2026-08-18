@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/plexapi"
+	"github.com/cplieger/plexapi/v2"
 )
 
 // The HTTP transport (retry policy, redirect refusal, path guard, body
-// caps, status mapping) is github.com/cplieger/plexapi and is tested there.
+// caps, status mapping) is github.com/cplieger/plexapi/v2 and is tested there.
 // These tests pin the exporter's adapter: construction (CA path handling),
 // the retry-counter metric, the error re-exports the startup classifier
 // keys on, and the library's ContainerTotalSize reached through the
@@ -25,14 +25,20 @@ import (
 
 func TestNewClient_invalid_url_returns_error(t *testing.T) {
 	for _, u := range []string{"ftp://plex:32400", "http://", "://bad"} {
-		if _, err := NewClient(u, "tok", ""); err == nil {
+		if _, err := NewClient(Options{ServerURL: u, Token: "tok"}); err == nil {
 			t.Errorf("NewClient(%q) succeeded, want error", u)
 		}
 	}
 }
 
+func TestNewClient_empty_token_errors(t *testing.T) {
+	if _, err := NewClient(Options{ServerURL: "https://plex:32400"}); err == nil {
+		t.Error("NewClient with an empty Token succeeded, want error (the struct must not soften the old compile-time requirement into a silent zero value)")
+	}
+}
+
 func TestNewClient_ca_cert_path_missing_file_errors(t *testing.T) {
-	_, err := NewClient("https://plex:32400", "tok", filepath.Join(t.TempDir(), "nope.pem"))
+	_, err := NewClient(Options{ServerURL: "https://plex:32400", Token: "tok", CACertPath: filepath.Join(t.TempDir(), "nope.pem")})
 	if err == nil {
 		t.Fatal("missing CA file accepted")
 	}
@@ -46,7 +52,7 @@ func TestNewClient_ca_cert_path_invalid_pem_errors(t *testing.T) {
 	if err := os.WriteFile(p, []byte("not a pem"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewClient("https://plex:32400", "tok", p); err == nil {
+	if _, err := NewClient(Options{ServerURL: "https://plex:32400", Token: "tok", CACertPath: p}); err == nil {
 		t.Fatal("garbage PEM accepted")
 	}
 }
@@ -63,7 +69,7 @@ func TestNewClient_ca_cert_pins_tls(t *testing.T) {
 	if err := os.WriteFile(p, pemBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := NewClient(ts.URL, "tok", p)
+	c, err := NewClient(Options{ServerURL: ts.URL, Token: "tok", CACertPath: p})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +89,7 @@ func TestNewClient_counts_retries(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer ts.Close()
-	c, err := NewClient(ts.URL, "tok", "")
+	c, err := NewClient(Options{ServerURL: ts.URL, Token: "tok"})
 	if err != nil {
 		t.Fatal(err)
 	}
