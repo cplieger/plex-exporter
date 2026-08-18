@@ -14,9 +14,8 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/library"
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
-	libplex "github.com/cplieger/plexapi"
+	"github.com/cplieger/plexapi/v2"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -48,10 +47,10 @@ type Server struct {
 	PlexPass             bool
 }
 
-// NewServer returns an initialised Server for the given Plex HTTP client.
+// New returns an initialised Server for the given Plex HTTP client.
 // LastBandwidthAt is seeded to "now" so the first bandwidth refresh only
 // picks up samples produced after startup, matching legacy behaviour.
-func NewServer(client *plex.Client) *Server {
+func New(client *plex.Client) *Server {
 	return &Server{
 		Client:          client,
 		LastBandwidthAt: int(time.Now().Unix()),
@@ -353,7 +352,7 @@ func (s *Server) writeBackItemCounts(libs []library.Library) {
 // The section path and container params are built by the plexapi library
 // (metadataType 0 = unfiltered).
 func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType int) (int64, bool) {
-	count, err := s.Client.ContainerTotalSize(ctx, libplex.RatingKey(libID), metadataType)
+	count, err := s.Client.ContainerTotalSize(ctx, plexapi.RatingKey(libID), metadataType)
 	if err != nil {
 		slog.Warn("library item count fetch failed",
 			"library_id", libID, "type_param", metadataType, "error", err)
@@ -394,7 +393,7 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 		return
 	}
 	updates := samples
-	slices.SortFunc(updates, func(a, b libplex.StatisticsBandwidth) int { return a.At - b.At })
+	slices.SortFunc(updates, func(a, b plexapi.StatisticsBandwidth) int { return a.At - b.At })
 
 	// Watermark accumulation: only samples newer than LastBandwidthAt are
 	// added. Correctness assumes the 5s refresh cadence never exceeds the
@@ -441,7 +440,7 @@ func (s *Server) RunSessionPollLoop(ctx context.Context) {
 // sessionWork pairs a validated active session with its parsed playback
 // state, carried through the metadata-fetch and tracker-apply passes.
 type sessionWork struct {
-	sess  *plexapi.SessionMetadata
+	sess  *plexapi.Item
 	state sessions.State
 }
 
@@ -453,7 +452,7 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	activeSessions, err := libplex.FetchMetadata[plexapi.SessionMetadata](fetchCtx, s.Client.Client, libplex.SessionsPath())
+	activeSessions, err := plexapi.FetchMetadata[plexapi.Item](fetchCtx, s.Client.Client, plexapi.SessionsPath())
 	if err != nil {
 		slog.Warn("session poll: failed to fetch sessions", "error", err)
 		s.RecordError("sessions_fetch")
@@ -494,7 +493,7 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 // with its parsed playback state. Sessions with an empty key are skipped,
 // and a non-numeric rating key is dropped (and recorded) so the later
 // /library/metadata/<key> fetch is never built from unvalidated input.
-func (s *Server) buildSessionWork(activeSessions []plexapi.SessionMetadata) []sessionWork {
+func (s *Server) buildSessionWork(activeSessions []plexapi.Item) []sessionWork {
 	work := make([]sessionWork, 0, len(activeSessions))
 	for i := range activeSessions {
 		m := &activeSessions[i]
@@ -506,7 +505,11 @@ func (s *Server) buildSessionWork(activeSessions []plexapi.SessionMetadata) []se
 			s.RecordError("invalid_rating_key")
 			continue
 		}
-		work = append(work, sessionWork{sess: m, state: sessions.ParseState(m.Player.State)})
+		playerState := ""
+		if m.Player != nil {
+			playerState = m.Player.State
+		}
+		work = append(work, sessionWork{sess: m, state: sessions.ParseState(playerState)})
 	}
 	return work
 }
@@ -521,8 +524,8 @@ func (s *Server) buildSessionWork(activeSessions []plexapi.SessionMetadata) []se
 // (MediaMeta is immutable per key): the nil result makes applySessionUpdate
 // keep the cached MediaMeta, saving one /library/metadata round-trip per
 // session per poll.
-func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*plexapi.SessionMetadata {
-	results := make([]*plexapi.SessionMetadata, len(work))
+func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*plexapi.Item {
+	results := make([]*plexapi.Item, len(work))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(min(4, len(work)))
 	for i, w := range work {
@@ -530,10 +533,10 @@ func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*p
 			continue
 		}
 		g.Go(func() error {
-			path, err := libplex.MetadataPath(libplex.RatingKey(w.sess.RatingKey))
+			path, err := plexapi.MetadataPath(plexapi.RatingKey(w.sess.RatingKey))
 			if err == nil {
-				var items []plexapi.SessionMetadata
-				items, err = libplex.FetchMetadata[plexapi.SessionMetadata](gctx, s.Client.Client, path)
+				var items []plexapi.Item
+				items, err = plexapi.FetchMetadata[plexapi.Item](gctx, s.Client.Client, path)
 				if err == nil {
 					if len(items) == 0 {
 						slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
@@ -554,7 +557,7 @@ func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*p
 
 // applySessionUpdate feeds one session's state into the tracker, attaches
 // library labels when metadata was fetched, and classifies any transcode.
-func (s *Server) applySessionUpdate(w *sessionWork, media *plexapi.SessionMetadata, libs []library.Library) {
+func (s *Server) applySessionUpdate(w *sessionWork, media *plexapi.Item, libs []library.Library) {
 	if media == nil {
 		// Still update the tracker with session state even without library metadata.
 		s.Sessions.Update(w.sess.SessionKey, w.state, w.sess, nil)
@@ -570,7 +573,7 @@ func (s *Server) applySessionUpdate(w *sessionWork, media *plexapi.SessionMetada
 // classifyTranscode derives transcode kind and subtitle action from the
 // session's embedded TranscodeSession and writes them to the tracked
 // session by SessionKey. No-op when the session carries no TranscodeSession.
-func (s *Server) classifyTranscode(sess *plexapi.SessionMetadata) {
+func (s *Server) classifyTranscode(sess *plexapi.Item) {
 	ts := sess.TranscodeSession
 	if ts == nil {
 		return
@@ -586,12 +589,12 @@ func (s *Server) classifyTranscode(sess *plexapi.SessionMetadata) {
 // fillSessionLibrary populates library labels on ss when missing, using the
 // provided library list matched by LibrarySectionID. No-op if ss already
 // has a library name.
-func fillSessionLibrary(ss *sessions.Session, media *plexapi.SessionMetadata, libs []library.Library) {
+func fillSessionLibrary(ss *sessions.Session, media *plexapi.Item, libs []library.Library) {
 	if ss.LibName != "" {
 		return
 	}
 	for _, lib := range libs {
-		if lib.ID != media.LibrarySectionID.String() {
+		if lib.ID != strconv.Itoa(int(media.LibrarySectionID)) {
 			continue
 		}
 		ss.LibName = lib.Name

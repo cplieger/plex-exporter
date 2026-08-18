@@ -4,13 +4,13 @@ import (
 	"strings"
 
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	"github.com/cplieger/plexapi/v2"
 )
 
 // TranscodeKind classifies a transcode session by audio/video decision
 // and codec changes. Return values are one of ValVideo, ValAudio,
 // ValBoth, or ValNone.
-func TranscodeKind(ts *plexapi.WSTranscodeSession) string {
+func TranscodeKind(ts *plexapi.TranscodeSession) string {
 	vDec := strings.ToLower(strings.TrimSpace(ts.VideoDecision))
 	aDec := strings.ToLower(strings.TrimSpace(ts.AudioDecision))
 	vSrc := strings.ToLower(strings.TrimSpace(ts.SourceVideoCodec))
@@ -53,7 +53,7 @@ var subtitleDecisionMap = map[string]string{
 // SubtitleAction classifies a transcode session's subtitle handling.
 // Return values are one of ValBurn, ValCopy, ValTranscode, ValNone, or
 // "other".
-func SubtitleAction(ts *plexapi.WSTranscodeSession) string {
+func SubtitleAction(ts *plexapi.TranscodeSession) string {
 	sd := strings.ToLower(strings.TrimSpace(ts.SubtitleDecision))
 	if v, ok := subtitleDecisionMap[sd]; ok {
 		return v

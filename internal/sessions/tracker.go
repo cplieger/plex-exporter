@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	"github.com/cplieger/plexapi/v2"
 )
 
 // State is a normalised session playback state derived from the Plex
@@ -79,8 +79,8 @@ type Session struct {
 	// on the same item (see Tracker.MediaResolved).
 	MediaKey       string
 	State          State
-	Meta           plexapi.SessionMetadata
-	MediaMeta      plexapi.SessionMetadata
+	Meta           plexapi.Item
+	MediaMeta      plexapi.Item
 	PrevPlayedTime time.Duration
 }
 
@@ -155,7 +155,7 @@ func (s *Session) bankPlayTime(now time.Time) {
 // cached metadata on the tracked session. On a playing→non-playing
 // transition the elapsed play time is banked into PrevPlayedTime to keep
 // plex_play_seconds_total monotonic.
-func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.SessionMetadata) {
+func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Item) {
 	// Bound SessionKey length to prevent high-cardinality label explosion
 	// from a malicious or buggy Plex server.
 	id = normalizeKey(id)

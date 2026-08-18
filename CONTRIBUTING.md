@@ -10,7 +10,7 @@ constructing the concrete types from `internal/*`, the HTTP listener,
 and goroutine launch. Keep behaviour out of it; all logic lives in the
 `internal/` packages:
 
-- `internal/plexapi`: pure JSON/XML wire types for the Plex API
+- `internal/plexwire`: pure JSON/XML wire types for the Plex API
   responses. No imports beyond `encoding/json`.
 - `internal/plex`: HTTP client for Plex, including retry semantics and
   the `ErrNotFound` sentinel; status-code classification uses the shared

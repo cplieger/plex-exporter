@@ -38,7 +38,7 @@ func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 		{ID: "2", Name: "TV Shows", Type: library.TypeShow},
@@ -78,7 +78,7 @@ func TestRefreshLibraryItems_writeback_boundary(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 		{ID: "2", Name: "TV", Type: library.TypeShow},
@@ -108,7 +108,7 @@ func TestRefreshLibraryItems_no_libraries_is_noop(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = nil
 
 	srv.refreshLibraryItems(t.Context())
@@ -141,7 +141,7 @@ func TestRefreshLibraryItems_artist_fallback_to_type7(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
@@ -176,7 +176,7 @@ func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
@@ -213,7 +213,7 @@ func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testin
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
@@ -249,7 +249,7 @@ func TestRefreshLibraryItems_artist_type7_returns_zero_falls_to_default(t *testi
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
@@ -285,7 +285,7 @@ func TestRefreshLibraryItems_artist_both_fail_uses_default_path(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
 	}
@@ -309,7 +309,7 @@ func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	lb := library.Library{ID: "not-numeric", Name: "Bad Section", Type: library.TypeMovie}
 
 	srv.fillItemCount(t.Context(), &lb)

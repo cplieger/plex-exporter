@@ -31,7 +31,7 @@ func TestRefreshResources_updates_host_metrics(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.refreshResources(t.Context())
 
 	srv.mu.Lock()
@@ -60,7 +60,7 @@ func TestRefreshResources_empty_stats_no_update(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.HostCPU = 0.99
 	srv.refreshResources(t.Context())
 
@@ -81,7 +81,7 @@ func TestRefreshResources_404_no_update(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.HostCPU = 0.11
 	srv.HostMem = 0.22
 	srv.refreshResources(t.Context())
@@ -178,7 +178,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			defer ts.Close()
 
 			client := plextest.NewTestClientFromServer(t, ts)
-			srv := NewServer(client)
+			srv := New(client)
 			srv.LastBandwidthAt = tc.initAt
 			// For the 404 case, pre-set TransmitBytes to verify it's unchanged.
 			if tc.json == "" {
@@ -236,7 +236,7 @@ func TestRefresh_populates_server_state(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	err := srv.Refresh(t.Context())
 	if err != nil {
@@ -296,7 +296,7 @@ func TestRefresh_preserves_item_counts(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	// Pre-populate with item counts
 	srv.Libraries = []library.Library{
@@ -357,7 +357,7 @@ func TestRefresh_filters_non_library_providers(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	err := srv.Refresh(t.Context())
 	if err != nil {
@@ -381,7 +381,7 @@ func TestRefresh_provider_error_returns_error(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	err := srv.Refresh(t.Context())
 	if err == nil {
@@ -411,7 +411,7 @@ func TestRefresh_server_info_error_returns_error(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	err := srv.Refresh(t.Context())
 	if err == nil {
@@ -438,7 +438,7 @@ func TestRunRefreshLoop_cancels_cleanly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := NewServer(client)
+	srv := New(client)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -457,7 +457,7 @@ func TestRunRefreshLoop_cancels_cleanly(t *testing.T) {
 }
 
 func TestRecordError_known_type_increments(t *testing.T) {
-	srv := NewServer(&plex.Client{})
+	srv := New(&plex.Client{})
 	srv.RecordError("refresh")
 	srv.RecordError("refresh")
 	srv.RecordError("sessions_fetch")
@@ -474,7 +474,7 @@ func TestRecordError_known_type_increments(t *testing.T) {
 }
 
 func TestRecordError_unknown_type_dropped(t *testing.T) {
-	srv := NewServer(&plex.Client{})
+	srv := New(&plex.Client{})
 	srv.RecordError("totally_unknown_type")
 
 	srv.mu.Lock()
@@ -582,7 +582,7 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.LastBandwidthAt = 1000
 
 	// First call: at=2000 (100 bytes)
@@ -639,7 +639,7 @@ func TestRefresh_prevItems_preserves_positive_counts_only(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	// Pre-populate: Movies has count, TV has 0
 	srv.Libraries = []library.Library{
@@ -699,7 +699,7 @@ func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	// Set lastItemsRefresh to 20 minutes ago — should trigger refresh
 	srv.LastItemsRefresh = time.Now().Add(-20 * time.Minute)
 
@@ -746,7 +746,7 @@ func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	// Set lastItemsRefresh to 5 minutes ago — should NOT trigger refresh
 	srv.LastItemsRefresh = time.Now().Add(-5 * time.Minute)
 

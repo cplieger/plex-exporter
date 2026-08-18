@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
+	"github.com/cplieger/plexapi/v2"
 )
 
 func TestTrackerUpdate(t *testing.T) {
 	tracker := NewTracker()
 
-	meta := &plexapi.SessionMetadata{Title: "Test Movie", Type: "movie"}
+	meta := &plexapi.Item{Title: "Test Movie", Type: "movie"}
 	tracker.Update("s1", StatePlaying, meta, nil)
 
 	tracker.mu.Lock()
@@ -34,9 +34,9 @@ func TestTrackerUpdate(t *testing.T) {
 func TestTrackerUpdate_stop_accumulates_time(t *testing.T) {
 	tracker := NewTracker()
 
-	meta := &plexapi.SessionMetadata{
+	meta := &plexapi.Item{
 		Title: "Test",
-		Media: []plexapi.MediaInfo{{Bitrate: 1000}},
+		Media: []plexapi.Media{{Bitrate: 1000}},
 	}
 	tracker.Update("s1", StatePlaying, meta, nil)
 	time.Sleep(10 * time.Millisecond)
@@ -54,10 +54,10 @@ func TestTrackerUpdate_stop_accumulates_time(t *testing.T) {
 func TestTrackerUpdateMetadata(t *testing.T) {
 	tracker := NewTracker()
 
-	meta := &plexapi.SessionMetadata{Title: "Original"}
+	meta := &plexapi.Item{Title: "Original"}
 	tracker.Update("s1", StatePlaying, meta, nil)
 
-	newMeta := &plexapi.SessionMetadata{Title: "Updated"}
+	newMeta := &plexapi.Item{Title: "Updated"}
 	tracker.Update("s1", StatePlaying, newMeta, nil)
 
 	tracker.mu.Lock()
@@ -106,9 +106,9 @@ func TestRunPruneLoopCancellation(t *testing.T) {
 func TestSessionTrackerResumeAfterStop(t *testing.T) {
 	tracker := NewTracker()
 
-	meta := &plexapi.SessionMetadata{
+	meta := &plexapi.Item{
 		Title: "Resume Test",
-		Media: []plexapi.MediaInfo{{Bitrate: 2000}},
+		Media: []plexapi.Media{{Bitrate: 2000}},
 	}
 	tracker.Update("s1", StatePlaying, meta, nil)
 	time.Sleep(10 * time.Millisecond)
@@ -135,8 +135,8 @@ func TestSessionTrackerResumeAfterStop(t *testing.T) {
 func TestSessionTrackerMediaMetaUpdate(t *testing.T) {
 	tracker := NewTracker()
 
-	meta := &plexapi.SessionMetadata{Title: "Session"}
-	mediaMeta := &plexapi.SessionMetadata{Title: "Media Info", Type: "movie"}
+	meta := &plexapi.Item{Title: "Session"}
+	mediaMeta := &plexapi.Item{Title: "Media Info", Type: "movie"}
 	tracker.Update("s1", StatePlaying, meta, mediaMeta)
 
 	tracker.mu.Lock()
@@ -154,7 +154,7 @@ func TestSessionTrackerMediaMetaUpdate(t *testing.T) {
 func TestSessionTrackerUpdate_truncates_long_session_key(t *testing.T) {
 	tracker := NewTracker()
 	longKey := strings.Repeat("x", MaxSessionKeyLen+20)
-	meta := &plexapi.SessionMetadata{Title: "Long Key"}
+	meta := &plexapi.Item{Title: "Long Key"}
 	tracker.Update(longKey, StatePlaying, meta, nil)
 
 	tracker.mu.Lock()
@@ -229,7 +229,7 @@ func TestUpdateLibraryLabels_normalizes_long_key(t *testing.T) {
 	longKey := strings.Repeat("a", MaxSessionKeyLen+30)
 
 	// Store session via Update (internally truncates).
-	tracker.Update(longKey, StatePlaying, &plexapi.SessionMetadata{Title: "LongKey"}, nil)
+	tracker.Update(longKey, StatePlaying, &plexapi.Item{Title: "LongKey"}, nil)
 
 	// Verify stored under truncated key.
 	truncated := longKey[:MaxSessionKeyLen]
@@ -264,7 +264,7 @@ func TestUpdateLibraryLabels_short_key_unchanged(t *testing.T) {
 	tracker := NewTracker()
 	shortKey := "short-session-id"
 
-	tracker.Update(shortKey, StatePlaying, &plexapi.SessionMetadata{Title: "Short"}, nil)
+	tracker.Update(shortKey, StatePlaying, &plexapi.Item{Title: "Short"}, nil)
 
 	var called bool
 	tracker.UpdateLibraryLabels(shortKey, func(s *Session) {
@@ -338,7 +338,7 @@ func TestTrackerUpdate_playing_to_paused_accumulates(t *testing.T) {
 		State:       StatePlaying,
 		PlayStarted: time.Now().Add(-10 * time.Second),
 		LastUpdate:  time.Now(),
-		Meta:        plexapi.SessionMetadata{Media: []plexapi.MediaInfo{{Bitrate: 1000}}},
+		Meta:        plexapi.Item{Media: []plexapi.Media{{Bitrate: 1000}}},
 	}
 	tracker.mu.Unlock()
 
@@ -380,13 +380,13 @@ func TestTrackerUpdate_paused_to_playing_resets_playstarted(t *testing.T) {
 }
 
 func TestMarkAbsentStopped(t *testing.T) {
-	withMedia := plexapi.SessionMetadata{Media: []plexapi.MediaInfo{{Bitrate: 1000}}}
-	noMedia := plexapi.SessionMetadata{Title: "no media"}
+	withMedia := plexapi.Item{Media: []plexapi.Media{{Bitrate: 1000}}}
+	noMedia := plexapi.Item{Title: "no media"}
 
 	tests := []struct {
 		name           string
 		state          State
-		meta           plexapi.SessionMetadata
+		meta           plexapi.Item
 		present        []string
 		wantState      State
 		wantTimeBanked bool
@@ -460,7 +460,7 @@ func TestMarkAbsentStopped_already_stopped_not_rebanked(t *testing.T) {
 		PlayStarted:    time.Now().Add(-10 * time.Minute),
 		LastUpdate:     stoppedAt,
 		PrevPlayedTime: 5 * time.Second,
-		Meta:           plexapi.SessionMetadata{Media: []plexapi.MediaInfo{{Bitrate: 1000}}},
+		Meta:           plexapi.Item{Media: []plexapi.Media{{Bitrate: 1000}}},
 	}
 	tracker.mu.Unlock()
 
@@ -481,7 +481,7 @@ func TestMarkAbsentStopped_normalizes_present_keys(t *testing.T) {
 	tracker := NewTracker()
 	longKey := strings.Repeat("k", MaxSessionKeyLen+30)
 	// Update stores the session under the normalized (truncated) key.
-	tracker.Update(longKey, StatePlaying, &plexapi.SessionMetadata{Title: "long"}, nil)
+	tracker.Update(longKey, StatePlaying, &plexapi.Item{Title: "long"}, nil)
 
 	// Reporting the SAME long key as present must normalize to the stored key,
 	// so the session counts as present and is not transitioned to stopped.

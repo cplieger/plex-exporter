@@ -44,7 +44,7 @@ func TestRefreshSessions_basic_playing_session(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
@@ -116,7 +116,7 @@ func TestRefreshSessions_with_transcode_session(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
@@ -183,7 +183,7 @@ func TestRefreshSessions_both_transcode(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	srv.RefreshSessions(t.Context())
 
@@ -222,7 +222,7 @@ func TestRefreshSessions_no_transcode_session(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	srv.RefreshSessions(t.Context())
 
@@ -249,7 +249,7 @@ func TestRefreshSessions_empty_response(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	srv.RefreshSessions(t.Context())
 
@@ -284,7 +284,7 @@ func TestRefreshSessions_invalid_rating_key_skipped(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	srv.RefreshSessions(t.Context())
 
@@ -309,7 +309,7 @@ func TestRefreshSessions_fetch_error_records_error(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.SetSessionsReachable(true) // seed true so the error branch's flip to false is observable
 
 	srv.RefreshSessions(t.Context())
@@ -349,7 +349,7 @@ func TestRefreshSessions_metadata_fetch_failure_still_updates_tracker(t *testing
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	srv.RefreshSessions(t.Context())
 
@@ -405,7 +405,7 @@ func TestRefreshSessions_multiple_sessions(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	srv.RefreshSessions(t.Context())
 
@@ -433,7 +433,7 @@ func TestRunSessionPollLoop_cancels_cleanly(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -500,7 +500,7 @@ func TestRefreshSessions_vanished_session_marked_stopped(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
@@ -578,7 +578,7 @@ func TestRefreshSessions_metadata_cached_per_rating_key(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Shows", Type: library.TypeShow},
 	}
@@ -658,7 +658,7 @@ func TestRefreshSessions_unresolved_library_refetches_metadata(t *testing.T) {
 	defer ts.Close()
 
 	client := plextest.NewTestClientFromServer(t, ts)
-	srv := NewServer(client)
+	srv := New(client)
 	// Degraded start: the library list is not known yet.
 
 	srv.RefreshSessions(t.Context())

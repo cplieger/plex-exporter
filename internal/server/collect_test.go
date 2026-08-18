@@ -9,18 +9,18 @@ import (
 
 	"github.com/cplieger/plex-exporter/v2/internal/library"
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
+	"github.com/cplieger/plexapi/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"pgregory.net/rapid"
 )
 
-// testMeta constructs a plexapi.SessionMetadata from JSON to avoid anonymous
+// testMeta constructs a plexapi.Item from JSON to avoid anonymous
 // struct tag mismatches in test literals.
-func testMeta(t *testing.T, jsonStr string) plexapi.SessionMetadata {
+func testMeta(t *testing.T, jsonStr string) plexapi.Item {
 	t.Helper()
-	var m plexapi.SessionMetadata
+	var m plexapi.Item
 	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
 		t.Fatalf("testMeta: %v", err)
 	}
@@ -79,16 +79,16 @@ func TestSessionLabels(t *testing.T) {
 		wantTitle string
 		wantChild string
 		wantGC    string
-		meta      plexapi.SessionMetadata
+		meta      plexapi.Item
 	}{
 		{
 			name:      "movie",
-			meta:      plexapi.SessionMetadata{Type: "movie", Title: "Inception"},
+			meta:      plexapi.Item{Type: "movie", Title: "Inception"},
 			wantTitle: "Inception",
 		},
 		{
 			name: "episode",
-			meta: plexapi.SessionMetadata{
+			meta: plexapi.Item{
 				Type: "episode", GrandparentTitle: "Breaking Bad",
 				ParentTitle: "Season 1", Title: "Pilot",
 			},
@@ -96,7 +96,7 @@ func TestSessionLabels(t *testing.T) {
 		},
 		{
 			name: "track",
-			meta: plexapi.SessionMetadata{
+			meta: plexapi.Item{
 				Type: "track", GrandparentTitle: "Pink Floyd",
 				ParentTitle: "The Wall", Title: "Comfortably Numb",
 			},
@@ -117,7 +117,7 @@ func TestSessionLabels(t *testing.T) {
 func TestSessionLabels_movie_returns_title_only(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		title := rapid.String().Draw(t, "title")
-		m := &plexapi.SessionMetadata{Type: "movie", Title: title}
+		m := &plexapi.Item{Type: "movie", Title: title}
 		gotTitle, gotChild, gotGC := sessionLabels(m)
 		if gotTitle != title {
 			t.Errorf("sessionLabels(movie) title = %q, want %q", gotTitle, title)
@@ -136,7 +136,7 @@ func TestSessionLabels_episode_returns_hierarchy(t *testing.T) {
 		gp := rapid.String().Draw(t, "grandparent")
 		p := rapid.String().Draw(t, "parent")
 		title := rapid.String().Draw(t, "title")
-		m := &plexapi.SessionMetadata{
+		m := &plexapi.Item{
 			Type:             "episode",
 			GrandparentTitle: gp,
 			ParentTitle:      p,
@@ -282,20 +282,20 @@ func TestStreamLabels(t *testing.T) {
 		name     string
 		wantType string
 		wantRes  string
-		meta     plexapi.SessionMetadata
+		meta     plexapi.Item
 	}{
 		{
 			name:     "no media",
-			meta:     plexapi.SessionMetadata{},
+			meta:     plexapi.Item{},
 			wantType: metrics.ValUnknown,
 			wantRes:  "",
 		},
 		{
 			name: "media with part decision",
-			meta: plexapi.SessionMetadata{
-				Media: []plexapi.MediaInfo{{
+			meta: plexapi.Item{
+				Media: []plexapi.Media{{
 					VideoResolution: "1080",
-					Part:            []plexapi.MediaPart{{Decision: "transcode"}},
+					Part:            []plexapi.Part{{Decision: "transcode"}},
 				}},
 			},
 			wantType: "transcode",
@@ -303,10 +303,10 @@ func TestStreamLabels(t *testing.T) {
 		},
 		{
 			name: "media with empty part decision",
-			meta: plexapi.SessionMetadata{
-				Media: []plexapi.MediaInfo{{
+			meta: plexapi.Item{
+				Media: []plexapi.Media{{
 					VideoResolution: "4k",
-					Part:            []plexapi.MediaPart{{Decision: ""}},
+					Part:            []plexapi.Part{{Decision: ""}},
 				}},
 			},
 			wantType: metrics.ValUnknown,
@@ -314,8 +314,8 @@ func TestStreamLabels(t *testing.T) {
 		},
 		{
 			name: "media with no parts",
-			meta: plexapi.SessionMetadata{
-				Media: []plexapi.MediaInfo{{VideoResolution: "720"}},
+			meta: plexapi.Item{
+				Media: []plexapi.Media{{VideoResolution: "720"}},
 			},
 			wantType: metrics.ValUnknown,
 			wantRes:  "720",
@@ -357,7 +357,7 @@ func TestResolveLibrary(t *testing.T) {
 		{
 			name: "lookup by librarySectionID",
 			sess: sessions.Session{
-				MediaMeta: plexapi.SessionMetadata{LibrarySectionID: "5"},
+				MediaMeta: plexapi.Item{LibrarySectionID: 5},
 			},
 			wantName: "4K Movies",
 			wantID:   "5",
@@ -366,7 +366,7 @@ func TestResolveLibrary(t *testing.T) {
 		{
 			name: "unknown fallback",
 			sess: sessions.Session{
-				MediaMeta: plexapi.SessionMetadata{LibrarySectionID: "999"},
+				MediaMeta: plexapi.Item{LibrarySectionID: 999},
 			},
 			wantName: metrics.ValUnknown,
 			wantID:   "0",

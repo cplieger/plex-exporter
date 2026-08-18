@@ -6,8 +6,8 @@ import (
 
 	"github.com/cplieger/plex-exporter/v2/internal/library"
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
+	"github.com/cplieger/plexapi/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -96,12 +96,14 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 		ch <- prometheus.MustNewConstMetric(metrics.DescPlaySeconds, prometheus.CounterValue,
 			totalPlay.Seconds(), labelVals...)
 
+		user, _, bw := sessionElements(&sess.Meta)
+
 		// Per-session bandwidth from the sessions API.
-		if sess.Meta.Session.Bandwidth > 0 {
+		if bw.Bandwidth > 0 {
 			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBandwidth, prometheus.GaugeValue,
-				float64(sess.Meta.Session.Bandwidth),
-				srvName, srvID, sessID, truncLabel(sess.Meta.User.Title),
-				metrics.LocationAllowlist.Normalize(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)))
+				float64(bw.Bandwidth),
+				srvName, srvID, sessID, truncLabel(user.Title),
+				metrics.LocationAllowlist.Normalize(orDefault(bw.Location, metrics.ValUnknown)))
 		}
 
 		// Per-session bitrate (replaces the former stream_bitrate label).
@@ -111,8 +113,8 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 		if br := sessionBitrate(&sess.Meta); br > 0 {
 			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBitrate, prometheus.GaugeValue,
 				br,
-				srvName, srvID, sessID, truncLabel(sess.Meta.User.Title),
-				metrics.LocationAllowlist.Normalize(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)))
+				srvName, srvID, sessID, truncLabel(user.Title),
+				metrics.LocationAllowlist.Normalize(orDefault(bw.Location, metrics.ValUnknown)))
 		}
 	}
 }
@@ -131,7 +133,7 @@ func truncLabel(s string) string {
 // unbounded cardinality because Plex reports changing bitrate values
 // during adaptive streaming). See sessionBitrate() for the replacement
 // gauge-valued metric emission.
-func streamLabels(m *plexapi.SessionMetadata) (streamType, streamRes string) {
+func streamLabels(m *plexapi.Item) (streamType, streamRes string) {
 	streamType = metrics.ValUnknown
 	if len(m.Media) == 0 {
 		return streamType, ""
@@ -146,7 +148,7 @@ func streamLabels(m *plexapi.SessionMetadata) (streamType, streamRes string) {
 // sessionBitrate returns the session's live-stream bitrate in kbps, or
 // 0 when Media is missing or reports no bitrate. Emitted as the
 // plex_session_bitrate_kbps gauge (bounded by active session count).
-func sessionBitrate(m *plexapi.SessionMetadata) float64 {
+func sessionBitrate(m *plexapi.Item) float64 {
 	if len(m.Media) == 0 {
 		return 0
 	}
@@ -155,7 +157,7 @@ func sessionBitrate(m *plexapi.SessionMetadata) float64 {
 
 // fileResolution returns the on-disk resolution (from library
 // metadata), or empty string when not reported.
-func fileResolution(m *plexapi.SessionMetadata) string {
+func fileResolution(m *plexapi.Item) string {
 	if len(m.Media) == 0 {
 		return ""
 	}
@@ -164,11 +166,34 @@ func fileResolution(m *plexapi.SessionMetadata) string {
 
 // resolveLibrary returns (name, id, type) using the session's cached
 // values, falling back to a lookup in libByID, then to unknown.
+
+// sessionElements returns a session item's User, Player and Session elements,
+// substituting zero values for the ones Plex omitted (the library models an
+// absent element as a nil pointer). The collector's contract is to degrade to
+// unknown/empty labels, never to panic mid-scrape — and sessions can enter
+// the tracker from any producer, so the nil handling lives here at the
+// dereference rather than trusting every write path to normalize.
+func sessionElements(it *plexapi.Item) (plexapi.SessionUser, plexapi.Player, plexapi.SessionBandwidth) {
+	var user plexapi.SessionUser
+	var player plexapi.Player
+	var bw plexapi.SessionBandwidth
+	if it.User != nil {
+		user = *it.User
+	}
+	if it.Player != nil {
+		player = *it.Player
+	}
+	if it.Session != nil {
+		bw = *it.Session
+	}
+	return user, player, bw
+}
+
 func resolveLibrary(sess *sessions.Session, libByID map[string]library.Library) (name, id, typ string) {
 	if sess.LibName != "" {
 		return sess.LibName, sess.LibID, sess.LibType
 	}
-	if lb, ok := libByID[sess.MediaMeta.LibrarySectionID.String()]; ok {
+	if lb, ok := libByID[strconv.Itoa(int(sess.MediaMeta.LibrarySectionID))]; ok {
 		return lb.Name, lb.ID, lb.Type
 	}
 	return metrics.ValUnknown, "0", metrics.ValUnknown
@@ -192,8 +217,9 @@ func sessionLabelValues(
 	if ttype == metrics.ValPending {
 		ttype = metrics.ValNone
 	}
+	user, player, bw := sessionElements(&sess.Meta)
 	local := metrics.ValFalse
-	if sess.Meta.Player.Local {
+	if player.Local {
 		local = metrics.ValTrue
 	}
 
@@ -204,11 +230,11 @@ func sessionLabelValues(
 		metrics.StreamTypeAllowlist.Normalize(streamType),
 		metrics.ResolutionAllowlist.Normalize(streamRes),
 		metrics.ResolutionAllowlist.Normalize(fileRes),
-		truncLabel(sess.Meta.Player.Device), truncLabel(sess.Meta.Player.Product),
-		truncLabel(sess.Meta.User.Title), sessID,
+		truncLabel(player.Device), truncLabel(player.Product),
+		truncLabel(user.Title), sessID,
 		ttype,
 		orDefault(sess.SubtitleAction, metrics.ValNone),
-		metrics.LocationAllowlist.Normalize(orDefault(sess.Meta.Session.Location, metrics.ValUnknown)),
+		metrics.LocationAllowlist.Normalize(orDefault(bw.Location, metrics.ValUnknown)),
 		local,
 	}
 }
@@ -217,7 +243,7 @@ func sessionLabelValues(
 // session metadata based on the media type. For episodes and tracks
 // the hierarchy is grandparent/parent/self; for movies only the title
 // is used.
-func sessionLabels(m *plexapi.SessionMetadata) (title, child, grandchild string) {
+func sessionLabels(m *plexapi.Item) (title, child, grandchild string) {
 	switch m.Type {
 	case library.TypeEpisode, library.TypeTrack:
 		return m.GrandparentTitle, m.ParentTitle, m.Title
@@ -230,11 +256,11 @@ func sessionLabels(m *plexapi.SessionMetadata) (title, child, grandchild string)
 // episodes and tracks, or "" for movies and other types where Plex's
 // index field is not meaningful. Kept as a separate label
 // (grandchild_index) so grandchild_title continues to carry the name.
-func sessionIndex(m *plexapi.SessionMetadata) string {
+func sessionIndex(m *plexapi.Item) string {
 	switch m.Type {
 	case library.TypeEpisode, library.TypeTrack:
 		if m.Index > 0 {
-			return strconv.Itoa(m.Index)
+			return strconv.Itoa(int(m.Index))
 		}
 	}
 	return ""
