@@ -352,7 +352,7 @@ func (s *Server) writeBackItemCounts(libs []library.Library) {
 // The section path and container params are built by the plexapi library
 // (metadataType 0 = unfiltered).
 func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType int) (int64, bool) {
-	count, err := s.Client.ContainerTotalSize(ctx, plexapi.RatingKey(libID), metadataType)
+	count, err := s.Client.CountSectionItems(ctx, plexapi.RatingKey(libID), metadataType)
 	if err != nil {
 		slog.Warn("library item count fetch failed",
 			"library_id", libID, "type_param", metadataType, "error", err)
