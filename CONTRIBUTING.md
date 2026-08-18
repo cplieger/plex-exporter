@@ -68,8 +68,8 @@ docker build -t plex-exporter .
 
 It compiles with `CGO_ENABLED=0` and ships on
 `gcr.io/distroless/static-debian13:nonroot`: no shell, no package
-manager. Runtime config is via env (`PLEX_SERVER`, `PLEX_TOKEN`,
-`LISTEN_ADDRESS`, `PLEX_CA_CERT_PATH`); see the README for the
+manager. Runtime config is via env (`PLEX_URL`, `PLEX_TOKEN`,
+`LISTEN_ADDR`, `PLEX_CA_CERT_PATH`); see the README for the
 full reference.
 
 ## Conventions and gotchas
