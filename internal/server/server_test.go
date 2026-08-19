@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cplieger/plex-exporter/v2/internal/library"
@@ -423,37 +425,48 @@ func TestRefresh_server_info_error_returns_error(t *testing.T) {
 }
 
 func TestRunRefreshLoop_cancels_cleanly(t *testing.T) {
-	// Point the server at an httptest mock that returns 500s so any refresh
-	// call is observable via a hit counter. With an immediate cancel, the
-	// 5-second ticker never fires, so zero hits are expected; the test
-	// verifies the goroutine exits on ctx.Done without leaking.
-	hits := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hits++
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer ts.Close()
+	// Bubbled, which turns the negative timer assertion into a proof. The
+	// synthetic clock only advances when every bubble goroutine is durably
+	// blocked, so cancel() lands before the loop's 5s ticker can fire and
+	// "zero refresh calls" is exact rather than a race the real clock usually
+	// won. httptest.NewTestServer is what makes the bubble legal: it serves
+	// over an in-memory net, where httptest.NewServer's accept goroutine
+	// parks indefinitely on a real socket, never becomes durably blocked, and
+	// so would freeze the bubble's clock. hits is atomic because the handler
+	// writes it from a different goroutine than the assertion reads it.
+	synctest.Test(t, func(t *testing.T) {
+		var hits atomic.Int64
+		ts := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			hits.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
 
-	client, err := plex.NewClientFromHTTP(ts.URL, "t", &http.Client{Timeout: time.Second})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := New(client)
+		// NewTestServer leaves Server.URL unset and its client routes every
+		// request to the handler regardless of host, so this base URL is a
+		// placeholder that is never dialed -- it only has to satisfy
+		// plexapi's scheme+host check, and a loopback host keeps the
+		// library's plaintext-to-a-remote-host warning out of test output.
+		client, err := plex.NewClientFromHTTP("http://127.0.0.1:32400", "t", ts.Client())
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := New(client)
 
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan struct{})
-	go func() { srv.RunRefreshLoop(ctx); close(done) }()
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan struct{})
+		go func() { srv.RunRefreshLoop(ctx); close(done) }()
 
-	// Cancel before the 5s ticker fires.
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("runRefreshLoop did not exit after context cancel")
-	}
-	if hits != 0 {
-		t.Errorf("expected 0 refresh calls before first tick, got %d", hits)
-	}
+		// Cancel before the 5s ticker fires.
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("runRefreshLoop did not exit after context cancel")
+		}
+		if n := hits.Load(); n != 0 {
+			t.Errorf("expected 0 refresh calls before first tick, got %d", n)
+		}
+	})
 }
 
 func TestRecordError_known_type_increments(t *testing.T) {

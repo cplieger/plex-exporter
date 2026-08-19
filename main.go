@@ -209,12 +209,10 @@ func isFatalStartupError(err error) bool {
 	}
 	// TLS/certificate misconfiguration (e.g. a self-signed cert without
 	// PLEX_CA_CERT_PATH): will not recover without a config change.
-	var certErr *tls.CertificateVerificationError
-	if errors.As(err, &certErr) {
+	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
 		return true
 	}
-	var unknownAuthority x509.UnknownAuthorityError
-	if errors.As(err, &unknownAuthority) {
+	if _, ok := errors.AsType[x509.UnknownAuthorityError](err); ok {
 		return true
 	}
 	// Transport errors (connection refused, DNS failure, timeout): Plex is
