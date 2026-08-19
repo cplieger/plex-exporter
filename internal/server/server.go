@@ -296,14 +296,12 @@ func (s *Server) refreshLibraryItems(ctx context.Context) {
 	close(ch)
 
 	var wg sync.WaitGroup
-	wg.Add(workers)
 	for range workers {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range ch {
 				s.fillItemCount(ctx, &libs[i])
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

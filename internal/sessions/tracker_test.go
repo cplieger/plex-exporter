@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cplieger/plexapi/v2"
@@ -32,23 +33,29 @@ func TestTrackerUpdate(t *testing.T) {
 }
 
 func TestTrackerUpdate_stop_accumulates_time(t *testing.T) {
-	tracker := NewTracker()
+	// Bubbled: bankPlayTime reads time.Now(), so on the synthetic clock the
+	// banked duration is exactly the slept interval. The real-clock version
+	// could only assert "> 0", which a bankPlayTime that banked a nanosecond
+	// would also satisfy.
+	synctest.Test(t, func(t *testing.T) {
+		tracker := NewTracker()
 
-	meta := &plexapi.Item{
-		Title: "Test",
-		Media: []plexapi.Media{{Bitrate: 1000}},
-	}
-	tracker.Update("s1", StatePlaying, meta, nil)
-	time.Sleep(10 * time.Millisecond)
-	tracker.Update("s1", StateStopped, nil, nil)
+		meta := &plexapi.Item{
+			Title: "Test",
+			Media: []plexapi.Media{{Bitrate: 1000}},
+		}
+		tracker.Update("s1", StatePlaying, meta, nil)
+		synctest.Sleep(10 * time.Millisecond)
+		tracker.Update("s1", StateStopped, nil, nil)
 
-	tracker.mu.Lock()
-	s := tracker.Sessions["s1"]
-	tracker.mu.Unlock()
+		tracker.mu.Lock()
+		s := tracker.Sessions["s1"]
+		tracker.mu.Unlock()
 
-	if s.PrevPlayedTime == 0 {
-		t.Error("PrevPlayedTime should be > 0 after stop")
-	}
+		if s.PrevPlayedTime != 10*time.Millisecond {
+			t.Errorf("PrevPlayedTime = %v, want exactly 10ms", s.PrevPlayedTime)
+		}
+	})
 }
 
 func TestTrackerUpdateMetadata(t *testing.T) {
@@ -104,32 +111,42 @@ func TestRunPruneLoopCancellation(t *testing.T) {
 }
 
 func TestSessionTrackerResumeAfterStop(t *testing.T) {
-	tracker := NewTracker()
+	// Bubbled, and the two legs sleep for different durations so the banked
+	// total (10ms + 25ms) proves BOTH play windows were accumulated. The
+	// real-clock version could only assert after > prev, which a second leg
+	// that overwrote rather than added would still satisfy.
+	synctest.Test(t, func(t *testing.T) {
+		tracker := NewTracker()
 
-	meta := &plexapi.Item{
-		Title: "Resume Test",
-		Media: []plexapi.Media{{Bitrate: 2000}},
-	}
-	tracker.Update("s1", StatePlaying, meta, nil)
-	time.Sleep(10 * time.Millisecond)
-	tracker.Update("s1", StateStopped, nil, nil)
+		meta := &plexapi.Item{
+			Title: "Resume Test",
+			Media: []plexapi.Media{{Bitrate: 2000}},
+		}
+		tracker.Update("s1", StatePlaying, meta, nil)
+		synctest.Sleep(10 * time.Millisecond)
+		tracker.Update("s1", StateStopped, nil, nil)
 
-	tracker.mu.Lock()
-	prev := tracker.Sessions["s1"].PrevPlayedTime
-	tracker.mu.Unlock()
+		tracker.mu.Lock()
+		prev := tracker.Sessions["s1"].PrevPlayedTime
+		tracker.mu.Unlock()
 
-	// Resume playing
-	tracker.Update("s1", StatePlaying, nil, nil)
-	time.Sleep(10 * time.Millisecond)
-	tracker.Update("s1", StateStopped, nil, nil)
+		if prev != 10*time.Millisecond {
+			t.Errorf("PrevPlayedTime after first stop = %v, want exactly 10ms", prev)
+		}
 
-	tracker.mu.Lock()
-	after := tracker.Sessions["s1"].PrevPlayedTime
-	tracker.mu.Unlock()
+		// Resume playing
+		tracker.Update("s1", StatePlaying, nil, nil)
+		synctest.Sleep(25 * time.Millisecond)
+		tracker.Update("s1", StateStopped, nil, nil)
 
-	if after <= prev {
-		t.Errorf("prevPlayedTime should accumulate: before=%v, after=%v", prev, after)
-	}
+		tracker.mu.Lock()
+		after := tracker.Sessions["s1"].PrevPlayedTime
+		tracker.mu.Unlock()
+
+		if after != 35*time.Millisecond {
+			t.Errorf("PrevPlayedTime after resume+stop = %v, want exactly 35ms (10ms + 25ms accumulated)", after)
+		}
+	})
 }
 
 func TestSessionTrackerMediaMetaUpdate(t *testing.T) {
