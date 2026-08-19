@@ -46,55 +46,71 @@ const (
 var (
 	DescServerInfo = prometheus.NewDesc(
 		"plex_server_info", "Plex server information",
-		append(SrvLabels, "version", "platform", "platform_version", "plex_pass"), nil)
+		append(SrvLabels, "version", "platform", "platform_version", "plex_pass"), nil,
+	)
 	DescHostCPU = prometheus.NewDesc(
 		"plex_host_cpu_utilization_ratio", "Host CPU utilization (0-1)",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescHostMem = prometheus.NewDesc(
 		"plex_host_memory_utilization_ratio", "Host memory utilization (0-1)",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescLibDuration = prometheus.NewDesc(
 		"plex_library_duration_milliseconds", "Total library duration in ms",
-		LibLabels, nil)
+		LibLabels, nil,
+	)
 	DescLibStorage = prometheus.NewDesc(
 		"plex_library_storage_bytes", "Total library storage in bytes",
-		LibLabels, nil)
+		LibLabels, nil,
+	)
 	DescLibItems = prometheus.NewDesc(
 		"plex_library_items", "Number of items in a library section",
-		append(LibLabels, "content_type"), nil)
+		append(LibLabels, "content_type"), nil,
+	)
 	DescTransmitBytes = prometheus.NewDesc(
 		"plex_transmit_bytes_total", "Bytes transmitted (bandwidth API)",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescActiveTranscodes = prometheus.NewDesc(
 		"plex_active_transcode_sessions", "Active transcode sessions",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescPlayCount = prometheus.NewDesc(
 		"plex_plays_active", "Currently active play sessions (1 per session)",
-		PlayLabels, nil)
+		PlayLabels, nil,
+	)
 	DescPlaySeconds = prometheus.NewDesc(
 		"plex_play_seconds_total", "Total play time per session",
-		PlayLabels, nil)
+		PlayLabels, nil,
+	)
 	DescSessionBandwidth = prometheus.NewDesc(
 		"plex_session_bandwidth_kbps", "Session bandwidth in kbps",
-		append(SrvLabels, "session", "user", "location"), nil)
+		append(SrvLabels, "session", "user", "location"), nil,
+	)
 	DescSessionBitrate = prometheus.NewDesc(
 		"plex_session_bitrate_kbps",
 		"Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.",
-		append(SrvLabels, "session", "user", "location"), nil)
+		append(SrvLabels, "session", "user", "location"), nil,
+	)
 	DescHTTPReachable = prometheus.NewDesc(
 		"plex_http_reachable", "HTTP polling reachability (1=last refresh succeeded, 0=failed)",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescSessionPollReachable = prometheus.NewDesc(
 		"plex_session_poll_reachable", "Session poll reachability (1=last /status/sessions poll succeeded, 0=failed)",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescHTTPRetries = prometheus.NewDesc(
 		"plex_http_retries_total",
 		"Total HTTP retries performed by the Plex client's retry round-tripper (httpx) across all requests",
-		SrvLabels, nil)
+		SrvLabels, nil,
+	)
 	DescErrors = prometheus.NewDesc(
 		"plex_exporter_errors_total",
 		"Plex exporter error count by type",
-		append(SrvLabels, "type"), nil)
+		append(SrvLabels, "type"), nil,
+	)
 )
 
 // AllDescs is the single source of truth for the descriptors emitted by
