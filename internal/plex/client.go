@@ -86,7 +86,7 @@ func NewClient(opts Options) (*Client, error) {
 		}
 		apiOpts = append(apiOpts, plexapi.WithCACertPEM(pemBytes))
 	}
-	api, err := plexapi.New(opts.ServerURL, opts.Token, apiOpts...)
+	api, err := plexapi.New(opts.ServerURL, plexapi.Token(opts.Token), apiOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func NewClient(opts Options) (*Client, error) {
 // NewClientFromHTTP builds a Client over a caller-supplied *http.Client —
 // the test-fixture path (httptest servers). No retry transport or counter
 // is installed; Retries() reports 0.
-func NewClientFromHTTP(serverURL, token string, hc *http.Client) (*Client, error) {
+func NewClientFromHTTP(serverURL string, token plexapi.Token, hc *http.Client) (*Client, error) {
 	api, err := plexapi.New(serverURL, token, plexapi.WithHTTPClient(hc))
 	if err != nil {
 		return nil, err
