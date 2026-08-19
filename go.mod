@@ -11,8 +11,8 @@ require (
 )
 
 require (
-	github.com/cplieger/envx v1.6.3
-	github.com/cplieger/plexapi v1.3.10
+	github.com/cplieger/envx v1.6.4
+	github.com/cplieger/plexapi v1.3.11
 	github.com/cplieger/slogx v1.6.2
 	github.com/cplieger/webhttp v1.23.2
 )
