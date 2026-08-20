@@ -68,7 +68,8 @@ services:
 | Variable | Description | Default | Required |
 | --- | --- | --- | --- |
 | `PLEX_URL` | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`) | _none_ | Yes |
-| `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken | _none_ | Yes |
+| `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken. Also readable from a file: see `PLEX_TOKEN_FILE` below | _none_ | Yes |
+| `PLEX_TOKEN_FILE` | Path to a file holding the Plex token (a Docker or Podman secret). When set it takes precedence over `PLEX_TOKEN` and keeps the token out of the container environment, so it does not appear in `docker inspect`. One trailing line ending is stripped; a file holding only whitespace is rejected at startup | _(unset)_ | No |
 | `LISTEN_ADDR` | Address and port for the metrics HTTP server | `:9594` | No |
 | `PLEX_CA_CERT_PATH` | Path to a PEM file with the CA that signed your Plex server's certificate; TLS verification stays on, pinned to that CA. See [TLS / certificate setup](#tls--certificate-setup). | _(unset)_ | No |
 
