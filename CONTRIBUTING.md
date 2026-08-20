@@ -10,11 +10,13 @@ constructing the concrete types from `internal/*`, the HTTP listener,
 and goroutine launch. Keep behaviour out of it; all logic lives in the
 `internal/` packages:
 
-- `internal/plexwire`: pure JSON/XML wire types for the Plex API
-  responses. No imports beyond `encoding/json`.
-- `internal/plex`: HTTP client for Plex, including retry semantics and
-  the `ErrNotFound` sentinel; status-code classification uses the shared
-  `plexapi` library's `StatusError` directly.
+- `internal/plex`: a thin adapter over the shared
+  `github.com/cplieger/plexapi/v2` client. The library owns the transport,
+  the Plex wire types, and the retry semantics. This package owns the
+  construction shape (the `Options` struct, the CA-cert path, and the retry
+  counter behind `plex_http_retries_total`). It also re-exports the
+  `ErrNotFound` sentinel, and status-code classification calls the library's
+  `IsConfigError` directly.
 - `internal/library`: the `Library` value type plus pure classification
   helpers (`IsType`, `ContentTypeLabel`, `Build`, `ItemCountTypes`).
   Deterministic and side-effect free.
