@@ -1,6 +1,6 @@
 # punused findings adjudicated as false positives. One literal substring per
 # line, matched against punused's output line; full-line `#` comments carry the
-# reason. Invalid-by-construction classes: `.kiro/steering/tools.md`.
+# reason.
 #
 # prometheus.Collector is exactly Describe(chan<- *Desc) + Collect(chan<- Metric).
 # main.go's run() builds the Server and hands it to prometheus.MustRegister --
