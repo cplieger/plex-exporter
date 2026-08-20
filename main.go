@@ -55,7 +55,9 @@ func run() int {
 		slog.Error("startup config error", "error", err)
 		return 1
 	}
-	plexToken, err := envx.Require("PLEX_TOKEN")
+	// envx.Secret, not Require: the token may arrive in PLEX_TOKEN_FILE instead,
+	// which keeps it out of the container environment and so out of docker inspect.
+	plexToken, err := envx.Secret("PLEX_TOKEN")
 	if err != nil {
 		slog.Error("startup config error", "error", err)
 		return 1
