@@ -450,7 +450,7 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	activeSessions, err := plexapi.FetchMetadata[plexapi.Item](fetchCtx, s.Client.Client, plexapi.SessionsPath())
+	activeSessions, err := s.Client.FetchMetadata[plexapi.Item](fetchCtx, plexapi.SessionsPath())
 	if err != nil {
 		slog.Warn("session poll: failed to fetch sessions", "error", err)
 		s.RecordError("sessions_fetch")
@@ -534,7 +534,7 @@ func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*p
 			path, err := plexapi.MetadataPath(plexapi.RatingKey(w.sess.RatingKey))
 			if err == nil {
 				var items []plexapi.Item
-				items, err = plexapi.FetchMetadata[plexapi.Item](gctx, s.Client.Client, path)
+				items, err = s.Client.FetchMetadata[plexapi.Item](gctx, path)
 				if err == nil {
 					if len(items) == 0 {
 						slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
