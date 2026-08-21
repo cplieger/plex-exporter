@@ -16,7 +16,7 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/plex"
 	"github.com/cplieger/plex-exporter/v2/internal/plexapi"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
-	libplex "github.com/cplieger/plexapi"
+	libplex "github.com/cplieger/plexapi/v2"
 	"golang.org/x/sync/errgroup"
 )
 

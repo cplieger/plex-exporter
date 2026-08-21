@@ -1,9 +1,13 @@
 module github.com/cplieger/plex-exporter/v2
 
-go 1.26.7
+go 1.27.0
 
 require (
+	github.com/cplieger/envx/v2 v2.0.0
 	github.com/cplieger/health v1.5.2
+	github.com/cplieger/plexapi/v2 v2.0.0
+	github.com/cplieger/slogx v1.6.2
+	github.com/cplieger/webhttp/v2 v2.0.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.2
 	golang.org/x/sync v0.22.0
@@ -11,17 +15,10 @@ require (
 )
 
 require (
-	github.com/cplieger/envx v1.6.4
-	github.com/cplieger/plexapi v1.3.11
-	github.com/cplieger/slogx v1.6.2
-	github.com/cplieger/webhttp v1.23.2
-)
-
-require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cplieger/httpx/v4 v4.3.2 // indirect
-	github.com/cplieger/pathinside v1.0.2 // indirect
+	github.com/cplieger/httpx/v5 v5.0.0 // indirect
+	github.com/cplieger/pathinside/v2 v2.0.0 // indirect
 	github.com/cplieger/xmlx v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
