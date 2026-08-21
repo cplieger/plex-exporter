@@ -58,7 +58,7 @@
       "id": 1,
       "options": {
         "colorMode": "background",
-        "graphMode": "area",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -70,7 +70,9 @@
       "targets": [
         {
           "expr": "plex_server_info{server=~\"$server\"}",
-          "legendFormat": "{{ server }} v{{ version }}"
+          "legendFormat": "{{ server }} v{{ version }}",
+          "instant": true,
+          "range": false
         }
       ]
     },
@@ -122,7 +124,7 @@
       "id": 2,
       "options": {
         "colorMode": "background",
-        "graphMode": "area",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -134,7 +136,9 @@
       "targets": [
         {
           "expr": "plex_session_poll_reachable{server=~\"$server\"}",
-          "legendFormat": "{{ server }}"
+          "legendFormat": "{{ server }}",
+          "instant": true,
+          "range": false
         }
       ]
     },
@@ -232,7 +236,7 @@
       "id": 3,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -244,7 +248,9 @@
       "targets": [
         {
           "expr": "plex_active_transcode_sessions{server=~\"$server\"}",
-          "legendFormat": "{{ server }}"
+          "legendFormat": "{{ server }}",
+          "instant": true,
+          "range": false
         }
       ]
     },
