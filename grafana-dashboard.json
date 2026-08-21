@@ -1110,12 +1110,12 @@
           "sort": "desc"
         }
       },
-      "title": "Library Growth",
+      "title": "Library Growth (30d)",
       "description": "Items added to each library section in the last 30 days",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "delta(plex_library_items{server=~\"$server\"}[$__range])",
+          "expr": "delta(plex_library_items{server=~\"$server\"}[30d])",
           "legendFormat": "{{library}}",
           "refId": "A"
         }
