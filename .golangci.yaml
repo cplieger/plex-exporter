@@ -136,11 +136,27 @@ formatters:
     - gci
   settings:
     gofumpt:
-      # Strictest: the `-extra` rules (group adjacent same-type params,
-      # forbid naked returns) on top of gofumpt's strict superset of
-      # gofmt. module-path is auto-detected from each repo's go.mod when
-      # left empty.
-      extra-rules: true
+      # Strictest: every `extra` rule, on top of gofumpt's strict superset of
+      # gofmt. module-path is auto-detected from each repo's go.mod when left
+      # empty.
+      #
+      # Named individually rather than via the old `extra-rules: true`
+      # catch-all, which golangci-lint deprecates (it warns on every run) and
+      # which will be removed. The three keys below are exactly what
+      # `extra-rules: true` enabled, so this migration changes no formatting.
+      #
+      # Upstream deliberately offers NO replacement "all" switch: enabling each
+      # rule is meant to be a conscious choice so new rules cannot silently
+      # reformat every repo. The consequence to know is that a future gofumpt
+      # rule will NOT arrive here automatically and has to be added on purpose.
+      extra:
+        # Group adjacent function parameters that share a type.
+        group-params: true
+        # Clothe naked returns in functions with named results.
+        clothe-returns: true
+        # Put a multi-line call's closing paren on its own line when the
+        # opening paren ends a line.
+        balance-calls: true
     gci:
       # Deterministic import grouping: standard -> third-party -> local
       # module (folded by gofumpt into the third-party group). A separate
