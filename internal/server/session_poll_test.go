@@ -15,6 +15,11 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
 )
 
+// TestRefreshSessions_basic_playing_session carries the live /status/sessions
+// wire shape: Plex quotes Media.id, Part.id and Stream.id on this endpoint and
+// sends them bare on /library/metadata/<key>, so both forms appear below. The
+// fixtures used to omit the ids entirely, which is why the app decoded every
+// active session into an error for three days without a test noticing.
 func TestRefreshSessions_basic_playing_session(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -27,14 +32,15 @@ func TestRefreshSessions_basic_playing_session(t *testing.T) {
 				"Player":{"device":"Chrome","product":"Plex Web","state":"playing","local":true},
 				"Session":{"location":"lan","bandwidth":5000},
 				"User":{"title":"testuser"},
-				"Media":[{"videoResolution":"1080","bitrate":8000,"Part":[{"decision":"copy"}]}]
+				"Media":[{"id":"55","videoResolution":"1080","bitrate":8000,
+					"Part":[{"id":"66","decision":"copy","Stream":[{"id":"77","streamType":2}]}]}]
 			}]}}`)
 		case "/library/metadata/100":
 			fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{
 				"type":"movie",
 				"title":"Test Movie",
 				"librarySectionID":"1",
-				"Media":[{"videoResolution":"1080"}]
+				"Media":[{"id":55,"videoResolution":"1080","Part":[{"id":66}]}]
 			}]}}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
