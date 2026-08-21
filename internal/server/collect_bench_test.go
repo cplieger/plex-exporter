@@ -9,40 +9,53 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/library"
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
-	"github.com/cplieger/plexapi/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// These benchmarks feed the weekly benchmark tracker. Collect runs once per
+// Prometheus scrape and its cost scales with the number of playing sessions,
+// so a per-session regression multiplies by scrape frequency; truncLabel runs
+// once per label value on that same path.
+//
+// Both benchmarks were dead until 2026-08. `go test ./...` compiles a
+// benchmark but never runs one without -bench, so nothing executed these, and
+// benchServer had nil-dereferenced since the commit that deleted the app's
+// duplicate Plex wire structs: Item.Player, Item.Session and Item.User are
+// pointers on the shared plexapi.Item, and the old hand-written literal
+// assigned straight through them. The fixture is therefore built with
+// testMeta, decoding the same JSON shape /status/sessions really returns, so
+// the benchmark cannot diverge from the wire again on a field it does not
+// name.
+
+// benchSessionJSON is one playing session as /status/sessions reports it:
+// direct-play movie, LAN client, known bandwidth and bitrate.
+const benchSessionJSON = `{
+	"type":"movie",
+	"title":"Bench Movie",
+	"Media":[{"videoResolution":"1080","bitrate":8000,"Part":[{"decision":"copy"}]}],
+	"Player":{"device":"Chrome","product":"Plex Web","local":true},
+	"Session":{"location":"lan","bandwidth":5000},
+	"User":{"title":"benchuser"}
+}`
+
+// benchMediaJSON is the cached /library/metadata item for that session.
+const benchMediaJSON = `{
+	"type":"movie",
+	"title":"Bench Movie",
+	"Media":[{"videoResolution":"1080"}]
+}`
+
 // benchServer returns a *Server pre-populated with n playing sessions.
-func benchServer(n int) *Server {
+func benchServer(tb testing.TB, n int) *Server {
+	tb.Helper()
 	tracker := sessions.NewTracker()
+	meta := testMeta(tb, benchSessionJSON)
+	mediaMeta := testMeta(tb, benchMediaJSON)
+	now := time.Now()
 	for i := range n {
-		id := fmt.Sprintf("s%d", i)
-		meta := plexapi.Item{
-			Type:  "movie",
-			Title: "Bench Movie",
-			Media: []plexapi.Media{{
-				VideoResolution: "1080",
-				Bitrate:         8000,
-				Part:            []plexapi.Part{{Decision: "copy"}},
-			}},
-		}
-		meta.Player.Device = "Chrome"
-		meta.Player.Product = "Plex Web"
-		meta.Player.Local = true
-		meta.Session.Location = "lan"
-		meta.Session.Bandwidth = 5000
-		meta.User.Title = "benchuser"
-
-		mediaMeta := plexapi.Item{
-			Type:  "movie",
-			Title: "Bench Movie",
-			Media: []plexapi.Media{{VideoResolution: "1080"}},
-		}
-
-		tracker.Sessions[id] = sessions.Session{
-			PlayStarted:    time.Now().Add(-time.Duration(i+1) * time.Second),
-			LastUpdate:     time.Now(),
+		tracker.Sessions[fmt.Sprintf("s%d", i)] = sessions.Session{
+			PlayStarted:    now.Add(-time.Duration(i+1) * time.Second),
+			LastUpdate:     now,
 			State:          sessions.StatePlaying,
 			LibName:        "Movies",
 			LibID:          "1",
@@ -66,13 +79,30 @@ func benchServer(n int) *Server {
 	}
 }
 
+// BenchmarkCollect measures one scrape across session counts. The counts are
+// spread so a per-session cost that turns super-linear shows as a widening
+// gap between them rather than a uniform slowdown that reads as runner noise.
 func BenchmarkCollect(b *testing.B) {
 	for _, n := range []int{0, 5, 20} {
-		srv := benchServer(n)
-		ch := make(chan prometheus.Metric, 256)
+		srv := benchServer(b, n)
+
+		// The channel is sized from a real Collect rather than a guessed
+		// constant: Collect sends synchronously, so a buffer smaller than one
+		// scrape's output deadlocks the benchmark instead of failing it.
+		probe := make(chan prometheus.Metric, 4096)
+		srv.Collect(probe)
+		emitted := len(probe)
+		for len(probe) > 0 {
+			<-probe
+		}
+		if emitted == 0 {
+			b.Fatalf("benchServer(%d): Collect emitted 0 metrics, want more than 0", n)
+		}
+
 		b.Run(fmt.Sprintf("sessions_%d", n), func(b *testing.B) {
+			ch := make(chan prometheus.Metric, emitted)
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				srv.Collect(ch)
 				for len(ch) > 0 {
 					<-ch
@@ -82,19 +112,27 @@ func BenchmarkCollect(b *testing.B) {
 	}
 }
 
+// BenchmarkTruncLabel covers the label-capping helper. It runs once per label
+// value on the scrape path, so its cost multiplies by label count; the two
+// cases separate the under-cap fast path from the cut.
 func BenchmarkTruncLabel(b *testing.B) {
-	short := "short"
-	long := strings.Repeat("x", 256)
-	b.Run("short", func(b *testing.B) {
-		b.ReportAllocs()
-		for range b.N {
-			_ = truncLabel(short)
-		}
-	})
-	b.Run("long", func(b *testing.B) {
-		b.ReportAllocs()
-		for range b.N {
-			_ = truncLabel(long)
-		}
-	})
+	cases := []struct {
+		name  string
+		value string
+	}{
+		{"short", "short"},
+		{"long", strings.Repeat("x", 256)},
+	}
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				labelSink = truncLabel(tc.value)
+			}
+		})
+	}
 }
+
+// labelSink keeps truncLabel's result live so the compiler cannot delete the
+// call it is meant to measure.
+var labelSink string
