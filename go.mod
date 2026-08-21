@@ -3,7 +3,7 @@ module github.com/cplieger/plex-exporter/v2
 go 1.27.0
 
 require (
-	github.com/cplieger/envx/v2 v2.0.0
+	github.com/cplieger/envx/v2 v2.0.1
 	github.com/cplieger/health v1.6.0
 	github.com/cplieger/plexapi/v2 v2.0.1
 	github.com/cplieger/slogx v1.6.3
