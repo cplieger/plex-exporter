@@ -19,6 +19,21 @@ groups:
             plex-exporter is running but its authenticated poll of the Plex API
             has returned plex_http_reachable=0 for 10m - most often a
             revoked/invalid PLEX_TOKEN. Metrics are stale until resolved.
+      - alert: PlexSessionPollFailing
+        expr: plex_session_poll_reachable == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Plex session poll failing on {{ $labels.server }}"
+          description: >
+            plex-exporter's /status/sessions poll has returned
+            plex_session_poll_reachable=0 for 10m while the rest of the Plex
+            API still answers (plex_http_reachable=1). Every session metric
+            (plex_plays_active, plex_play_seconds_total, the bandwidth and
+            bitrate gauges) is absent or stale until it recovers. A poll that
+            fails only while something is playing points at the session
+            payload itself, so read the exporter log for a decode error.
       - alert: PlexExporterCollectionErrors
         expr: sum by (type) (rate(plex_exporter_errors_total[15m])) > 0
         for: 30m
