@@ -18,11 +18,18 @@ import (
 
 // testMeta constructs a plexapi.Item from JSON to avoid anonymous
 // struct tag mismatches in test literals.
-func testMeta(t *testing.T, jsonStr string) plexapi.Item {
-	t.Helper()
+//
+// It takes testing.TB rather than *testing.T so benchmarks build their
+// fixtures through the same decode the production wire path uses. A
+// hand-written literal is what broke BenchmarkCollect: Item.Player,
+// Item.Session and Item.User became pointers when the duplicate wire
+// structs were deleted, and a literal that assigns through them compiles
+// and then nil-derefs.
+func testMeta(tb testing.TB, jsonStr string) plexapi.Item {
+	tb.Helper()
 	var m plexapi.Item
 	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
-		t.Fatalf("testMeta: %v", err)
+		tb.Fatalf("testMeta: %v", err)
 	}
 	return m
 }
