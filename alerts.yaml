@@ -4,10 +4,35 @@
 # Alertmanager like any other Prometheus alert. Thresholds, the "for" windows,
 # and the severity labels are starting points; adjust them to your deployment.
 # The scrape "job" label is yours to set, so it is intentionally left out of
-# the selectors below.
+# the selectors below. PlexExporterTargetDown is the one exception and says why.
 groups:
   - name: plex-exporter
     rules:
+      # Every other rule here reads a gauge the exporter itself publishes, so
+      # every other rule goes silent when the exporter dies. This one is the
+      # floor under them.
+      #
+      # Written as absent(up{...} == 1) rather than up{...} == 0 on purpose.
+      # "up == 0" needs the target to still be IN service discovery: it fires
+      # for a failing scrape and says nothing when the target disappears
+      # altogether, which is what a deleted Kubernetes pod or ServiceMonitor, a
+      # dropped scrape target, or a removed scrape config all look like. The
+      # absent() form covers both. It has to carry a job matcher (a bare
+      # absent(up == 1) can never fire while any other target is up), so set
+      # the pattern to whatever your scrape config calls this exporter.
+      - alert: PlexExporterTargetDown
+        expr: absent(up{job=~".*plex-exporter.*"} == 1)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter is not being scraped successfully"
+          description: >
+            No successful scrape of plex-exporter for 15m, so every Plex metric
+            is stale and every other rule in this group is blind. Either the
+            scrape is failing (container down, wrong port, network) or the
+            target is gone from service discovery entirely. Check the container
+            and your scrape config.
       - alert: PlexAPIUnreachable
         expr: plex_http_reachable == 0
         for: 10m
