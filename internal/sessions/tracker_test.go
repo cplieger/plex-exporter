@@ -152,7 +152,7 @@ func TestSessionTrackerResumeAfterStop(t *testing.T) {
 func TestSessionTrackerMediaMetaUpdate(t *testing.T) {
 	tracker := NewTracker()
 
-	meta := &plexapi.Item{Title: "Session"}
+	meta := &plexapi.Item{Title: "Session", RatingKey: "12345"}
 	mediaMeta := &plexapi.Item{Title: "Media Info", Type: "movie"}
 	tracker.Update("s1", StatePlaying, meta, mediaMeta)
 
@@ -165,6 +165,11 @@ func TestSessionTrackerMediaMetaUpdate(t *testing.T) {
 	}
 	if s.MediaMeta.Type != "movie" {
 		t.Errorf("mediaMeta.Type = %q, want movie", s.MediaMeta.Type)
+	}
+	// Stored metadata carries the rating key it was fetched for, so the next
+	// poll can skip the refetch while the session stays on the same item.
+	if s.MediaKey != "12345" {
+		t.Errorf("MediaKey = %q, want 12345", s.MediaKey)
 	}
 }
 
