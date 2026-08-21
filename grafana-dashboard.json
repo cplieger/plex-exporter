@@ -1110,16 +1110,17 @@
           "sort": "desc"
         }
       },
-      "title": "Library Growth (30d)",
-      "description": "Items added to each library section in the last 30 days",
+      "title": "Items Added per Day",
+      "description": "Net items added to each library section per day. A negative bar is a net removal. Buckets follow the dashboard zoom but never go below one day.",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "delta(plex_library_items{server=~\"$server\"}[30d])",
+          "expr": "last_over_time(plex_library_items{server=~\"$server\"}[$__interval]) - first_over_time(plex_library_items{server=~\"$server\"}[$__interval])",
           "legendFormat": "{{library}}",
           "refId": "A"
         }
-      ]
+      ],
+      "interval": "1d"
     }
   ],
   "schemaVersion": 39,
