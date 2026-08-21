@@ -8,39 +8,66 @@ initial_tag = "v1.0.0"
 
 [changelog]
 header = ""
-# Breaking changes lead, then the ordinary grouped log.
+# Migration steps lead, then the ordinary grouped log.
 #
-# Two things the previous subject-only template dropped. Conventional-commit
-# parsing strips the type and the `!` from commit.message, so a `feat!:` rendered
-# under "### Added" with nothing marking it breaking -- hence the [**breaking**]
-# marker in the group list. And the BREAKING CHANGE footer, which is where the
-# migration steps live, was discarded entirely -- hence the leading section.
+# Conventional-commit parsing strips the type AND the `!` from commit.message, so
+# a `feat!:` renders under "### Added" with nothing marking it breaking -- hence
+# the [**breaking**] marker in the group list, which is the INDEX of breaking
+# changes. The BREAKING CHANGE footer is where the migration steps live and was
+# discarded entirely -- hence the leading section, which is only the INSTRUCTIONS.
 #
 # Only the FOOTER is surfaced, never the commit body: a footer is written as an
 # instruction to the reader ("rename X to Y before upgrading"), while the body is
 # rationale that belongs in git log. Rendering bodies too was measured at ~105 KB
 # for one repo's release against ~13 KB for this shape.
 #
-# breaking_description falls back to the SUBJECT when a commit has no
-# BREAKING CHANGE footer, so it is compared against commit.message before being
-# printed -- without that guard every `refactor!:` prints its subject twice
-# (measured: 125 of the fleet's 174 breaking commits carry no footer).
+# Three mechanics, all load-bearing rather than stylistic, and all paid for by
+# plex-language-sync v2.0.0 -- the first release this template rendered with three
+# breaking commits and one footer between them (2026-08-21).
 #
-# The footer is quoted with `> ` rather than indented because git-cliff strips
-# leading whitespace from template lines, which silently breaks an indented block
-# out of its list item.
+# 1. A footer-bearing commit gets its own `####` subheading. The first shape put
+#    every breaking SUBJECT in a flat bullet list and then one quote block under
+#    it, so with three breaking commits and one footer the reader could not tell
+#    which subject the migration steps belonged to, and each subject was printed
+#    twice (3 bullets here + 3 marked lines in the groups = 6 lines for 3
+#    changes). Only footer-bearing commits appear here now; a breaking commit
+#    with no footer is named once, by its marker in the group list.
+#
+# 2. The footer is emitted as ORDINARY MARKDOWN, never quoted with `> `. A
+#    blockquote silently destroys pre-formatted content: measured through
+#    GitHub's own /markdown endpoint, an aligned env-var table inside `> ` comes
+#    back as `<p>` and the browser collapses its space runs, while the same text
+#    unquoted comes back as `<pre>` with the alignment intact. Worse, markdown's
+#    4-space code-block threshold applies AFTER the `> ` is stripped, so the
+#    author's indent depth decided whether a table survived (2 spaces became
+#    mush, 6 spaces became a code block) with nothing telling them which they
+#    picked. Unquoted, a fenced block in the commit footer reaches the reader as
+#    a fenced block. Authoring rules for footers are in git-commits.md.
+#
+# 3. `set_global` is required, and an attribute filter cannot replace it.
+#    breaking_description falls back to the SUBJECT when a commit has no
+#    BREAKING CHANGE footer, so `filter(attribute="breaking_description")` keeps
+#    EVERY breaking commit (verified: 2 of 2 footerless commits kept) and a
+#    release whose breaking commits all lack footers rendered a bare
+#    "### Breaking changes" heading with nothing beneath it. The flag emits the
+#    heading lazily, on the first commit whose description differs from its
+#    subject, so the section is absent when it would be empty. Verified both
+#    ways on the pinned git-cliff v2.13.1: a mixed set yields the heading plus
+#    one entry, an all-footerless set yields no heading at all.
 body = """
 {% set brk = commits | filter(attribute="breaking", value=true) %}\
-{% if brk | length > 0 %}
+{% set_global shown = false %}\
+{% for commit in brk %}\
+{% if commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
+{% if not shown %}
 ### Breaking changes
-{% for commit in brk %}
-- {{ commit.message | upper_first }}\
-{% if commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}
+{% set_global shown = true %}\
+{% endif %}
+#### {{ commit.message | upper_first }}
 
-{{ commit.breaking_description | trim | upper_first | indent(prefix="> ", first=true, blank=true) }}
+{{ commit.breaking_description | trim | upper_first }}
 {% endif %}\
-{% endfor %}
-{% endif %}\
+{% endfor %}\
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | striptags | trim | upper_first }}
 {% for commit in commits %}
