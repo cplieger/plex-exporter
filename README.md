@@ -89,6 +89,40 @@ Pick the configuration that matches your Plex server:
 | --- | --- |
 | `9594` | Prometheus metrics endpoint (`/metrics`) and health check (`/api/health`) |
 
+### Hardened and Kubernetes deployments
+
+The health probe writes a marker file to `/tmp/.healthy` (see [Healthcheck](#healthcheck)), so **a read-only root filesystem needs a writable `/tmp`**. Without one the probe can never pass and the container is reported unhealthy while the exporter itself works. A small in-memory mount is enough; the marker is an empty file.
+
+Docker Compose:
+
+```yaml
+    read_only: true
+    tmpfs:
+      - "/tmp:size=1m,mode=1777,noexec,nosuid,nodev"
+```
+
+Kubernetes, alongside `securityContext.readOnlyRootFilesystem: true`:
+
+```yaml
+    volumes:
+      - name: tmp
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Mi
+    # in the container spec
+    volumeMounts:
+      - name: tmp
+        mountPath: /tmp
+```
+
+One more thing worth setting on Kubernetes: the Prometheus Operator adds `pod`, `endpoint` and `container` labels to every scraped series, and the `pod` value changes on each restart. That forks a new series per restart, so panels reading a single gauge render one entry per dead pod until the old series ages out. Drop them in the ServiceMonitor:
+
+```yaml
+    metricRelabelings:
+      - action: labeldrop
+        regex: (pod|endpoint|container)
+```
+
 ## Metrics reference
 
 ### HTTP Endpoints
@@ -163,6 +197,7 @@ any other Prometheus alert. They cover:
 
 | Alert | Fires when | Severity |
 | --- | --- | --- |
+| `PlexExporterTargetDown` | no successful scrape of the exporter for 15m, whether the scrape is failing or the target has left service discovery | warning |
 | `PlexAPIUnreachable` | the authenticated Plex API poll reports `plex_http_reachable=0` for 10m (often a revoked or invalid `PLEX_TOKEN`) | warning |
 | `PlexSessionPollFailing` | the `/status/sessions` poll reports `plex_session_poll_reachable=0` for 10m while the rest of the API answers, so every session metric is absent or stale | warning |
 | `PlexExporterCollectionErrors` | the exporter logs collection errors of some `type` continuously for 30m | warning |
@@ -171,6 +206,12 @@ any other Prometheus alert. They cover:
 Thresholds, the `for:` windows, and the `severity` labels are starting points;
 add your scrape `job` label to the selectors if you run more than one instance,
 and route by whatever labels your Alertmanager uses.
+
+`PlexExporterTargetDown` is the one rule that must carry a `job` matcher, because
+it asks whether this exporter is visible at all. Set its pattern to whatever your
+scrape config calls the exporter. Every other rule reads a gauge the exporter
+publishes, so all of them go quiet together when it stops being scraped, which is
+what that rule exists to catch.
 
 ## Healthcheck
 
