@@ -1111,7 +1111,7 @@
         }
       },
       "title": "Items Added per Day",
-      "description": "Net items added to each library section per day. A negative bar is a net removal. Buckets follow the dashboard zoom but never go below one day.",
+      "description": "Net change in each library section per day. Removing some items from a library shows as a bar below zero. Deleting a library, or emptying it completely, shows as NO bar rather than a negative one, because the exporter stops publishing a section once it holds no items. Buckets follow the dashboard zoom but never go below one day, and the current day appears once it has two samples.",
       "type": "timeseries",
       "targets": [
         {

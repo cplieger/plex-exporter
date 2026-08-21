@@ -115,13 +115,17 @@ Kubernetes, alongside `securityContext.readOnlyRootFilesystem: true`:
         mountPath: /tmp
 ```
 
-One more thing worth setting on Kubernetes: the Prometheus Operator adds `pod`, `endpoint` and `container` labels to every scraped series, and the `pod` value changes on each restart. That forks a new series per restart, so panels reading a single gauge render one entry per dead pod until the old series ages out. Drop them in the ServiceMonitor:
+One more thing worth knowing on Kubernetes: the Prometheus Operator adds `pod`, `endpoint` and `container` labels to every scraped series, and the `pod` value changes on each restart. A panel reading a single gauge over a time range therefore renders one entry per dead pod until the old series ages out.
+
+The shipped dashboard handles this by asking current-state tiles for an instant value rather than a range, so stale pod series cannot appear. If you need those labels gone at ingestion instead, drop them in the ServiceMonitor:
 
 ```yaml
     metricRelabelings:
       - action: labeldrop
         regex: (pod|endpoint|container)
 ```
+
+Do this **only for a single-replica deployment**. Those labels are what distinguishes one replica's series from another's, so dropping all three on a multi-replica ServiceMonitor makes two replicas emit identical label sets, which Prometheus [warns against explicitly](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config). With more than one replica, keep `pod` and aggregate in the query instead.
 
 ## Metrics reference
 
