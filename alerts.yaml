@@ -12,16 +12,21 @@ groups:
       # every other rule goes silent when the exporter dies. This one is the
       # floor under them.
       #
-      # Written as absent(up{...} == 1) rather than up{...} == 0 on purpose.
-      # "up == 0" needs the target to still be IN service discovery: it fires
-      # for a failing scrape and says nothing when the target disappears
-      # altogether, which is what a deleted Kubernetes pod or ServiceMonitor, a
-      # dropped scrape target, or a removed scrape config all look like. The
-      # absent() form covers both. It has to carry a job matcher (a bare
-      # absent(up == 1) can never fire while any other target is up), so set
-      # the pattern to whatever your scrape config calls this exporter.
+      # Two arms, because neither covers the other. `up == 0` catches a target
+      # that is configured and failing, and keeps its labels so the alert names
+      # which instance. `absent(up{...})` catches a target that stopped EXISTING
+      # — a deleted Kubernetes pod or ServiceMonitor, a dropped scrape target, a
+      # removed scrape config — where `up` has no series at all and `up == 0` can
+      # never match.
+      #
+      # Use an EXACT job matcher, not a regex. A regex form
+      # (absent(up{job=~".*x.*"} == 1)) looks tidier and is wrong twice: with
+      # several replicas on one job it asks whether ANY of them is up, so one
+      # healthy replica masks every failed one; and the synthetic result carries
+      # no job label at all, so the alert reaches your Alertmanager with nothing
+      # to route or group on.
       - alert: PlexExporterTargetDown
-        expr: absent(up{job=~".*plex-exporter.*"} == 1)
+        expr: up{job="plex-exporter"} == 0
         for: 15m
         labels:
           severity: warning
@@ -32,7 +37,20 @@ groups:
             is stale and every other rule in this group is blind. Either the
             scrape is failing (container down, wrong port, network) or the
             target is gone from service discovery entirely. Check the container
-            and your scrape config.
+            and your scrape config. Set the job matcher to whatever your scrape
+            config calls this exporter.
+      - alert: PlexExporterTargetAbsent
+        expr: absent(up{job="plex-exporter"})
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter has no scrape target at all"
+          description: >
+            There is no up{job="plex-exporter"} series, so plex-exporter is not merely
+            failing to scrape but is no longer a configured target: a dropped
+            scrape target, a removed scrape config, or a deleted Kubernetes pod
+            or ServiceMonitor. Every other rule in this group is blind.
       - alert: PlexAPIUnreachable
         expr: plex_http_reachable == 0
         for: 10m
@@ -45,7 +63,9 @@ groups:
             has returned plex_http_reachable=0 for 10m - most often a
             revoked/invalid PLEX_TOKEN. Metrics are stale until resolved.
       - alert: PlexSessionPollFailing
-        expr: plex_session_poll_reachable == 0
+        expr: >
+          plex_session_poll_reachable == 0
+          and plex_http_reachable == 1
         for: 10m
         labels:
           severity: warning
