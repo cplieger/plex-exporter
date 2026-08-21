@@ -291,6 +291,9 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 	if labels["location"] != "wan" {
 		t.Errorf("location = %q, want wan", labels["location"])
 	}
+	if labels["user"] != "testuser" {
+		t.Errorf("user = %q, want testuser", labels["user"])
+	}
 
 	// Verify plex_session_bitrate_kbps gauge value matches Media[0].Bitrate.
 	bitrateMetrics := byDesc[descKey(metrics.DescSessionBitrate)]
