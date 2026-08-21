@@ -124,7 +124,7 @@ Pick the configuration that matches your Plex server:
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
-| `plex_plays_active` | Gauge | `server`, `server_id`, `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `grandchild_index`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location`, `local` | Currently active play sessions (1 per session). Use `count(plex_plays_active)` for total stream count. Removed after 60s of inactivity. |
+| `plex_plays_active` | Gauge | `server`, `server_id`, `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `grandchild_index`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location`, `local` | Currently active play sessions (1 per session). Reported once the exporter has seen the session playing, so a stream that was already paused when the exporter started is absent until it resumes. Use `count(plex_plays_active)` for total stream count. Removed after 60s of inactivity. |
 | `plex_play_seconds_total` | Counter | _(same as above)_ | Cumulative play time for the session (seconds) |
 | `plex_session_bandwidth_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Real-time session bandwidth from the Plex Sessions API (kbps) |
 | `plex_session_bitrate_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Live stream bitrate per session (kbps). Kept as its own series rather than a label on the play metrics, so adaptive-streaming bitrate changes cannot inflate label cardinality. |
@@ -164,6 +164,7 @@ any other Prometheus alert. They cover:
 | Alert | Fires when | Severity |
 | --- | --- | --- |
 | `PlexAPIUnreachable` | the authenticated Plex API poll reports `plex_http_reachable=0` for 10m (often a revoked or invalid `PLEX_TOKEN`) | warning |
+| `PlexSessionPollFailing` | the `/status/sessions` poll reports `plex_session_poll_reachable=0` for 10m while the rest of the API answers, so every session metric is absent or stale | warning |
 | `PlexExporterCollectionErrors` | the exporter logs collection errors of some `type` continuously for 30m | warning |
 | `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m | warning |
 
