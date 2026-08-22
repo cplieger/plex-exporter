@@ -450,7 +450,7 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	activeSessions, err := s.Client.FetchMetadata[plexapi.Item](fetchCtx, plexapi.SessionsPath())
+	activeSessions, err := s.Client.Sessions(fetchCtx)
 	if err != nil {
 		slog.Warn("session poll: failed to fetch sessions", "error", err)
 		s.RecordError("sessions_fetch")
@@ -513,15 +513,15 @@ func (s *Server) buildSessionWork(activeSessions []plexapi.Item) []sessionWork {
 }
 
 // fetchSessionMedia fetches each work item's library metadata concurrently
-// (at most 4 in flight) and returns it keyed by work index. The metadata
-// path is the plexapi builder's (rating keys were validated in
-// buildSessionWork, so the builder cannot reject them). A fetch error or
-// empty response leaves that index unset, so the caller still applies
-// session state without library labels. A session whose tracked state
-// already carries metadata for its current rating key is skipped
-// (MediaMeta is immutable per key): the nil result makes applySessionUpdate
-// keep the cached MediaMeta, saving one /library/metadata round-trip per
-// session per poll.
+// (at most 4 in flight) and returns it keyed by work index. Every error
+// leaves that index unset and records metadata_fetch, ErrNotFound included:
+// plexapi maps a 404 and an empty container onto it alike, and a live
+// session whose item cannot be fetched is the case worth alerting on. The
+// caller still applies session state without library labels. A session
+// whose tracked state already carries metadata for its current rating key
+// is skipped (MediaMeta is immutable per key): the nil result makes
+// applySessionUpdate keep the cached MediaMeta, saving one
+// /library/metadata round-trip per session per poll.
 func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*plexapi.Item {
 	results := make([]*plexapi.Item, len(work))
 	g, gctx := errgroup.WithContext(ctx)
@@ -531,21 +531,13 @@ func (s *Server) fetchSessionMedia(ctx context.Context, work []sessionWork) []*p
 			continue
 		}
 		g.Go(func() error {
-			path, err := plexapi.MetadataPath(plexapi.RatingKey(w.sess.RatingKey))
-			if err == nil {
-				var items []plexapi.Item
-				items, err = s.Client.FetchMetadata[plexapi.Item](gctx, path)
-				if err == nil {
-					if len(items) == 0 {
-						slog.Debug("session poll: empty metadata response", "key", w.sess.RatingKey)
-						return nil
-					}
-					results[i] = &items[0]
-					return nil
-				}
+			item, err := s.Client.Metadata(gctx, plexapi.RatingKey(w.sess.RatingKey))
+			if err != nil {
+				slog.Warn("session poll: metadata fetch failed", "key", w.sess.RatingKey, "error", err)
+				s.RecordError("metadata_fetch")
+				return nil
 			}
-			slog.Warn("session poll: metadata fetch failed", "key", w.sess.RatingKey, "error", err)
-			s.RecordError("metadata_fetch")
+			results[i] = item
 			return nil
 		})
 	}
