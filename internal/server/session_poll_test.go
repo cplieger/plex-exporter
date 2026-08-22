@@ -690,3 +690,70 @@ func TestRefreshSessions_unresolved_library_refetches_metadata(t *testing.T) {
 		t.Errorf("after poll 2: LibName = %q, want Movies (labels resolved on refetch)", lib)
 	}
 }
+
+// TestRefreshSessions_metadata_absent_records_error pins the disposition of a
+// library item a live session points at but the server will not return.
+// plexapi's Metadata maps a 404, an empty container and a zero-byte body onto
+// ErrNotFound alike, and fetchSessionMedia treats every error the same way:
+// Warn plus plex_exporter_errors_total{type="metadata_fetch"}. The session
+// stays tracked with its state, without library labels.
+func TestRefreshSessions_metadata_absent_records_error(t *testing.T) {
+	tests := map[string]struct {
+		body   string
+		status int
+	}{
+		"not_found":       {status: http.StatusNotFound},
+		"empty_container": {status: http.StatusOK, body: `{"MediaContainer":{"Metadata":[]}}`},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/status/sessions":
+					fmt.Fprint(w, `{"MediaContainer":{"Metadata":[{
+						"sessionKey":"s7",
+						"ratingKey":"700",
+						"type":"movie",
+						"title":"Vanished Item",
+						"Player":{"device":"TV","state":"playing"},
+						"User":{"title":"u5"},
+						"Media":[{"Part":[{"decision":"copy"}]}]
+					}]}}`)
+				case "/library/metadata/700":
+					w.WriteHeader(test.status)
+					fmt.Fprint(w, test.body)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			})
+			ts := httptest.NewServer(handler)
+			defer ts.Close()
+
+			client := plextest.NewTestClientFromServer(t, ts)
+			srv := New(client)
+			srv.Libraries = []library.Library{
+				{ID: "1", Name: "Movies", Type: library.TypeMovie},
+			}
+
+			srv.RefreshSessions(t.Context())
+
+			srv.mu.Lock()
+			errCount := srv.ErrorCounts["metadata_fetch"]
+			srv.mu.Unlock()
+			if errCount != 1 {
+				t.Errorf("metadata/700 answered %d %q: errorCounts[metadata_fetch] = %v, want 1", test.status, test.body, errCount)
+			}
+			snap := srv.Sessions.SnapshotSessions()
+			s, ok := snap["s7"]
+			if !ok {
+				t.Fatalf("metadata/700 answered %d %q: session s7 not tracked, want tracked without library labels", test.status, test.body)
+			}
+			if s.State != sessions.StatePlaying {
+				t.Errorf("metadata/700 answered %d %q: state = %q, want playing", test.status, test.body, s.State)
+			}
+			if s.LibName != "" {
+				t.Errorf("metadata/700 answered %d %q: libName = %q, want empty (no metadata to match a library)", test.status, test.body, s.LibName)
+			}
+		})
+	}
+}
