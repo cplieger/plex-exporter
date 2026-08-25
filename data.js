@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1787698975714,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/plex-exporter",
   "entries": {
     "Benchmark": [
       {
@@ -15,10 +15,10 @@ window.BENCHMARK_DATA = {
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "22ecb93b0586a9d799b745b0b5f7c2a5da2fe072",
-          "message": "chore(deps): update cplieger/ci digest to f04eff4 (#512)",
-          "timestamp": "2026-08-25T08:02:03Z",
-          "url": "https://github.com/cplieger/ci/commit/22ecb93b0586a9d799b745b0b5f7c2a5da2fe072"
+          "id": "f3d03d21c49a80398ff5ae03bf714bce250d36e6",
+          "message": "chore(sync): synced file(s) with cplieger/ci (#536)\n\nCo-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-08-25T08:12:58Z",
+          "url": "https://github.com/cplieger/plex-exporter/commit/f3d03d21c49a80398ff5ae03bf714bce250d36e6"
         },
         "date": 1787698975355,
         "tool": "customSmallerIsBetter",
