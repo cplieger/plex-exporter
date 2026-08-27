@@ -73,7 +73,7 @@ func benchServer(tb testing.TB, n int) *Server {
 		Platform: "Linux",
 		Sessions: tracker,
 		Libraries: []library.Library{
-			{Name: "Movies", ID: "1", Type: library.TypeMovie, DurationTotal: 100, StorageTotal: 200, ItemsCount: 50},
+			{Name: "Movies", ID: "1", Type: library.TypeMovie, DurationTotal: 100, StorageTotal: 200, ItemsCount: 50, ItemsKnown: true},
 		},
 		ErrorCounts: make(map[string]float64, len(metrics.ErrorTypes)),
 	}

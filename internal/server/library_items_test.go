@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/cplieger/plex-exporter/v2/internal/library"
+	"github.com/cplieger/plex-exporter/v2/internal/metrics"
 	"github.com/cplieger/plex-exporter/v2/internal/plextest"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
@@ -192,9 +194,9 @@ func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
 }
 
 func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testing.T) {
-	// When type=10 (tracks) returns count=0 — not an error, just zero — the
-	// count is not accepted and falls back to type=7. Zero is the boundary: a
-	// positive count is required (count > 0), so 0 falls through.
+	// A zero from a non-final type in the chain is not the answer for the
+	// library: type=10 (tracks) reporting 0 falls through to type=7, which is
+	// what library.ItemCountTypes' artist chain exists for.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/library/sections/1/all" {
 			switch r.URL.Query().Get("type") {
@@ -320,10 +322,140 @@ func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
 	if lb.ItemsCount != 0 {
 		t.Errorf("ItemsCount = %d, want 0 (non-numeric ID rejected)", lb.ItemsCount)
 	}
+	if lb.ItemsKnown {
+		t.Error("ItemsKnown = true, want false: a rejected section id was never read")
+	}
 	srv.mu.Lock()
 	got := srv.ErrorCounts["library_items"]
 	srv.mu.Unlock()
 	if got != 1 {
 		t.Errorf("ErrorCounts[library_items] = %v, want 1", got)
+	}
+}
+
+// libItemsGauge returns the plex_library_items value for the named library and
+// whether the gauge was published for it at all.
+func libItemsGauge(t *testing.T, srv *Server, libName string) (float64, bool) {
+	t.Helper()
+	ch := make(chan prometheus.Metric, 64)
+	srv.Collect(ch)
+	close(ch)
+	for _, m := range collectByDesc(ch)[descKey(metrics.DescLibItems)] {
+		labels, val := metricSnapshot(t, m)
+		if labels["library"] == libName {
+			return val, true
+		}
+	}
+	return 0, false
+}
+
+func TestRefreshLibraryItems_successful_zero_is_published_as_zero(t *testing.T) {
+	// A library emptied to exactly zero items answers 0, and that answer is
+	// authoritative: it replaces the last count read and reaches the gauge as 0
+	// rather than leaving the stale value in place forever.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/library/sections/1/all" {
+			fmt.Fprint(w, `{"MediaContainer":{"totalSize":0}}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.Libraries = []library.Library{
+		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 900, ItemsKnown: true},
+	}
+
+	srv.refreshLibraryItems(t.Context())
+
+	srv.mu.Lock()
+	got := srv.Libraries[0]
+	srv.mu.Unlock()
+	if got.ItemsCount != 0 || !got.ItemsKnown {
+		t.Errorf("Movies = (%d, known %t), want (0, known true) after a successful zero answer",
+			got.ItemsCount, got.ItemsKnown)
+	}
+
+	val, published := libItemsGauge(t, srv, "Movies")
+	if !published {
+		t.Fatal("plex_library_items{library=Movies} absent, want it published at 0")
+	}
+	if val != 0 {
+		t.Errorf("plex_library_items{library=Movies} = %v, want 0", val)
+	}
+}
+
+func TestRefreshLibraryItems_fetch_failure_keeps_previous_count(t *testing.T) {
+	// A query that fails is not an answer, so the previous count stands and the
+	// gauge does not move: an outage must never read as a collapse.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.Libraries = []library.Library{
+		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 900, ItemsKnown: true},
+	}
+
+	srv.refreshLibraryItems(t.Context())
+
+	srv.mu.Lock()
+	got := srv.Libraries[0]
+	srv.mu.Unlock()
+	if got.ItemsCount != 900 || !got.ItemsKnown {
+		t.Errorf("Movies = (%d, known %t), want (900, known true) preserved across a failed fetch",
+			got.ItemsCount, got.ItemsKnown)
+	}
+
+	val, published := libItemsGauge(t, srv, "Movies")
+	if !published {
+		t.Fatal("plex_library_items{library=Movies} absent, want the previous count still published")
+	}
+	if val != 900 {
+		t.Errorf("plex_library_items{library=Movies} = %v, want 900 (unchanged by a failed fetch)", val)
+	}
+}
+
+func TestRefreshLibraryItems_unread_library_publishes_nothing(t *testing.T) {
+	// A library whose count has never been read is not published as a zero, so
+	// a fetch failing from the very first refresh emits no series at all.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.Libraries = []library.Library{
+		{ID: "1", Name: "Movies", Type: library.TypeMovie},
+	}
+
+	srv.refreshLibraryItems(t.Context())
+
+	if val, published := libItemsGauge(t, srv, "Movies"); published {
+		t.Errorf("plex_library_items{library=Movies} = %v, want absent for a count never read", val)
+	}
+}
+
+func TestTryItemCount_negative_total_is_not_an_answer(t *testing.T) {
+	// An item count cannot be negative, so a section reporting one is refused
+	// like a transport error rather than published as a gauge value.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"MediaContainer":{"totalSize":-5}}`)
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+
+	count, answered := srv.tryItemCount(t.Context(), "1", 0)
+	if answered || count != 0 {
+		t.Errorf("tryItemCount() = (%d, %t), want (0, false) for a negative total", count, answered)
+	}
+	srv.mu.Lock()
+	errs := srv.ErrorCounts["library_items"]
+	srv.mu.Unlock()
+	if errs != 1 {
+		t.Errorf("ErrorCounts[library_items] = %v, want 1", errs)
 	}
 }

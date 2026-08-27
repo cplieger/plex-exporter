@@ -108,9 +108,12 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 		s.Version = providers.Version
 
 		// Build a lookup of existing item counts so they survive the rebuild.
+		// Presence in the map is the validity signal: only a count that was
+		// actually read carries over, so a section whose count is unknown stays
+		// unknown rather than becoming a published zero.
 		prevItems := make(map[string]int64, len(s.Libraries))
 		for _, lib := range s.Libraries {
-			if lib.ItemsCount > 0 {
+			if lib.ItemsKnown {
 				prevItems[lib.ID] = lib.ItemsCount
 			}
 		}
@@ -308,9 +311,14 @@ func (s *Server) refreshLibraryItems(ctx context.Context) {
 	s.writeBackItemCounts(libs)
 }
 
-// fillItemCount sets lb.ItemsCount from the first item-count query that
-// returns a positive result for the library's type. When no query yields a
-// positive count it logs at debug and leaves any existing count untouched.
+// fillItemCount sets lb.ItemsCount from the library type's item-count queries,
+// marking it known. A positive result wins immediately; a zero falls through to
+// the next type in the chain, which is the artist-library behaviour
+// library.ItemCountTypes exists for. Once the chain is exhausted, an all-zero
+// outcome is authoritative as long as at least one query answered — a library
+// emptied to exactly zero items must publish 0, not keep its last count. When
+// no query answered at all it logs at debug and leaves the previous count and
+// its known-ness untouched, so a fetch outage never reads as a collapse.
 func (s *Server) fillItemCount(ctx context.Context, lb *library.Library) {
 	if _, err := strconv.Atoi(lb.ID); err != nil {
 		slog.Warn("library item count: non-numeric section id, skipping",
@@ -318,16 +326,28 @@ func (s *Server) fillItemCount(ctx context.Context, lb *library.Library) {
 		s.RecordError("library_items")
 		return
 	}
+	var (
+		count    int64
+		answered bool
+	)
 	for _, typ := range library.ItemCountTypes(lb.Type) {
-		if count, ok := s.tryItemCount(ctx, lb.ID, typ); ok {
-			lb.ItemsCount = count
-			return
+		c, ok := s.tryItemCount(ctx, lb.ID, typ)
+		if !ok {
+			continue
+		}
+		answered = true
+		count = c
+		if c > 0 {
+			break
 		}
 	}
-	if lb.ItemsCount == 0 {
+	if !answered {
 		slog.Debug("library item count unavailable",
 			"library", lb.Name, "id", lb.ID, "type", lb.Type)
+		return
 	}
+	lb.ItemsCount = count
+	lb.ItemsKnown = true
 }
 
 // writeBackItemCounts copies refreshed item counts back into s.Libraries
@@ -339,17 +359,19 @@ func (s *Server) writeBackItemCounts(libs []library.Library) {
 	for i, lb := range libs {
 		if i < len(s.Libraries) && s.Libraries[i].ID == lb.ID {
 			s.Libraries[i].ItemsCount = lb.ItemsCount
+			s.Libraries[i].ItemsKnown = lb.ItemsKnown
 		}
 	}
 }
 
-// tryItemCount fetches the item count for a library section.
-// Returns (count, true) on a positive result; (0, false) on error or zero.
-// Zero is treated as "try the next fallback" to match pre-refactor behaviour
-// where a zero result falls through to the default path for music libraries.
-// The section path and container params are built by the plexapi library
-// (metadataType 0 = unfiltered).
-func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType int) (int64, bool) {
+// tryItemCount fetches the item count for a library section, reporting whether
+// the query ANSWERED — (0, true) is a section that really holds no items and
+// (0, false) is a section whose count could not be read, which the caller must
+// keep apart. A negative total cannot describe a collection, so it is refused
+// like a transport error rather than published as a gauge value. The section
+// path and container params are built by the plexapi library (metadataType 0 =
+// unfiltered).
+func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType int) (count int64, answered bool) {
 	count, err := s.Client.CountSectionItems(ctx, plexapi.RatingKey(libID), metadataType)
 	if err != nil {
 		slog.Warn("library item count fetch failed",
@@ -357,7 +379,13 @@ func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType in
 		s.RecordError("library_items")
 		return 0, false
 	}
-	return count, count > 0
+	if count < 0 {
+		slog.Warn("library item count: negative total reported, ignoring",
+			"library_id", libID, "type_param", metadataType, "count", count)
+		s.RecordError("library_items")
+		return 0, false
+	}
+	return count, true
 }
 
 func (s *Server) refreshResources(ctx context.Context) {
