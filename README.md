@@ -194,28 +194,43 @@ resolution labels. An empty Plex `subtitleDecision` is reported as
 ## Alerting
 
 plex-exporter exposes Prometheus metrics on `/metrics` (see
-[Metrics reference](#metrics-reference)). Scrape that endpoint and
-evaluate the rules in [`alerts.yaml`](alerts.yaml) with Prometheus or
-the Mimir ruler; firing alerts deliver through your Alertmanager like
-any other Prometheus alert. They cover:
+[Metrics reference](#metrics-reference)) and writes its own diagnostics to its
+container log. The rules in [`alerts.yaml`](alerts.yaml) read both, so two
+rulers evaluate them: scrape `/metrics` and evaluate the six PromQL rules with
+Prometheus or the Mimir ruler, and ship the container's logs to Loki (Grafana
+Alloy's Docker log discovery does this with no configuration) to evaluate the
+three LogQL rules with Loki's ruler. Firing alerts deliver through your
+Alertmanager either way. They cover:
 
 | Alert | Fires when | Severity |
 | --- | --- | --- |
-| `PlexExporterTargetDown` | no successful scrape of the exporter for 15m, whether the scrape is failing or the target has left service discovery | warning |
+| `PlexExporterTargetDown` | no successful scrape of the exporter for 15m, so the scrape itself is failing | warning |
+| `PlexExporterTargetAbsent` | the exporter has no `up` series at all for 15m, so the target has left service discovery | warning |
 | `PlexAPIUnreachable` | the authenticated Plex API poll reports `plex_http_reachable=0` for 10m (often a revoked or invalid `PLEX_TOKEN`) | warning |
 | `PlexSessionPollFailing` | the `/status/sessions` poll reports `plex_session_poll_reachable=0` for 10m while the rest of the API answers, so every session metric is absent or stale | warning |
-| `PlexExporterCollectionErrors` | the exporter logs collection errors of some `type` continuously for 30m | warning |
-| `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m | warning |
+| `PlexExporterCollectionErrors` | the `plex_exporter_errors_total` counter keeps rising for some `type` over 30m | warning |
+| `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m (a drop to exactly zero stays invisible, see the file) | warning |
+| `PlexExporterFatalError` | the exporter logs an `ERROR`: a rejected config or token, a bind failure, a metrics-server failure, or a recovered panic | warning |
+| `PlexExporterSessionMapFull` | the session tracker is at its cap and drops new Plex sessions, so the session metrics undercount | warning |
+| `PlexExporterRefreshIncomplete` | a refresh cycle runs out of time before the Plex Pass gauges are read, so they keep serving values from an earlier cycle | warning |
 
 Thresholds, the `for:` windows, and the `severity` labels are starting points;
 add your scrape `job` label to the selectors if you run more than one instance,
-and route by whatever labels your Alertmanager uses.
+adjust the `container` selector to whatever your log collector sets, and route
+by whatever labels your Alertmanager uses.
 
-`PlexExporterTargetDown` is the one rule that must carry a `job` matcher, because
-it asks whether this exporter is visible at all. Set its pattern to whatever your
-scrape config calls the exporter. Every other rule reads a gauge the exporter
-publishes, so all of them go quiet together when it stops being scraped, which is
-what that rule exists to catch.
+`PlexExporterTargetDown` and `PlexExporterTargetAbsent` are the two rules that
+must carry a `job` matcher, because they ask whether this exporter is visible at
+all. Set both to whatever your scrape config calls the exporter, and keep the
+matcher exact rather than a regex: a regex asks whether *any* matching target is
+up, so one healthy replica masks a failed one, and it leaves the `absent()`
+result with no label to route on.
+
+Every metric rule reads a series the exporter publishes, so all of them go quiet
+together when it stops being scraped, which is what those two rules exist to
+catch. The three log rules are the ones that still fire when there is nothing
+left to scrape: a configuration the exporter refuses outright reaches
+`PlexExporterFatalError` before any series exists.
 
 ## Healthcheck
 
