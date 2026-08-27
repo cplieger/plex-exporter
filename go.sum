@@ -12,6 +12,8 @@ github.com/cplieger/pathinside/v2 v2.0.0 h1:UZxSiu3UBCCs+Xe0+Of+oTLyzL+4wchKO2tS
 github.com/cplieger/pathinside/v2 v2.0.0/go.mod h1:XuMYE6rO3te8Yf6Zcy35PLMgDcWaIz3RglJatWPhHnU=
 github.com/cplieger/plexapi/v2 v2.0.5 h1:r/STp87nBL7z72Cj12/KpthN9YFBx5U6y4TauSL6K+k=
 github.com/cplieger/plexapi/v2 v2.0.5/go.mod h1:/l20cQoM496w2vq4WaDW/DKC0ZkZ5B2BjBvB3oJzEAY=
+github.com/cplieger/runesafe/v2 v2.0.0 h1:jEkFU2dbDxKLwgHag6l3gbSLpRNfkD8mMsdiCgu56wY=
+github.com/cplieger/runesafe/v2 v2.0.0/go.mod h1:X3avIOn44UaASh8QEhXDIKNWA4HLmSAZYWywNwpOYyE=
 github.com/cplieger/slogx v1.6.3 h1:1W8DxUwovnfbL1wjthdELHhw2gFH1FXaUcG34KjefIw=
 github.com/cplieger/slogx v1.6.3/go.mod h1:KW/UCGyMK3grILRvcU4Zloawb27C13cLN5HQ7ZLNS5Q=
 github.com/cplieger/webhttp/v2 v2.0.2 h1:55fv7cuiF7GAjQAC1UZv7Jvi6cFCYvpUlKABlf4QKDU=
