@@ -8,6 +8,7 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
 	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/runesafe/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -119,11 +120,10 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 	}
 }
 
-// truncLabel truncates a label value to maxLabelLen bytes to prevent
-// high-cardinality label sets from user-controlled Plex API data. It
-// respects UTF-8 boundaries to avoid splitting multi-byte codepoints.
+// truncLabel bounds a label value to maxLabelLen bytes, capping Prometheus
+// cardinality from user-controlled Plex API strings.
 func truncLabel(s string) string {
-	return metrics.TruncateLabelValue(s, maxLabelLen)
+	return runesafe.CapBytes(s, maxLabelLen)
 }
 
 // streamLabels returns (streamType, resolution) derived from the

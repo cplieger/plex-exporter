@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/plex-exporter/v2/internal/metrics"
 	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/runesafe/v2"
 )
 
 // State is a normalised session playback state derived from the Plex
@@ -99,15 +99,13 @@ func NewTracker() *Tracker {
 	}
 }
 
-// normalizeKey truncates a session key to MaxSessionKeyLen so that
-// write and lookup always use the same map key. It uses
-// metrics.TruncateLabelValue (rune-aware truncation) deliberately: the
+// normalizeKey truncates a session key to MaxSessionKeyLen so that write and
+// lookup always use the same map key. The cut must land on a rune boundary: the
 // normalized key is emitted verbatim as the `session` Prometheus label
-// (collectSessions passes sessID through un-truncated), so it must stay
-// valid UTF-8 — a plain byte-slice cut could split a multi-byte rune and
-// make prometheus.MustNewConstMetric panic the collector goroutine.
+// (collectSessions passes sessID through un-truncated), and an invalid label
+// value makes prometheus.MustNewConstMetric panic the collector goroutine.
 func normalizeKey(id string) string {
-	return metrics.TruncateLabelValue(id, MaxSessionKeyLen)
+	return runesafe.CapBytes(id, MaxSessionKeyLen)
 }
 
 // UpdateLibraryLabels applies fn to the session identified by id under
