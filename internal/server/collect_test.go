@@ -483,8 +483,8 @@ func TestCollectServerMetrics(t *testing.T) {
 		TransmitBytes:    12345,
 		ActiveTranscodes: 2,
 		Libraries: []library.Library{
-			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 1000, StorageTotal: 2000, ItemsCount: 50},
-			{ID: "2", Name: "TV Shows", Type: library.TypeShow, DurationTotal: 3000, StorageTotal: 4000, ItemsCount: 0},
+			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 1000, StorageTotal: 2000, ItemsCount: 50, ItemsKnown: true},
+			{ID: "2", Name: "TV Shows", Type: library.TypeShow, DurationTotal: 3000, StorageTotal: 4000},
 		},
 		Sessions: sessions.NewTracker(),
 	}
@@ -496,7 +496,7 @@ func TestCollectServerMetrics(t *testing.T) {
 	ms := drainMetrics(ch)
 	// Base: server_info, cpu, mem, transmit, active_transcodes,
 	// http_reachable, session_poll_reachable, http_retries + len(metrics.ErrorTypes) error counters.
-	// Plus: 2x lib_duration, 2x lib_storage, 1x lib_items (only Movies has count>0)
+	// Plus: 2x lib_duration, 2x lib_storage, 1x lib_items (only Movies has a count that was read)
 	want := 8 + len(metrics.ErrorTypes) + 5
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
@@ -561,7 +561,7 @@ func TestCollectWithActiveSessions(t *testing.T) {
 		TransmitBytes:    50000,
 		ActiveTranscodes: 1,
 		Libraries: []library.Library{
-			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 5000, StorageTotal: 10000, ItemsCount: 100},
+			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 5000, StorageTotal: 10000, ItemsCount: 100, ItemsKnown: true},
 		},
 		Sessions: tracker,
 	}
@@ -585,9 +585,9 @@ func TestCollectMultipleLibraries(t *testing.T) {
 		ID:      "id1",
 		Version: "1.0",
 		Libraries: []library.Library{
-			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 100, StorageTotal: 200, ItemsCount: 10},
-			{ID: "2", Name: "TV", Type: library.TypeShow, DurationTotal: 300, StorageTotal: 400, ItemsCount: 20},
-			{ID: "3", Name: "Music", Type: library.TypeArtist, DurationTotal: 500, StorageTotal: 600, ItemsCount: 30},
+			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 100, StorageTotal: 200, ItemsCount: 10, ItemsKnown: true},
+			{ID: "2", Name: "TV", Type: library.TypeShow, DurationTotal: 300, StorageTotal: 400, ItemsCount: 20, ItemsKnown: true},
+			{ID: "3", Name: "Music", Type: library.TypeArtist, DurationTotal: 500, StorageTotal: 600, ItemsCount: 30, ItemsKnown: true},
 		},
 		Sessions: sessions.NewTracker(),
 	}
@@ -640,15 +640,18 @@ func TestCollect_host_metrics_values(t *testing.T) {
 	}
 }
 
-func TestCollect_library_items_only_when_positive(t *testing.T) {
-	// Libraries with ItemsCount=0 should NOT emit lib_items metric.
-	// Libraries with ItemsCount>0 should emit with correct content_type label.
+func TestCollect_library_items_published_for_a_known_count_including_zero(t *testing.T) {
+	// A library whose count was read emits plex_library_items even when that
+	// count is zero — an emptied library must report 0, not vanish. A library
+	// whose count was never read emits nothing, so an unread section is never
+	// published as a zero.
 	srv := &Server{
 		Name: "Srv",
 		ID:   "id1",
 		Libraries: []library.Library{
-			{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 100},
-			{ID: "2", Name: "TV", Type: library.TypeShow, ItemsCount: 0},
+			{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 100, ItemsKnown: true},
+			{ID: "2", Name: "TV", Type: library.TypeShow, ItemsCount: 0, ItemsKnown: true},
+			{ID: "3", Name: "Music", Type: library.TypeArtist},
 		},
 		Sessions: sessions.NewTracker(),
 	}
@@ -659,19 +662,32 @@ func TestCollect_library_items_only_when_positive(t *testing.T) {
 
 	byDesc := collectByDesc(ch)
 	itemMetrics := byDesc[descKey(metrics.DescLibItems)]
-	if len(itemMetrics) != 1 {
-		t.Fatalf("expected 1 lib_items metric (only Movies), got %d", len(itemMetrics))
+	if len(itemMetrics) != 2 {
+		t.Fatalf("expected 2 lib_items metrics (Movies and the emptied TV), got %d", len(itemMetrics))
 	}
 
-	labels, val := metricSnapshot(t, itemMetrics[0])
-	if val != 100 {
-		t.Errorf("lib_items value = %v, want 100", val)
+	byLibrary := make(map[string]float64, len(itemMetrics))
+	contentTypes := make(map[string]string, len(itemMetrics))
+	for _, m := range itemMetrics {
+		labels, val := metricSnapshot(t, m)
+		byLibrary[labels["library"]] = val
+		contentTypes[labels["library"]] = labels["content_type"]
 	}
-	if labels["content_type"] != "movies" {
-		t.Errorf("content_type = %q, want movies", labels["content_type"])
+
+	if got, ok := byLibrary["Movies"]; !ok || got != 100 {
+		t.Errorf("lib_items{library=Movies} = %v (present %t), want 100", got, ok)
 	}
-	if labels["library"] != "Movies" {
-		t.Errorf("library = %q, want Movies", labels["library"])
+	if got, ok := byLibrary["TV"]; !ok || got != 0 {
+		t.Errorf("lib_items{library=TV} = %v (present %t), want 0 for a library read as empty", got, ok)
+	}
+	if _, ok := byLibrary["Music"]; ok {
+		t.Error("lib_items{library=Music} was published, want absent for a count never read")
+	}
+	if contentTypes["Movies"] != "movies" {
+		t.Errorf("content_type = %q, want movies", contentTypes["Movies"])
+	}
+	if contentTypes["TV"] != "episodes" {
+		t.Errorf("content_type = %q, want episodes", contentTypes["TV"])
 	}
 }
 

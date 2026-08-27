@@ -131,14 +131,13 @@ groups:
             more than 50% versus its level ~1-2h ago and stayed down for 30m.
             Likely a partly lost media mount or an accidental bulk delete.
             Check the media bind mount and the library on the Plex server.
-            This sees a PARTIAL collapse only. plex_library_items is published
-            only for a POSITIVE count, and the exporter keeps the last positive
-            count it read, so a library that reaches exactly zero items goes on
-            reporting its old count and this expression has nothing to
-            subtract. Nothing else covers that case either: a zero count is
-            not an error, so no error counter moves and no line above DEBUG is
-            written. An external check on the library's own item count is what
-            covers a collapse all the way to zero.
+            A collapse all the way to zero is covered too: the exporter
+            publishes plex_library_items=0 once it reads a library as empty, so
+            the drop is a full 100% and this expression sees it. A library whose
+            count cannot be READ is a different condition and deliberately does
+            not fire here — the series holds its last value and the fetch
+            failure raises plex_exporter_errors_total{type="library_items"},
+            which PlexExporterCollectionErrors alerts on.
 
       # --- LogQL rules, evaluated by LOKI's ruler, not by Prometheus --------
       # Everything below is LogQL over the container's log stream. Each of the

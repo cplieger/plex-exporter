@@ -55,7 +55,7 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 			float64(lib.DurationTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
 		ch <- prometheus.MustNewConstMetric(metrics.DescLibStorage, prometheus.GaugeValue,
 			float64(lib.StorageTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
-		if lib.ItemsCount > 0 {
+		if lib.ItemsKnown {
 			ch <- prometheus.MustNewConstMetric(metrics.DescLibItems, prometheus.GaugeValue,
 				float64(lib.ItemsCount), snap.Name, snap.ID, lib.Type, libName, lib.ID,
 				library.ContentTypeLabel(lib.Type))

@@ -302,7 +302,7 @@ func TestRefresh_preserves_item_counts(t *testing.T) {
 
 	// Pre-populate with item counts
 	srv.Libraries = []library.Library{
-		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 500},
+		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 500, ItemsKnown: true},
 	}
 	// Set lastItemsRefresh to recent so it won't re-fetch items
 	srv.LastItemsRefresh = time.Now()
@@ -623,9 +623,10 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	srv.mu.Unlock()
 }
 
-func TestRefresh_prevItems_preserves_positive_counts_only(t *testing.T) {
-	// Libraries with ItemsCount=0 should NOT be preserved across a rebuild;
-	// only positive counts carry over into the prevItems lookup.
+func TestRefresh_prevItems_preserves_known_counts_only(t *testing.T) {
+	// A count that was read carries across a library-list rebuild, a zero one
+	// included; a count that was never read stays unread rather than being
+	// rebuilt as a published zero.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/media/providers":
@@ -634,7 +635,8 @@ func TestRefresh_prevItems_preserves_positive_counts_only(t *testing.T) {
 				"MediaProvider":[{"identifier":"com.plexapp.plugins.library","Feature":[
 					{"type":"content","Directory":[
 						{"title":"Movies","id":"1","type":"movie"},
-						{"title":"TV","id":"2","type":"show"}
+						{"title":"TV","id":"2","type":"show"},
+						{"title":"Music","id":"3","type":"artist"}
 					]}
 				]}]
 			}}`)
@@ -654,10 +656,12 @@ func TestRefresh_prevItems_preserves_positive_counts_only(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := New(client)
 
-	// Pre-populate: Movies has count, TV has 0
+	// Pre-populate one of each state: a read positive count, a read zero, and
+	// a section whose count has never been read.
 	srv.Libraries = []library.Library{
-		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 100},
-		{ID: "2", Name: "TV", Type: library.TypeShow, ItemsCount: 0},
+		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 100, ItemsKnown: true},
+		{ID: "2", Name: "TV", Type: library.TypeShow, ItemsCount: 0, ItemsKnown: true},
+		{ID: "3", Name: "Music", Type: library.TypeArtist},
 	}
 	srv.LastItemsRefresh = time.Now() // skip items refresh
 
@@ -669,16 +673,21 @@ func TestRefresh_prevItems_preserves_positive_counts_only(t *testing.T) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
-	// Movies should preserve its count (100 > 0)
-	if srv.Libraries[0].ItemsCount != 100 {
-		t.Errorf("Movies ItemsCount = %d, want 100 (preserved)", srv.Libraries[0].ItemsCount)
+	if len(srv.Libraries) != 3 {
+		t.Fatalf("libraries count = %d, want 3", len(srv.Libraries))
 	}
-	// TV should remain 0 (0 is not > 0, so not preserved)
-	if srv.Libraries[1].ItemsCount != 0 {
-		t.Errorf("TV ItemsCount = %d, want 0 (not preserved)", srv.Libraries[1].ItemsCount)
+	if got := srv.Libraries[0]; got.ItemsCount != 100 || !got.ItemsKnown {
+		t.Errorf("Movies = (%d, known %t), want (100, known true)", got.ItemsCount, got.ItemsKnown)
+	}
+	if got := srv.Libraries[1]; got.ItemsCount != 0 || !got.ItemsKnown {
+		t.Errorf("TV = (%d, known %t), want (0, known true) — a read zero must survive the rebuild",
+			got.ItemsCount, got.ItemsKnown)
+	}
+	if got := srv.Libraries[2]; got.ItemsKnown {
+		t.Errorf("Music = (%d, known %t), want known false for a count never read",
+			got.ItemsCount, got.ItemsKnown)
 	}
 }
-
 func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 	// When lastItemsRefresh is older than 15 minutes, item counts are refetched.
 	itemsRequested := false

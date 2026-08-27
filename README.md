@@ -156,7 +156,7 @@ Do this **only for a single-replica deployment**. Those labels are what distingu
 | --- | --- | --- | --- |
 | `plex_library_duration_milliseconds` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total duration of all items in the library (ms) |
 | `plex_library_storage_bytes` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total storage used by the library (bytes) |
-| `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Number of items in the library. `content_type` is `movies`, `episodes`, `tracks`, `photos`, or `items`. Refreshed every 15 minutes. |
+| `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Number of items in the library. `content_type` is `movies`, `episodes`, `tracks`, `photos`, or `items`. Refreshed every 15 minutes. Absent until the count is read once; a library read as empty reports `0`. |
 
 ### Session Metrics
 
@@ -209,7 +209,7 @@ Alertmanager either way. They cover:
 | `PlexAPIUnreachable` | the authenticated Plex API poll reports `plex_http_reachable=0` for 10m (often a revoked or invalid `PLEX_TOKEN`) | warning |
 | `PlexSessionPollFailing` | the `/status/sessions` poll reports `plex_session_poll_reachable=0` for 10m while the rest of the API answers, so every session metric is absent or stale | warning |
 | `PlexExporterCollectionErrors` | the `plex_exporter_errors_total` counter keeps rising for some `type` over 30m | warning |
-| `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m (a drop to exactly zero stays invisible, see the file) | warning |
+| `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m, a drop to exactly zero included | warning |
 | `PlexExporterFatalError` | the exporter logs an `ERROR`: a rejected config or token, a bind failure, a metrics-server failure, or a recovered panic | warning |
 | `PlexExporterSessionMapFull` | the session tracker is at its cap and drops new Plex sessions, so the session metrics undercount | warning |
 | `PlexExporterRefreshIncomplete` | a refresh cycle runs out of time before the Plex Pass gauges are read, so they keep serving values from an earlier cycle | warning |

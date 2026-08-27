@@ -148,19 +148,30 @@ func TestBuild_prevItems_preserved(t *testing.T) {
 						Type: "content",
 						Directories: []plexapi.ProviderDirectory{
 							{Title: "Movies", ID: "1", Type: "movie"},
+							{Title: "TV", ID: "2", Type: "show"},
+							{Title: "Music", ID: "3", Type: "artist"},
 						},
 					},
 				},
 			},
 		},
 	}
-	prevItems := map[string]int64{"1": 500, "99": 999}
+	// "2" carries a read zero, "3" is absent (never read), "99" has no section.
+	prevItems := map[string]int64{"1": 500, "2": 0, "99": 999}
 	got := Build(&providers, prevItems)
-	if len(got) != 1 {
-		t.Fatalf("Build() returned %d libs, want 1", len(got))
+	if len(got) != 3 {
+		t.Fatalf("Build() returned %d libs, want 3", len(got))
 	}
-	if got[0].ItemsCount != 500 {
-		t.Errorf("ItemsCount = %d, want 500 (from prevItems)", got[0].ItemsCount)
+	if got[0].ItemsCount != 500 || !got[0].ItemsKnown {
+		t.Errorf("Movies = (%d, known %t), want (500, known true) from prevItems", got[0].ItemsCount, got[0].ItemsKnown)
+	}
+	if got[1].ItemsCount != 0 || !got[1].ItemsKnown {
+		t.Errorf("TV = (%d, known %t), want (0, known true): a read zero is a count, not an absence",
+			got[1].ItemsCount, got[1].ItemsKnown)
+	}
+	if got[2].ItemsKnown {
+		t.Errorf("Music = (%d, known %t), want known false: absent from prevItems means never read",
+			got[2].ItemsCount, got[2].ItemsKnown)
 	}
 }
 

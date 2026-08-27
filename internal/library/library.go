@@ -39,11 +39,17 @@ const MaxLibraries = 256
 
 // Library is a Plex library (section) entry. Fields are exported
 // because consumers elsewhere in the exporter read them directly.
+//
+// ItemsCount is only meaningful when ItemsKnown is set: a library emptied to
+// exactly zero items and a library whose count was never read both hold 0, and
+// only the first may be published. The zero value is therefore "never read",
+// which is the correct state for a freshly built entry.
 type Library struct {
 	ID, Name, Type string
 	DurationTotal  int64
 	StorageTotal   int64
 	ItemsCount     int64
+	ItemsKnown     bool
 }
 
 // IsType reports whether t is a library type the exporter emits
@@ -87,7 +93,9 @@ func isCountableSection(libType, id string) bool {
 }
 
 // Build extracts library entries from the media providers response,
-// preserving existing item counts from prevItems.
+// preserving existing item counts from prevItems. A section absent from
+// prevItems has never had its count read, so it comes back with ItemsKnown
+// false rather than a count of zero.
 func Build(providers *plexapi.MediaProviders, prevItems map[string]int64) []Library {
 	var libs []Library
 	for _, p := range providers.MediaProviders {
@@ -99,10 +107,11 @@ func Build(providers *plexapi.MediaProviders, prevItems map[string]int64) []Libr
 				continue
 			}
 			for _, d := range f.Directories {
+				count, known := prevItems[d.ID]
 				libs = appendLibrary(libs, Library{
 					ID: d.ID, Name: d.Title, Type: d.Type,
 					DurationTotal: d.DurationTotal, StorageTotal: d.StorageTotal,
-					ItemsCount: prevItems[d.ID],
+					ItemsCount: count, ItemsKnown: known,
 				})
 			}
 		}
