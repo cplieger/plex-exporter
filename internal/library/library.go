@@ -108,7 +108,7 @@ func Build(providers *plexapi.MediaProviders, prevItems map[string]int64) []Libr
 			}
 			for _, d := range f.Directories {
 				count, known := prevItems[d.ID]
-				libs = appendLibrary(libs, Library{
+				libs = appendLibrary(libs, &Library{
 					ID: d.ID, Name: d.Title, Type: d.Type,
 					DurationTotal: d.DurationTotal, StorageTotal: d.StorageTotal,
 					ItemsCount: count, ItemsKnown: known,
@@ -124,14 +124,14 @@ func Build(providers *plexapi.MediaProviders, prevItems map[string]int64) []Libr
 // unchanged) slice. Centralising the countable + cardinality-cap checks keeps
 // Build's nesting shallow and the cap in one place. Building a candidate
 // Library for a non-countable directory is harmless: the value is discarded.
-func appendLibrary(libs []Library, lib Library) []Library {
+func appendLibrary(libs []Library, lib *Library) []Library {
 	if !isCountableSection(lib.Type, lib.ID) {
 		return libs
 	}
 	if len(libs) >= MaxLibraries {
 		return libs
 	}
-	return append(libs, lib)
+	return append(libs, *lib)
 }
 
 // ItemCountTypes returns the Plex metadata-type IDs to try in order for

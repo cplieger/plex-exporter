@@ -688,6 +688,7 @@ func TestRefresh_prevItems_preserves_known_counts_only(t *testing.T) {
 			got.ItemsCount, got.ItemsKnown)
 	}
 }
+
 func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 	// When lastItemsRefresh is older than 15 minutes, item counts are refetched.
 	itemsRequested := false

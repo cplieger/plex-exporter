@@ -222,7 +222,7 @@ by whatever labels your Alertmanager uses.
 `PlexExporterTargetDown` and `PlexExporterTargetAbsent` are the two rules that
 must carry a `job` matcher, because they ask whether this exporter is visible at
 all. Set both to whatever your scrape config calls the exporter, and keep the
-matcher exact rather than a regex: a regex asks whether *any* matching target is
+matcher exact rather than a regex: a regex asks whether _any_ matching target is
 up, so one healthy replica masks a failed one, and it leaves the `absent()`
 result with no label to route on.
 
