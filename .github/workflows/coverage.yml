@@ -27,4 +27,4 @@ jobs:
     # NOTE: pin this @SHA to the ci release tag that first contains
     # coverage.yaml when cutting that tag (see ci.md "Updating and propagating").
     # Renovate then tracks the `# v2` comment and bumps the digest thereafter.
-    uses: cplieger/ci/.github/workflows/coverage.yaml@65ffdc3c93593576520404ce66cc82bfe20b53b6 # v2
+    uses: cplieger/ci/.github/workflows/coverage.yaml@fa470ff05e7d9139566788951ec04883a69cead6 # v2
