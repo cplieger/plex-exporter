@@ -174,3 +174,25 @@ formatters:
     # Generated files are auto-excluded (default generated: lax).
     paths:
       - node_modules
+
+# Report every finding, rather than the first few of each kind.
+#
+# Both limits below default to a non-zero value (max-same-issues 3,
+# max-issues-per-linter 50), and the deduplication is keyed on the issue's
+# TEXT alone — no rule, file or position component. gosec's taint analyzers
+# give every finding of a rule the rule's static description, so the wrapper
+# builds one identical string ("G702: Command injection via taint analysis")
+# for every site and the processor keeps three of them.
+#
+# Measured 2026-08-27: a corpus where standalone gosec reported 15 G702
+# findings reported 3 through golangci-lint, and which 3 survived depended on
+# processing order — which is also what made a `//nolint:gosec` directive on a
+# taint finding fail `nolintlint` as "unused" on some runs and not others.
+# A security scanner silently dropping findings is the wrong default here, and
+# the flicker it causes costs more CI rounds than the noise it saves.
+#
+# `golangci-lint run -v` logs "N/M issues with text ... were hidden" when a
+# limit bites, which is the direct way to check this rather than inferring it.
+issues:
+  max-same-issues: 0
+  max-issues-per-linter: 0
