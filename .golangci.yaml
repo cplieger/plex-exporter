@@ -58,11 +58,12 @@ linters:
       # Cross-file duplication was the one quality axis nothing measured. The
       # tool's default of 150 tokens over-fires on idiomatic Go (error-handling
       # chains, flat switch bodies); 200 was chosen by measurement, not taste.
-      # VALIDATED AGAINST KNOWN FINDINGS before being enabled, which the fleet's
-      # vacuous-gate rule requires: at 200 with tests exempt a sweep of 37 Go
-      # repos reported exactly 2 findings, both the insertLines/deleteLines pair
-      # in web-terminal-engine/vt/csi.go. Those were resolved by extracting the
-      # shared prologue (prepareLineShift), and the fleet then measured clean.
+      # VALIDATED AGAINST KNOWN FINDINGS before being enabled, because a gate
+      # never seen to fire may not be gating anything: at 200 with tests exempt
+      # a sweep of 37 Go repos reported exactly 2 findings, both the
+      # insertLines/deleteLines pair in web-terminal-engine/vt/csi.go. Those
+      # were resolved by extracting the shared prologue (prepareLineShift), and
+      # the sweep then measured clean.
       # So this gate now guards against future drift rather than clearing a
       # backlog. Duplication is genuinely rare here; do not read a green result
       # as the linter being broken. Tests are exempt below for the same reason
