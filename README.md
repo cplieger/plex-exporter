@@ -9,6 +9,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/plex-exporter/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/plex-exporter)
 [![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/plex-exporter/releases)
 
+<!-- hub-overview BEGIN -->
 See what your Plex server is doing in Grafana: sessions, libraries, bandwidth, transcoding.
 
 ## What it does
@@ -41,6 +42,7 @@ Connects to your Plex Media Server and exposes metrics (active sessions, library
 - **Library item counts are cached.** Episode, track, and item
   counts are refreshed every 15 minutes to avoid hammering the
   Plex API. Counts may lag slightly after large library scans.
+<!-- hub-overview END -->
 
 ## Quick start
 
