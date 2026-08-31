@@ -10,7 +10,7 @@ require (
 	github.com/cplieger/slogx v1.6.3
 	github.com/cplieger/webhttp/v2 v2.0.2
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.3
 	golang.org/x/sync v0.22.0
 	pgregory.net/rapid v1.3.0
 )
