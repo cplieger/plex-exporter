@@ -1,3 +1,10 @@
+# Synced from cplieger/ci/.github/workflow-templates/codeql.yml — DO NOT EDIT.
+# CodeQL static analysis. Uploads SARIF to the repo's Security tab and backs the
+# code-scanning branch-protection gate.
+#
+# This template predates the sync-header convention (2026-06-02) and was one of
+# two that never got one backfilled, so nothing warned an editor that the next
+# chore(sync) would clobber a local change. Edit it HERE.
 name: CodeQL
 
 on:
