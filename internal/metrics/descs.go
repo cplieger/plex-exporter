@@ -6,8 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Label slice vars shared across descriptors. Order matters for the
-// Prometheus wire contract (inviolate contract #6/#7); do not re-order.
+// Order matters for the Prometheus wire contract; do not re-order.
 var (
 	SrvLabels  = []string{LabelServer, LabelServerID}
 	LibLabels  = []string{LabelServer, LabelServerID, "library_type", "library", "library_id"}
@@ -21,8 +20,8 @@ var (
 	}
 )
 
-// Canonical label values for Prometheus metrics (inviolate contract #6).
-// All packages must reference these instead of local string literals.
+// Canonical label values for Prometheus metrics. All packages must
+// reference these instead of local string literals.
 const (
 	ValUnknown   = "unknown"
 	ValNone      = "none"

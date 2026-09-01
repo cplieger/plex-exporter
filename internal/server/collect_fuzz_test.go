@@ -18,7 +18,7 @@ func FuzzTruncLabel(f *testing.F) {
 		if utf8.ValidString(input) && !utf8.ValidString(got) {
 			t.Fatalf("truncLabel(%q) produced invalid UTF-8 %q from valid input", input, got)
 		}
-		// Idempotent: an already-bounded label must pass through unchanged.
+		// An already-bounded label must pass through unchanged.
 		if got2 := truncLabel(got); got2 != got {
 			t.Fatalf("truncLabel not idempotent: truncLabel(%q)=%q, truncLabel(%q)=%q",
 				input, got, got, got2)

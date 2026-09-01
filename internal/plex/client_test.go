@@ -16,12 +16,9 @@ import (
 	"github.com/cplieger/plexapi/v2"
 )
 
-// The HTTP transport (retry policy, redirect refusal, path guard, body
-// caps, status mapping) is github.com/cplieger/plexapi/v2 and is tested there.
-// These tests pin the exporter's adapter: construction (CA path handling),
-// the retry-counter metric, the error re-exports the startup classifier
-// keys on, and the library's CountSectionItems reached through the
-// embedded client.
+// The HTTP transport (retry, redirects, status mapping) is
+// github.com/cplieger/plexapi/v2 and is tested there; these tests
+// pin only the exporter's adapter layer on top of it.
 
 func TestNewClient_invalid_url_returns_error(t *testing.T) {
 	for _, u := range []string{"ftp://plex:32400", "http://", "://bad"} {
@@ -57,8 +54,6 @@ func TestNewClient_ca_cert_path_invalid_pem_errors(t *testing.T) {
 	}
 }
 
-// TestNewClient_ca_cert_pins_tls proves the caCertPath wiring end-to-end: a
-// TLS server whose self-signed cert is written to disk and pinned verifies.
 func TestNewClient_ca_cert_pins_tls(t *testing.T) {
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"MediaContainer":{"friendlyName":"pinned"}}`))
@@ -108,9 +103,6 @@ func TestClient_Retries_nil_safe(t *testing.T) {
 	}
 }
 
-// TestGet_populates_StatusError pins error transparency through the
-// adapter: a non-200 surfaces as the library's StatusError, the type
-// main.go's fatal-vs-transient startup classifier matches.
 func TestGet_populates_StatusError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -125,7 +117,6 @@ func TestGet_populates_StatusError(t *testing.T) {
 	if !errors.As(got, &statusErr) || statusErr.Code != http.StatusUnauthorized {
 		t.Errorf("err = %v, want *plexapi.StatusError 401", got)
 	}
-	// And the lib's classifier agrees it is fatal.
 	if !plexapi.IsConfigError(got) {
 		t.Error("401 should classify as a config error")
 	}
@@ -143,10 +134,6 @@ func TestGet_not_found_is_ErrNotFound(t *testing.T) {
 	}
 }
 
-// The CountSectionItems tests exercise the library method through the
-// adapter's embedded client — the app's former GetContainerSize rename
-// wrapper was inlined away (callers convert the section id with
-// plexapi.RatingKey at the call site).
 func TestCountSectionItems(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -190,17 +177,13 @@ func TestCountSectionItems_rejects_non_numeric_section(t *testing.T) {
 	}
 }
 
-// TestGet_timeout_bounds_stalled_request pins the no-deadline fallback: a
-// caller without a context deadline is still bounded (the adapter's 30s
-// default, shrunk here via a caller deadline to keep the test fast — the
-// contract under test is that a stall terminates rather than hangs).
 func TestGet_timeout_bounds_stalled_request(t *testing.T) {
 	release := make(chan struct{})
 	ts := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		<-release
 	}))
 	defer ts.Close()
-	defer close(release) // LIFO: unblock the handler BEFORE ts.Close waits on it
+	defer close(release) // must unblock the handler before ts.Close, which waits on it
 	c, err := NewClientFromHTTP(ts.URL, "tok", ts.Client())
 	if err != nil {
 		t.Fatal(err)

@@ -64,8 +64,6 @@ func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
 }
 
 func TestRefreshLibraryItems_writeback_boundary(t *testing.T) {
-	// Refreshed counts are written back to the matching sections, by index and
-	// ID, for every library in the list.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/library/sections/1/all"):
@@ -100,8 +98,6 @@ func TestRefreshLibraryItems_writeback_boundary(t *testing.T) {
 }
 
 func TestRefreshLibraryItems_no_libraries_is_noop(t *testing.T) {
-	// With no libraries the worker pool is empty, so refreshLibraryItems makes
-	// no HTTP calls and leaves the (empty) library list untouched.
 	var hit bool
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hit = true
@@ -159,7 +155,6 @@ func TestRefreshLibraryItems_artist_fallback_to_type7(t *testing.T) {
 }
 
 func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
-	// When the type=10 (tracks) query errors, the count falls back to type=7.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/library/sections/1/all" {
 			switch r.URL.Query().Get("type") {
@@ -194,9 +189,6 @@ func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
 }
 
 func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testing.T) {
-	// A zero from a non-final type in the chain is not the answer for the
-	// library: type=10 (tracks) reporting 0 falls through to type=7, which is
-	// what library.ItemCountTypes' artist chain exists for.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/library/sections/1/all" {
 			switch r.URL.Query().Get("type") {
@@ -232,7 +224,6 @@ func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testin
 }
 
 func TestRefreshLibraryItems_artist_type7_returns_zero_falls_to_default(t *testing.T) {
-	// When both type=10 and type=7 return 0, should fall through to default path.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/library/sections/1/all" {
 			switch r.URL.Query().Get("type") {
@@ -261,14 +252,12 @@ func TestRefreshLibraryItems_artist_type7_returns_zero_falls_to_default(t *testi
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
-	// Both type queries returned 0, should fall through to default path
 	if srv.Libraries[0].ItemsCount != 99 {
 		t.Errorf("Music ItemsCount = %d, want 99 (both type queries returned 0, default path)", srv.Libraries[0].ItemsCount)
 	}
 }
 
 func TestRefreshLibraryItems_artist_both_fail_uses_default_path(t *testing.T) {
-	// When both type=10 and type=7 fail for artist, should fall through to default path.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/library/sections/1/all" {
 			switch r.URL.Query().Get("type") {

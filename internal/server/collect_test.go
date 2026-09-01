@@ -19,12 +19,9 @@ import (
 // testMeta constructs a plexapi.Item from JSON to avoid anonymous
 // struct tag mismatches in test literals.
 //
-// It takes testing.TB rather than *testing.T so benchmarks build their
-// fixtures through the same decode the production wire path uses. A
-// hand-written literal is what broke BenchmarkCollect: Item.Player,
-// Item.Session and Item.User became pointers when the duplicate wire
-// structs were deleted, and a literal that assigns through them compiles
-// and then nil-derefs.
+// It takes testing.TB so benchmarks share the same decode path: a
+// hand-written literal breaks when Item.Player/Session/User become
+// pointers, since assigning through them compiles and then nil-derefs.
 func testMeta(tb testing.TB, jsonStr string) plexapi.Item {
 	tb.Helper()
 	var m plexapi.Item
@@ -34,7 +31,6 @@ func testMeta(tb testing.TB, jsonStr string) plexapi.Item {
 	return m
 }
 
-// drainMetrics collects all metrics from a closed channel.
 func drainMetrics(ch <-chan prometheus.Metric) []prometheus.Metric {
 	var result []prometheus.Metric
 	for m := range ch {
@@ -43,8 +39,6 @@ func drainMetrics(ch <-chan prometheus.Metric) []prometheus.Metric {
 	return result
 }
 
-// collectByDesc collects metrics from a channel and groups them by
-// descriptor string.
 func collectByDesc(ch <-chan prometheus.Metric) map[string][]prometheus.Metric {
 	result := make(map[string][]prometheus.Metric)
 	for m := range ch {
@@ -54,12 +48,8 @@ func collectByDesc(ch <-chan prometheus.Metric) map[string][]prometheus.Metric {
 	return result
 }
 
-// descKey returns the Desc().String() for a given prometheus.Desc for
-// use as map key.
 func descKey(d *prometheus.Desc) string { return d.String() }
 
-// metricSnapshot extracts label pairs and the numeric value from a
-// prometheus.Metric.
 func metricSnapshot(t *testing.T, m prometheus.Metric) (labels map[string]string, value float64) {
 	t.Helper()
 	d := &dto.Metric{}
@@ -206,25 +196,21 @@ func TestTruncLabel(t *testing.T) {
 		{"short ascii passthrough", "hello", "hello"},
 		{"exact max length passthrough", strings.Repeat("a", maxLabelLen), strings.Repeat("a", maxLabelLen)},
 		{"one byte over max truncates", strings.Repeat("a", maxLabelLen+1), strings.Repeat("a", maxLabelLen)},
-		// 127 ASCII + 2-byte é: boundary at byte 128 lands mid-é.
 		{
 			"2-byte codepoint straddling boundary is dropped",
 			strings.Repeat("a", 127) + "é" + "xx",
 			strings.Repeat("a", 127),
 		},
-		// 126 ASCII + 3-byte € (U+20AC): boundary at byte 128 lands mid-€.
 		{
 			"3-byte codepoint straddling boundary is dropped",
 			strings.Repeat("a", 126) + "€" + "zz",
 			strings.Repeat("a", 126),
 		},
-		// 125 ASCII + 4-byte 😀 (U+1F600): boundary at byte 128 lands mid-emoji.
 		{
 			"4-byte codepoint straddling boundary is dropped",
 			strings.Repeat("a", 125) + "😀" + "zz",
 			strings.Repeat("a", 125),
 		},
-		// 126 ASCII + 2-byte é ends at byte 128: keep all 128.
 		{
 			"codepoint ending exactly at boundary is kept",
 			strings.Repeat("a", 126) + "é" + "zz",

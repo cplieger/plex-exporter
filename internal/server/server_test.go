@@ -41,7 +41,7 @@ func TestRefreshResources_updates_host_metrics(t *testing.T) {
 	mem := srv.HostMem
 	srv.mu.Unlock()
 
-	// API returns percentages (0-100), code divides by 100 to get ratios
+	// API returns percentages (0-100); code divides by 100 to get ratios.
 	if cpu != 0.42 {
 		t.Errorf("hostCPU = %v, want 0.42", cpu)
 	}
@@ -182,7 +182,6 @@ func TestRefreshBandwidth(t *testing.T) {
 			client := plextest.NewTestClientFromServer(t, ts)
 			srv := New(client)
 			srv.LastBandwidthAt = tc.initAt
-			// For the 404 case, pre-set TransmitBytes to verify it's unchanged.
 			if tc.json == "" {
 				srv.TransmitBytes = 999
 			}
@@ -263,7 +262,6 @@ func TestRefresh_populates_server_state(t *testing.T) {
 	if srv.ActiveTranscodes != 2 {
 		t.Errorf("activeTranscodes = %d, want 2", srv.ActiveTranscodes)
 	}
-	// Should have 2 libraries (movie + show), not playlist
 	if len(srv.Libraries) != 2 {
 		t.Errorf("libraries count = %d, want 2", len(srv.Libraries))
 	}
@@ -300,11 +298,9 @@ func TestRefresh_preserves_item_counts(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := New(client)
 
-	// Pre-populate with item counts
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 500, ItemsKnown: true},
 	}
-	// Set lastItemsRefresh to recent so it won't re-fetch items
 	srv.LastItemsRefresh = time.Now()
 
 	err := srv.Refresh(t.Context())
@@ -369,7 +365,6 @@ func TestRefresh_filters_non_library_providers(t *testing.T) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
-	// Only 1 library: Movies from com.plexapp.plugins.library content feature
 	if len(srv.Libraries) != 1 {
 		t.Errorf("libraries count = %d, want 1", len(srv.Libraries))
 	}
@@ -392,8 +387,6 @@ func TestRefresh_provider_error_returns_error(t *testing.T) {
 }
 
 func TestRefresh_server_info_error_returns_error(t *testing.T) {
-	// When the "/" server-info fetch fails after providers succeed, Refresh
-	// must return the wrapped error.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/media/providers":
@@ -500,7 +493,6 @@ func TestRecordError_unknown_type_dropped(t *testing.T) {
 
 func TestRecordError_nil_map_initialized(t *testing.T) {
 	srv := &Server{Sessions: sessions.NewTracker()}
-	// errorCounts is nil — recordError should initialize it
 	srv.RecordError("refresh")
 
 	srv.mu.Lock()
@@ -572,7 +564,6 @@ func TestSnapshot_false_booleans(t *testing.T) {
 }
 
 func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
-	// Verifies that transmitBytes accumulates across multiple refreshBandwidth calls.
 	callCount := 0
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/statistics/bandwidth" {
@@ -598,7 +589,6 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	srv := New(client)
 	srv.LastBandwidthAt = 1000
 
-	// First call: at=2000 (100 bytes)
 	srv.refreshBandwidth(t.Context())
 
 	srv.mu.Lock()
@@ -610,7 +600,6 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	}
 	srv.mu.Unlock()
 
-	// Second call: at=2000 already seen, only at=3000 (200 bytes) is new
 	srv.refreshBandwidth(t.Context())
 
 	srv.mu.Lock()
@@ -624,9 +613,9 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 }
 
 func TestRefresh_prevItems_preserves_known_counts_only(t *testing.T) {
-	// A count that was read carries across a library-list rebuild, a zero one
-	// included; a count that was never read stays unread rather than being
-	// rebuilt as a published zero.
+	// A read count carries across a library-list rebuild, a zero one
+	// included; an unread count stays unread rather than becoming a
+	// published zero.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/media/providers":
@@ -656,14 +645,12 @@ func TestRefresh_prevItems_preserves_known_counts_only(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := New(client)
 
-	// Pre-populate one of each state: a read positive count, a read zero, and
-	// a section whose count has never been read.
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 100, ItemsKnown: true},
 		{ID: "2", Name: "TV", Type: library.TypeShow, ItemsCount: 0, ItemsKnown: true},
 		{ID: "3", Name: "Music", Type: library.TypeArtist},
 	}
-	srv.LastItemsRefresh = time.Now() // skip items refresh
+	srv.LastItemsRefresh = time.Now()
 
 	err := srv.Refresh(t.Context())
 	if err != nil {
@@ -690,7 +677,6 @@ func TestRefresh_prevItems_preserves_known_counts_only(t *testing.T) {
 }
 
 func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
-	// When lastItemsRefresh is older than 15 minutes, item counts are refetched.
 	itemsRequested := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -723,7 +709,6 @@ func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := New(client)
-	// Set lastItemsRefresh to 20 minutes ago — should trigger refresh
 	srv.LastItemsRefresh = time.Now().Add(-20 * time.Minute)
 
 	err := srv.Refresh(t.Context())
@@ -737,7 +722,6 @@ func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 }
 
 func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
-	// When lastItemsRefresh is recent, items should NOT be refreshed.
 	itemsRequested := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -770,7 +754,6 @@ func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
 
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := New(client)
-	// Set lastItemsRefresh to 5 minutes ago — should NOT trigger refresh
 	srv.LastItemsRefresh = time.Now().Add(-5 * time.Minute)
 
 	err := srv.Refresh(t.Context())

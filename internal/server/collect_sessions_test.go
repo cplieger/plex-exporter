@@ -222,10 +222,6 @@ func TestCollectSessionsMultipleSessions(t *testing.T) {
 }
 
 func TestCollectSessions_stream_labels_from_media(t *testing.T) {
-	// Verifies stream_type, stream_resolution, and stream_file_resolution
-	// labels are populated from the live and file Media fields, and that the
-	// plex_session_bitrate_kbps gauge matches Media[0].Bitrate (the bitrate
-	// dimension that replaced the former stream_bitrate label).
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{
 		"Player":{"device":"Chrome","product":"Plex Web","local":false},
@@ -263,7 +259,6 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 
 	labels, _ := metricSnapshot(t, playMetrics[0])
 
-	// Verify stream labels derived from meta.Media
 	if labels["stream_type"] != "transcode" {
 		t.Errorf("stream_type = %q, want transcode", labels["stream_type"])
 	}
@@ -274,11 +269,9 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 	if _, hasOldLabel := labels["stream_bitrate"]; hasOldLabel {
 		t.Errorf("stream_bitrate label must not be present (migrated to plex_session_bitrate_kbps gauge)")
 	}
-	// Verify file resolution from mediaMeta.Media
 	if labels["stream_file_resolution"] != "1080" {
 		t.Errorf("stream_file_resolution = %q, want 1080", labels["stream_file_resolution"])
 	}
-	// Verify other labels
 	if labels["transcode_type"] != "video" {
 		t.Errorf("transcode_type = %q, want video", labels["transcode_type"])
 	}
@@ -295,7 +288,6 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 		t.Errorf("user = %q, want testuser", labels["user"])
 	}
 
-	// Verify plex_session_bitrate_kbps gauge value matches Media[0].Bitrate.
 	bitrateMetrics := byDesc[descKey(metrics.DescSessionBitrate)]
 	if len(bitrateMetrics) != 1 {
 		t.Fatalf("expected 1 session_bitrate metric, got %d", len(bitrateMetrics))
@@ -307,10 +299,8 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 }
 
 func TestCollectSessions_no_media_uses_defaults(t *testing.T) {
-	// When meta.Media is empty, stream_type should be "unknown" and
-	// resolution empty. When mediaMeta.Media is empty, file_resolution empty.
 	// No plex_session_bitrate_kbps sample is emitted for a zero-bitrate
-	// session (prevents spurious series for fully-idle sessions).
+	// session — prevents spurious series for fully-idle sessions.
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{
 		"Player":{"device":"TV","local":false},
@@ -355,14 +345,12 @@ func TestCollectSessions_no_media_uses_defaults(t *testing.T) {
 		t.Errorf("stream_file_resolution = %q, want empty (no mediaMeta media)", labels["stream_file_resolution"])
 	}
 
-	// With no Media, no bitrate sample should be emitted at all.
 	if got := len(byDesc[descKey(metrics.DescSessionBitrate)]); got != 0 {
 		t.Errorf("expected 0 session_bitrate metrics when Media is empty, got %d", got)
 	}
 }
 
 func TestCollectSessions_local_true_label(t *testing.T) {
-	// Verifies the local label is "true" when Player.Local is true.
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{
 		"Player":{"device":"TV","local":true},
@@ -398,8 +386,6 @@ func TestCollectSessions_local_true_label(t *testing.T) {
 }
 
 func TestCollectSessions_library_lookup_sets_labels(t *testing.T) {
-	// When a session has no libName it is resolved from the libs list;
-	// when it already HAS a libName that value is kept, not overridden.
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{"Player":{"device":"TV"},"User":{"title":"user1"}}`)
 
@@ -461,8 +447,6 @@ func TestCollectSessions_library_lookup_sets_labels(t *testing.T) {
 }
 
 func TestCollectSessions_bandwidth_only_when_positive(t *testing.T) {
-	// Session with bandwidth=0 should NOT emit session_bandwidth metric.
-	// Session with bandwidth>0 should emit with correct value.
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{
 		"Player":{"device":"TV"},
@@ -494,7 +478,7 @@ func TestCollectSessions_bandwidth_only_when_positive(t *testing.T) {
 }
 
 func TestCollectSessions_play_seconds_stopped_uses_prev(t *testing.T) {
-	// A stopped session should use prevPlayedTime, not add time.Since(playStarted).
+	// A stopped session must use prevPlayedTime, not time.Since(playStarted).
 	tracker := sessions.NewTracker()
 	meta := testMeta(t, `{"Player":{"device":"TV"},"User":{"title":"user1"}}`)
 	mediaMeta := testMeta(t, `{"type":"movie","title":"Stopped Movie"}`)

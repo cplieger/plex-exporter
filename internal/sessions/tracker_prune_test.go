@@ -26,7 +26,6 @@ func TestTrackerPrune(t *testing.T) {
 		LastUpdate: time.Now().Add(-2 * sessionTimeout),
 	}
 	tracker.Sessions["playing_stale"] = Session{
-		// Non-stopped but silent longer than staleSessionTimeout — orphaned.
 		State:      StatePlaying,
 		LastUpdate: time.Now().Add(-2 * staleSessionTimeout),
 	}
@@ -65,12 +64,12 @@ func TestTrackerPrune_stale_boundary(t *testing.T) {
 	tracker := NewTracker()
 
 	tracker.mu.Lock()
-	// Well under the threshold — should be kept.
+	// Under the threshold — kept.
 	tracker.Sessions["under_threshold"] = Session{
 		State:      StatePlaying,
 		LastUpdate: time.Now().Add(-staleSessionTimeout + time.Minute),
 	}
-	// Just past the threshold — should be pruned.
+	// Past the threshold — pruned.
 	tracker.Sessions["past_threshold"] = Session{
 		State:      StatePlaying,
 		LastUpdate: time.Now().Add(-staleSessionTimeout - time.Second),
@@ -97,13 +96,11 @@ func TestTrackerPrune_stale_boundary(t *testing.T) {
 func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
 	tracker := NewTracker()
 
-	// Session stopped just barely within the timeout — should be kept
 	tracker.mu.Lock()
 	tracker.Sessions["barely_within"] = Session{
 		State:      StateStopped,
 		LastUpdate: time.Now().Add(-sessionTimeout + 100*time.Millisecond),
 	}
-	// Session stopped well past the timeout — should be pruned
 	tracker.Sessions["well_past"] = Session{
 		State:      StateStopped,
 		LastUpdate: time.Now().Add(-sessionTimeout - time.Second),
