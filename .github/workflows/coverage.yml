@@ -26,5 +26,10 @@ jobs:
       contents: write
     # NOTE: pin this @SHA to the ci release tag that first contains
     # coverage.yaml when cutting that tag (see ci.md "Updating and propagating").
-    # Renovate then tracks the `# v2` comment and bumps the digest thereafter.
+    # Thereafter repo-sync is the SINGLE WRITER of this digest in every consumer:
+    # each ci release propagates as an auto-merging chore(sync) PR with the new
+    # digest already baked in. Renovate does NOT bump it there — cplieger/.github's
+    # preset disables the github-actions manager on all six synced workflow
+    # filenames, so sync cannot be raced. Only in cplieger/ci itself (and two other
+    # named exclusions) does Renovate track this pin.
     uses: cplieger/ci/.github/workflows/coverage.yaml@5ba93f366541ece117eaed5d1490e0d4c4bc5fd0 # v2
