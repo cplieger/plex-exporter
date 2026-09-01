@@ -7,9 +7,8 @@ import (
 	"github.com/cplieger/plexapi/v2"
 )
 
-// TranscodeKind classifies a transcode session by audio/video decision
-// and codec changes. Return values are one of ValVideo, ValAudio,
-// ValBoth, or ValNone.
+// TranscodeKind classifies a transcode session by audio/video decision and
+// codec changes. Returns ValVideo, ValAudio, ValBoth, or ValNone.
 func TranscodeKind(ts *plexapi.TranscodeSession) string {
 	vDec := strings.ToLower(strings.TrimSpace(ts.VideoDecision))
 	aDec := strings.ToLower(strings.TrimSpace(ts.AudioDecision))
@@ -33,8 +32,8 @@ func TranscodeKind(ts *plexapi.TranscodeSession) string {
 	}
 }
 
-// subtitleDecisionMap maps Plex wire-protocol subtitle decision strings
-// to canonical Prometheus label values.
+// subtitleDecisionMap maps Plex wire-protocol subtitle decisions to
+// canonical Prometheus label values.
 const (
 	wireSubBurnIn      = "burn-in"
 	wireSubCopying     = "copying"
@@ -51,19 +50,18 @@ var subtitleDecisionMap = map[string]string{
 }
 
 // SubtitleAction classifies a transcode session's subtitle handling.
-// Return values are one of ValBurn, ValCopy, ValTranscode, ValNone, or
-// "other".
+// Returns ValBurn, ValCopy, ValTranscode, ValNone, or FallbackOther.
 func SubtitleAction(ts *plexapi.TranscodeSession) string {
 	sd := strings.ToLower(strings.TrimSpace(ts.SubtitleDecision))
 	if v, ok := subtitleDecisionMap[sd]; ok {
 		return v
 	}
 	if sd == "" {
-		// Plex sets an explicit subtitleDecision (burn/copy/transcode) whenever
-		// a subtitle stream is part of the transcode, so an empty decision means
-		// no subtitle is being handled. Report none rather than guessing burn
-		// from a video transcode or copy from an srt container; the reference
-		// consumer (Tautulli) likewise treats an empty decision as none.
+		// Plex always sets an explicit subtitleDecision when a subtitle
+		// stream is part of the transcode, so empty means none is being
+		// handled; guessing from the video decision would be wrong for a
+		// video transcode with no subtitle stream. Tautulli treats an
+		// empty decision as none too.
 		return metrics.ValNone
 	}
 	return metrics.FallbackOther

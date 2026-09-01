@@ -16,10 +16,8 @@ import (
 )
 
 // TestRefreshSessions_basic_playing_session carries the live /status/sessions
-// wire shape: Plex quotes Media.id, Part.id and Stream.id on this endpoint and
-// sends them bare on /library/metadata/<key>, so both forms appear below. The
-// fixtures used to omit the ids entirely, which is why the app decoded every
-// active session into an error for three days without a test noticing.
+// wire shape: Plex quotes Media.id, Part.id and Stream.id on this endpoint but
+// sends them bare on /library/metadata/<key>, so both forms appear below.
 func TestRefreshSessions_basic_playing_session(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -140,14 +138,9 @@ func TestRefreshSessions_with_transcode_session(t *testing.T) {
 	if s.State != sessions.StatePlaying {
 		t.Errorf("state = %q, want playing", s.State)
 	}
-	// TranscodeKind: videoDecision=transcode, audioDecision=copy,
-	// sourceVideoCodec=hevc, videoCodec=h264 → video is transcoding.
-	// audioDecision=copy, sourceAudioCodec=eac3, audioCodec=eac3 → no audio transcode.
-	// Result: "video"
 	if s.TranscodeType != metrics.ValVideo {
 		t.Errorf("transcodeType = %q, want %q", s.TranscodeType, metrics.ValVideo)
 	}
-	// SubtitleAction: subtitleDecision=burn → "burn"
 	if s.SubtitleAction != metrics.ValBurn {
 		t.Errorf("subtitleAction = %q, want %q", s.SubtitleAction, metrics.ValBurn)
 	}
@@ -234,7 +227,6 @@ func TestRefreshSessions_no_transcode_session(t *testing.T) {
 
 	snap := srv.Sessions.SnapshotSessions()
 	s := snap["s4"]
-	// No TranscodeSession → TranscodeType should remain default (empty)
 	if s.TranscodeType != "" {
 		t.Errorf("transcodeType = %q, want empty (no transcode session)", s.TranscodeType)
 	}
@@ -263,8 +255,6 @@ func TestRefreshSessions_empty_response(t *testing.T) {
 	if len(snap) != 0 {
 		t.Errorf("expected 0 sessions, got %d", len(snap))
 	}
-	// A healthy "no one watching" poll must read reachable=1: the success
-	// set is placed before the empty-sessions early return.
 	srv.mu.Lock()
 	reachable := srv.SessionsReachable
 	srv.mu.Unlock()
@@ -298,7 +288,6 @@ func TestRefreshSessions_invalid_rating_key_skipped(t *testing.T) {
 	if len(snap) != 0 {
 		t.Errorf("expected 0 sessions (invalid rating key skipped), got %d", len(snap))
 	}
-	// Should have recorded an error
 	srv.mu.Lock()
 	errCount := srv.ErrorCounts["invalid_rating_key"]
 	srv.mu.Unlock()
@@ -359,7 +348,6 @@ func TestRefreshSessions_metadata_fetch_failure_still_updates_tracker(t *testing
 
 	srv.RefreshSessions(t.Context())
 
-	// Session should still be tracked even if metadata fetch fails
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
 		t.Fatalf("expected 1 session, got %d", len(snap))
@@ -518,10 +506,10 @@ func TestRefreshSessions_vanished_session_marked_stopped(t *testing.T) {
 		t.Fatalf("after poll 1: s1 state = %q, want playing", snap["s1"].State)
 	}
 
-	// Poll 2: s1 is absent, so RefreshSessions must reconcile the vanished
-	// stream to StateStopped (the MarkAbsentStopped path) so it lands on the
-	// 60s stopped-prune timer instead of lingering as playing until the 5m
-	// stale timeout. It stays tracked because RefreshSessions does not prune.
+	// Poll 2: s1 is absent; RefreshSessions must reconcile it to StateStopped
+	// (the MarkAbsentStopped path) so it lands on the 60s stopped-prune timer
+	// instead of the 5m stale-orphan path. It stays tracked because
+	// RefreshSessions itself does not prune.
 	srv.RefreshSessions(t.Context())
 	snap = srv.Sessions.SnapshotSessions()
 	s, ok := snap["s1"]
@@ -666,7 +654,6 @@ func TestRefreshSessions_unresolved_library_refetches_metadata(t *testing.T) {
 	client := plextest.NewTestClientFromServer(t, ts)
 	srv := New(client)
 	// Degraded start: the library list is not known yet.
-
 	srv.RefreshSessions(t.Context())
 	snap := srv.Sessions.SnapshotSessions()
 	if lib := snap["s1"].LibName; lib != "" {

@@ -7,12 +7,9 @@ import (
 	"pgregory.net/rapid"
 )
 
-// TestNormalize_bounded_to_allowlist proves the cardinality-bounding
-// invariant LabelAllowlist.Normalize exists to enforce: for ANY input
-// (including attacker-controlled strings from a compromised Plex server) the
-// result is always either an allowlisted key or the Fallback, and the mapping
-// is idempotent. The example tests in internal/server check only a handful of
-// inputs; this checks the bound holds for arbitrary input.
+// For any input, including attacker-controlled strings from a compromised
+// Plex server, Normalize must return an allowlisted value or the Fallback,
+// and the mapping must be idempotent.
 func TestNormalize_bounded_to_allowlist(t *testing.T) {
 	lists := []*metrics.LabelAllowlist{
 		metrics.StreamTypeAllowlist,
@@ -35,10 +32,6 @@ func TestNormalize_bounded_to_allowlist(t *testing.T) {
 	}
 }
 
-// TestNormalize_case_insensitive_for_known_values pins the strings.ToLower
-// step: a known value in any case normalizes to its canonical lowercase form.
-// A mutation dropping ToLower survives the bounded-output property (an
-// uppercased unknown falls through to Fallback) but is caught here.
 func TestNormalize_case_insensitive_for_known_values(t *testing.T) {
 	tests := []struct {
 		name string

@@ -73,10 +73,7 @@ type Session struct {
 	LibName        string
 	LibID          string
 	LibType        string
-	// MediaKey is the rating key MediaMeta was fetched for; empty until a
-	// successful /library/metadata fetch lands. It lets the session poll
-	// skip refetching immutable per-key metadata while the session stays
-	// on the same item (see Tracker.MediaResolved).
+	// MediaKey is the rating key MediaMeta was fetched for; see MediaResolved.
 	MediaKey       string
 	State          State
 	Meta           plexapi.Item
@@ -99,11 +96,10 @@ func NewTracker() *Tracker {
 	}
 }
 
-// normalizeKey truncates a session key to MaxSessionKeyLen so that write and
-// lookup always use the same map key. The cut must land on a rune boundary: the
-// normalized key is emitted verbatim as the `session` Prometheus label
-// (collectSessions passes sessID through un-truncated), and an invalid label
-// value makes prometheus.MustNewConstMetric panic the collector goroutine.
+// normalizeKey truncates a session key to MaxSessionKeyLen so write and
+// lookup always use the same map key. The cut must land on a rune boundary:
+// the key is emitted verbatim as the `session` Prometheus label, and an
+// invalid label value panics the collector goroutine.
 func normalizeKey(id string) string {
 	return runesafe.CapBytes(id, MaxSessionKeyLen)
 }
@@ -142,7 +138,8 @@ func (t *Tracker) MediaResolved(id, ratingKey string) bool {
 }
 
 // bankPlayTime banks a playing session's elapsed play time into
-// PrevPlayedTime, keeping plex_play_seconds_total monotonic. Caller holds the tracker mutex.
+// PrevPlayedTime, keeping plex_play_seconds_total monotonic. Caller holds
+// the tracker mutex.
 func (s *Session) bankPlayTime(now time.Time) {
 	elapsed := now.Sub(s.PlayStarted)
 	s.PrevPlayedTime += elapsed
@@ -154,15 +151,12 @@ func (s *Session) bankPlayTime(now time.Time) {
 // transition the elapsed play time is banked into PrevPlayedTime to keep
 // plex_play_seconds_total monotonic.
 func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Item) {
-	// Bound SessionKey length to prevent high-cardinality label explosion
-	// from a malicious or buggy Plex server.
 	id = normalizeKey(id)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	// Reject new sessions once the map is full; existing sessions continue
-	// to update (so a legitimate session-churn during the cap doesn't drop
-	// state). RunPruneLoop handles reclaiming stopped sessions.
+	// to update. RunPruneLoop handles reclaiming stopped sessions.
 	if _, existing := t.Sessions[id]; !existing && len(t.Sessions) >= MaxTrackedSessions {
 		slog.Warn("session map full, dropping new session",
 			"id", id, "tracked", len(t.Sessions), "cap", MaxTrackedSessions)
@@ -176,17 +170,13 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ite
 	if mediaMeta != nil {
 		s.MediaMeta = *mediaMeta
 		if meta != nil {
-			// Record which rating key this metadata belongs to so
-			// MediaResolved can skip refetches until the key changes.
 			s.MediaKey = meta.RatingKey
 		}
 	}
 
-	// Bank play time on every playing→non-playing transition.
 	if s.State == StatePlaying && newState != StatePlaying {
 		s.bankPlayTime(time.Now())
 	}
-	// Reset play timer on non-playing→playing transition.
 	if s.State != StatePlaying && newState == StatePlaying {
 		s.PlayStarted = time.Now()
 	}
@@ -218,7 +208,6 @@ func (t *Tracker) MarkAbsentStopped(presentKeys []string) {
 		if s.State == StateStopped {
 			continue
 		}
-		// Bank play time on the implicit playing→stopped transition.
 		if s.State == StatePlaying {
 			s.bankPlayTime(now)
 		}

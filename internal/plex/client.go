@@ -18,23 +18,16 @@ import (
 	"github.com/cplieger/plexapi/v2"
 )
 
-// Retry defaults preserved from the pre-library client: total attempts
-// including the first, and the base backoff between them. The library adds
-// a per-attempt response-header timeout so a stalled attempt fails as a
-// retryable error.
 const (
 	defaultMaxAttempts    = 3
 	defaultRetryBaseDelay = 100 * time.Millisecond
-	// defaultRequestTimeout bounds a request when the caller's context has
-	// no deadline (the library never undercuts a caller deadline). Mirrors
-	// the old 30s total-retry ceiling.
+	// defaultRequestTimeout bounds a request only when the caller's context
+	// has no deadline; the library never undercuts a caller deadline.
 	defaultRequestTimeout = 30 * time.Second
 )
 
 // ErrNotFound is the library's 404 sentinel, re-exported so call sites and
 // the Plex Pass graceful-degradation path keep reading plex.ErrNotFound.
-// Status-code classification needs no re-export: callers match the
-// library's plexapi.StatusError / plexapi.IsConfigError directly.
 var ErrNotFound = plexapi.ErrNotFound
 
 // Client is the exporter's Plex client: the library client plus the
@@ -44,14 +37,10 @@ type Client struct {
 	retries *atomic.Int64
 }
 
-// Options configures NewClient. The old signature was three adjacent
-// strings; a transposed pair compiled, and one transposition (the token into
-// the cert-path slot) would have echoed the credential into the startup
-// error. Named fields make every assignment say which string it is.
+// Options configures NewClient.
 type Options struct {
 	// ServerURL is the Plex server base URL. Required; plexapi.New
-	// validates it at construction, so a URL/token transposition fails
-	// loudly before any request.
+	// validates it at construction.
 	ServerURL string
 	// Token authenticates every request (X-Plex-Token).
 	Token string
@@ -64,9 +53,6 @@ type Options struct {
 
 // NewClient returns a Client configured by opts.
 func NewClient(opts Options) (*Client, error) {
-	// The old positional signature made a forgotten token a compile error;
-	// the struct must not soften that into a zero value that authenticates
-	// nothing and 401s on every scrape.
 	if opts.Token == "" {
 		return nil, errors.New("plex: Options.Token must not be empty")
 	}

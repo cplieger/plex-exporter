@@ -43,8 +43,8 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable, snap.Name, snap.ID)
 	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPRetries, prometheus.CounterValue, snap.Retries, snap.Name, snap.ID)
 
-	// Emit one sample per known error type. Always emit all so
-	// rate()/increase() return zero rather than stale values.
+	// Emit one sample per known error type so rate()/increase() return zero
+	// rather than stale values.
 	for _, typ := range metrics.ErrorTypes {
 		ch <- prometheus.MustNewConstMetric(metrics.DescErrors, prometheus.CounterValue,
 			snap.ErrorCounts[typ], snap.Name, snap.ID, typ)
@@ -65,14 +65,10 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	s.collectSessions(ch, snap.Name, snap.ID, snap.Libraries)
 }
 
-// collectSessions emits per-session Prometheus metrics. Collect invokes it
-// after taking the server-level snapshot; it is split out so the session
-// metrics are emitted from a sessions-only snapshot taken under the tracker lock.
+// collectSessions emits per-session Prometheus metrics, from a
+// sessions-only snapshot taken under the tracker lock (Collect already
+// took the server-level snapshot).
 func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID string, libs []library.Library) {
-	// Snapshot under lock so we can emit metrics without blocking
-	// writers (Update, UpdateLibraryLabels, MarkAbsentStopped, Prune)
-	// behind a slow channel consumer. Matches the snapshot pattern
-	// used by Collect() for s.mu.
 	sessSnaps := s.Sessions.SnapshotSessions()
 
 	libByID := make(map[string]library.Library, len(libs))
@@ -99,7 +95,6 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 
 		user, _, bw := sessionElements(&sess.Meta)
 
-		// Per-session bandwidth from the sessions API.
 		if bw.Bandwidth > 0 {
 			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBandwidth, prometheus.GaugeValue,
 				float64(bw.Bandwidth),
@@ -107,10 +102,8 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 				metrics.LocationAllowlist.Normalize(orDefault(bw.Location, metrics.ValUnknown)))
 		}
 
-		// Per-session bitrate (replaces the former stream_bitrate label).
-		// Emitted as a gauge so cardinality is bounded by active session
-		// count, not by the number of distinct bitrate values observed
-		// during adaptive streaming. Value is 0 when Media is missing.
+		// Bitrate is a gauge (not a play-count label) so cardinality is bounded
+		// by session count, not by every adaptive-streaming bitrate value seen.
 		if br := sessionBitrate(&sess.Meta); br > 0 {
 			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBitrate, prometheus.GaugeValue,
 				br,
@@ -129,10 +122,8 @@ func truncLabel(s string) string {
 // streamLabels returns (streamType, resolution) derived from the
 // live-playback Media info. Defaults are "unknown", "".
 //
-// The bitrate dimension was intentionally removed as a label (it caused
-// unbounded cardinality because Plex reports changing bitrate values
-// during adaptive streaming). See sessionBitrate() for the replacement
-// gauge-valued metric emission.
+// Bitrate is deliberately not a label here (Plex reports changing bitrate
+// during adaptive streaming, causing unbounded cardinality); see sessionBitrate.
 func streamLabels(m *plexapi.Item) (streamType, streamRes string) {
 	streamType = metrics.ValUnknown
 	if len(m.Media) == 0 {
@@ -164,15 +155,9 @@ func fileResolution(m *plexapi.Item) string {
 	return m.Media[0].VideoResolution
 }
 
-// resolveLibrary returns (name, id, type) using the session's cached
-// values, falling back to a lookup in libByID, then to unknown.
-
 // sessionElements returns a session item's User, Player and Session elements,
-// substituting zero values for the ones Plex omitted (the library models an
-// absent element as a nil pointer). The collector's contract is to degrade to
-// unknown/empty labels, never to panic mid-scrape — and sessions can enter
-// the tracker from any producer, so the nil handling lives here at the
-// dereference rather than trusting every write path to normalize.
+// substituting zero values for the ones Plex omitted. The collector's
+// contract is to degrade to unknown/empty labels, never to panic mid-scrape.
 func sessionElements(it *plexapi.Item) (plexapi.SessionUser, plexapi.Player, plexapi.SessionBandwidth) {
 	var user plexapi.SessionUser
 	var player plexapi.Player
@@ -189,6 +174,8 @@ func sessionElements(it *plexapi.Item) (plexapi.SessionUser, plexapi.Player, ple
 	return user, player, bw
 }
 
+// resolveLibrary returns (name, id, type) using the session's cached
+// values, falling back to a lookup in libByID, then to unknown.
 func resolveLibrary(sess *sessions.Session, libByID map[string]library.Library) (name, id, typ string) {
 	if sess.LibName != "" {
 		return sess.LibName, sess.LibID, sess.LibType

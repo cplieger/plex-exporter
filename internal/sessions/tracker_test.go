@@ -34,9 +34,8 @@ func TestTrackerUpdate(t *testing.T) {
 
 func TestTrackerUpdate_stop_accumulates_time(t *testing.T) {
 	// Bubbled: bankPlayTime reads time.Now(), so on the synthetic clock the
-	// banked duration is exactly the slept interval. The real-clock version
-	// could only assert "> 0", which a bankPlayTime that banked a nanosecond
-	// would also satisfy.
+	// banked duration equals exactly the slept interval, which a real clock
+	// could only assert "> 0" for.
 	synctest.Test(t, func(t *testing.T) {
 		tracker := NewTracker()
 
@@ -104,17 +103,15 @@ func TestRunPruneLoopCancellation(t *testing.T) {
 
 	select {
 	case <-done:
-		// ok — loop exited on cancelled context
 	case <-time.After(time.Second):
 		t.Fatal("RunPruneLoop did not exit on cancelled context")
 	}
 }
 
 func TestSessionTrackerResumeAfterStop(t *testing.T) {
-	// Bubbled, and the two legs sleep for different durations so the banked
-	// total (10ms + 25ms) proves BOTH play windows were accumulated. The
-	// real-clock version could only assert after > prev, which a second leg
-	// that overwrote rather than added would still satisfy.
+	// Bubbled; the two legs sleep for different durations so the banked
+	// total (10ms + 25ms) proves both play windows were accumulated, not
+	// overwritten.
 	synctest.Test(t, func(t *testing.T) {
 		tracker := NewTracker()
 
@@ -194,7 +191,6 @@ func TestSessionTrackerUpdate_truncates_long_session_key(t *testing.T) {
 func TestSessionTrackerUpdate_rejects_new_when_full(t *testing.T) {
 	tracker := NewTracker()
 
-	// Fill to capacity
 	for i := range MaxTrackedSessions {
 		tracker.Update(fmt.Sprintf("s%d", i), StatePlaying, nil, nil)
 	}
@@ -226,12 +222,10 @@ func TestSessionTrackerUpdate_rejects_new_when_full(t *testing.T) {
 func TestSessionTrackerUpdate_existing_session_updates_when_full(t *testing.T) {
 	tracker := NewTracker()
 
-	// Fill to capacity
 	for i := range MaxTrackedSessions {
 		tracker.Update(fmt.Sprintf("s%d", i), StatePlaying, nil, nil)
 	}
 
-	// Existing session should still update
 	tracker.Update("s0", StateStopped, nil, nil)
 
 	tracker.mu.Lock()
@@ -244,16 +238,14 @@ func TestSessionTrackerUpdate_existing_session_updates_when_full(t *testing.T) {
 }
 
 func TestUpdateLibraryLabels_normalizes_long_key(t *testing.T) {
-	// Regression: UpdateLibraryLabels must truncate the key the same way
-	// Update does, so that a session stored via Update with a >64-byte key
-	// is found by UpdateLibraryLabels using the original long key.
+	// UpdateLibraryLabels must truncate the key the same way Update does, so
+	// a session stored via Update with a >64-byte key is found by
+	// UpdateLibraryLabels using the original long key.
 	tracker := NewTracker()
 	longKey := strings.Repeat("a", MaxSessionKeyLen+30)
 
-	// Store session via Update (internally truncates).
 	tracker.Update(longKey, StatePlaying, &plexapi.Item{Title: "LongKey"}, nil)
 
-	// Verify stored under truncated key.
 	truncated := longKey[:MaxSessionKeyLen]
 	tracker.mu.Lock()
 	if _, ok := tracker.Sessions[truncated]; !ok {
@@ -261,7 +253,6 @@ func TestUpdateLibraryLabels_normalizes_long_key(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	// UpdateLibraryLabels with the SAME original long key must resolve.
 	var called bool
 	tracker.UpdateLibraryLabels(longKey, func(s *Session) {
 		called = true
@@ -282,7 +273,6 @@ func TestUpdateLibraryLabels_normalizes_long_key(t *testing.T) {
 }
 
 func TestUpdateLibraryLabels_short_key_unchanged(t *testing.T) {
-	// Verify that short keys (<=MaxSessionKeyLen) still work as before.
 	tracker := NewTracker()
 	shortKey := "short-session-id"
 
@@ -306,10 +296,9 @@ func TestUpdateLibraryLabels_short_key_unchanged(t *testing.T) {
 }
 
 func TestNormalizeKey(t *testing.T) {
-	// normalizeKey clamps a session key to MaxSessionKeyLen so writes and
-	// lookups always use the same map key. Three regions matter: below the cap
-	// (unchanged), exactly at the cap (unchanged — the limit is inclusive), and
-	// above the cap (truncated to exactly MaxSessionKeyLen bytes).
+	// Three regions matter: below the cap (unchanged), exactly at the cap
+	// (unchanged — the limit is inclusive), and above the cap (truncated to
+	// exactly MaxSessionKeyLen bytes).
 	cases := []struct {
 		name string
 		in   string
@@ -502,11 +491,10 @@ func TestMarkAbsentStopped_already_stopped_not_rebanked(t *testing.T) {
 func TestMarkAbsentStopped_normalizes_present_keys(t *testing.T) {
 	tracker := NewTracker()
 	longKey := strings.Repeat("k", MaxSessionKeyLen+30)
-	// Update stores the session under the normalized (truncated) key.
 	tracker.Update(longKey, StatePlaying, &plexapi.Item{Title: "long"}, nil)
 
-	// Reporting the SAME long key as present must normalize to the stored key,
-	// so the session counts as present and is not transitioned to stopped.
+	// Reporting the same long key as present must normalize to the stored
+	// key so the session is not transitioned to stopped.
 	tracker.MarkAbsentStopped([]string{longKey})
 
 	tracker.mu.Lock()
@@ -544,8 +532,9 @@ func TestSnapshotSessions_returns_independent_copy(t *testing.T) {
 		t.Fatalf("snapshot len = %d, want 1", len(snap))
 	}
 
-	// Mutating the returned map must not affect the tracker's map: the collector iterates the
-	// snapshot outside the tracker lock, so a shared (non-copied) map would be a data race.
+	// Mutating the returned map must not affect the tracker's: the collector
+	// iterates the snapshot outside the tracker lock, so a shared map would
+	// be a data race.
 	snap["s2"] = Session{State: StatePlaying}
 	delete(snap, "s1")
 

@@ -12,20 +12,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// These benchmarks feed the weekly benchmark tracker. Collect runs once per
-// Prometheus scrape and its cost scales with the number of playing sessions,
-// so a per-session regression multiplies by scrape frequency; truncLabel runs
-// once per label value on that same path.
+// These benchmarks feed the weekly benchmark tracker. Collect's cost scales
+// with playing-session count; truncLabel runs once per label value on the
+// same path.
 //
-// Both benchmarks were dead until 2026-08. `go test ./...` compiles a
-// benchmark but never runs one without -bench, so nothing executed these, and
-// benchServer had nil-dereferenced since the commit that deleted the app's
-// duplicate Plex wire structs: Item.Player, Item.Session and Item.User are
-// pointers on the shared plexapi.Item, and the old hand-written literal
-// assigned straight through them. The fixture is therefore built with
-// testMeta, decoding the same JSON shape /status/sessions really returns, so
-// the benchmark cannot diverge from the wire again on a field it does not
-// name.
+// Both were dead until 2026-08: `go test ./...` compiles a benchmark but
+// never runs one without -bench, so benchServer's nil-dereference (Item.Player/
+// Session/User are pointers on plexapi.Item) went unnoticed. The fixture is
+// built with testMeta, decoding real JSON, so it cannot diverge from the wire
+// shape again.
 
 // benchSessionJSON is one playing session as /status/sessions reports it:
 // direct-play movie, LAN client, known bandwidth and bitrate.
@@ -86,9 +81,8 @@ func BenchmarkCollect(b *testing.B) {
 	for _, n := range []int{0, 5, 20} {
 		srv := benchServer(b, n)
 
-		// The channel is sized from a real Collect rather than a guessed
-		// constant: Collect sends synchronously, so a buffer smaller than one
-		// scrape's output deadlocks the benchmark instead of failing it.
+		// Channel sized from a real Collect: Collect sends synchronously, so
+		// an undersized buffer deadlocks the benchmark instead of failing it.
 		probe := make(chan prometheus.Metric, 4096)
 		srv.Collect(probe)
 		emitted := len(probe)
