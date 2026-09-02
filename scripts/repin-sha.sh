@@ -1,4 +1,9 @@
 #!/bin/sh
+# Renovate sha256 repin helper — CANONICAL COPY in cplieger/ci
+# (configs/repin-sha.sh), synced to scripts/repin-sha.sh in every repo with a
+# root Dockerfile by scripts/classify-repos.py. DO NOT edit the synced copy in
+# an app repo — change it here and let the sync land it.
+#
 # Recompute a Dockerfile sha256 integrity pin after Renovate moved its version
 # literal. Run by Renovate itself via postUpgradeTasks, because no datasource
 # publishes a sha256, so the recomputed pin lands in the bump commit.

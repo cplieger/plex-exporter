@@ -107,7 +107,11 @@ exclude_paths = [
   ".github/",                  # CI workflows + pins: never in the artifact
   "**/*.md",                   # docs, incl. fix:-typed README-only edits
   "LICENSE",
-  "alerts.yaml",               # README-companion alert rules (docs artifact)
+  "alerts/",                   # README-companion alert rules, one file per
+                               # expression language (a ruler parses every expr in
+                               # the file it loads, and PromQL/LogQL are mutually
+                               # unparseable, so a mixed single file loads in neither)
+  "alerts.yaml",               # the pre-folder root form, until no repo has one left
   "compose.yaml",              # the root-level example compose
   "tests/",                    # smoke tests: exercised at build, never shipped
   "**/testdata/",
