@@ -197,12 +197,14 @@ resolution labels. An empty Plex `subtitleDecision` is reported as
 
 plex-exporter exposes Prometheus metrics on `/metrics` (see
 [Metrics reference](#metrics-reference)) and writes its own diagnostics to its
-container log. The rules in [`alerts.yaml`](alerts.yaml) read both, so two
-rulers evaluate them: scrape `/metrics` and evaluate the six PromQL rules with
-Prometheus or the Mimir ruler, and ship the container's logs to Loki (Grafana
-Alloy's Docker log discovery does this with no configuration) to evaluate the
-three LogQL rules with Loki's ruler. Firing alerts deliver through your
-Alertmanager either way. They cover:
+container log. The rules ship as one file per expression language: scrape
+`/metrics` and evaluate the six PromQL rules in
+[`alerts/promql.yaml`](alerts/promql.yaml) with Prometheus or the Mimir ruler,
+and ship the container's logs to Loki (Grafana Alloy's Docker log discovery does
+this with no configuration) to evaluate the three LogQL rules in
+[`alerts/logql.yaml`](alerts/logql.yaml) with Loki's ruler. Load each half into
+its own ruler: neither ruler parses the other's expressions. Firing alerts
+deliver through your Alertmanager either way. They cover:
 
 | Alert | Fires when | Severity |
 | --- | --- | --- |
