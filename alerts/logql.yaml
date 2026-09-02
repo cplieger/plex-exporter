@@ -1,0 +1,95 @@
+# Recommended alert rules for plex-exporter, the LogQL half: the three rules a
+# Loki ruler evaluates. The other six are PromQL and live in
+# alerts/promql.yaml, because the exporter carries its operational state in two
+# places and a condition with no series still has a log line. Load each half
+# into its own ruler: neither ruler parses the other's expressions.
+#
+# The three rules here (PlexExporterFatalError, PlexExporterSessionMapFull,
+# PlexExporterRefreshIncomplete) read the container's log stream, because
+# their condition has no series to read: either the process is already gone
+# before it could publish one, or the exporter keeps serving every series
+# while the data behind it is wrong. Ship the container's logs to Loki
+# (Grafana Alloy's Docker log discovery does this with no configuration) and
+# evaluate them with Loki's ruler; firing alerts deliver through your
+# Alertmanager exactly like metric ones.
+# Their shared prerequisites are the log ENCODING and the log DESTINATION, and
+# the exporter satisfies both out of the box. It writes Go slog logfmt to
+# stderr, which Docker captures, so `level=ERROR` and the `msg` text are plain
+# substrings and no parser stage is needed (Go renders the level UPPERCASE, so
+# match `level=ERROR` and never `level=error`). There is no log-level setting,
+# so the level is fixed at INFO: every WARN and ERROR line these rules match
+# is always emitted, and a DEBUG line can never be matched.
+#
+# Thresholds, the "for" windows, and the severity labels are starting points;
+# adjust them to your deployment. The "container" selector on these rules is
+# whatever your log collector sets (Alloy's Docker log discovery sets
+# "container" with no configuration; Promtail and others may key on "job" or
+# "service" instead).
+groups:
+  - name: plex-exporter
+    rules:
+      - alert: PlexExporterFatalError
+        expr: |
+          sum by (container) (count_over_time(
+            {container="plex-exporter"} |= `level=ERROR` [15m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter logged an error"
+          description: >
+            No series can carry this one: every configuration and startup
+            error the exporter reports is followed by a non-zero exit, so the
+            process is gone before /metrics could publish anything, and a
+            restart policy then repeats the line on every attempt. The causes
+            are an unset PLEX_URL or PLEX_TOKEN, a rejected token or another
+            4xx, a 404 (reached Plex, wrong server), a TLS or CA
+            misconfiguration, a LISTEN_ADDR already in use, and a
+            metrics-server failure after startup. The other producer of an
+            ERROR line is the HTTP middleware, which does NOT exit: a
+            recovered panic, or a 5xx on /metrics or /api/health. Read the
+            line, it names which. PlexExporterTargetDown reaches the same
+            outage 15m later, without the cause.
+      - alert: PlexExporterSessionMapFull
+        expr: |
+          sum by (container) (count_over_time(
+            {container="plex-exporter"} |= `session map full` [15m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter is dropping Plex sessions from its tracker"
+          description: >
+            The session tracker is at its cap, so a new playback session was
+            not tracked and publishes no series at all. Nothing in /metrics
+            reports this: the dropped session is simply missing, every other
+            series stays healthy, no error counter moves, and
+            count(plex_plays_active) understates the real stream count. Expect
+            either a genuinely large concurrent-stream count or a Plex server
+            minting session keys faster than the tracker reclaims them (a
+            stopped session is reclaimed after 60s, an idle one after 5m). The
+            line carries the tracked and cap attributes.
+      - alert: PlexExporterRefreshIncomplete
+        expr: |
+          sum by (container) (count_over_time(
+            {container="plex-exporter"}
+            |= `fetch skipped, context deadline exceeded` [15m]
+          )) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter is running out of time on its Plex refresh"
+          description: >
+            A refresh cycle reached its deadline before the host-resources or
+            bandwidth fetch ran, so those Plex Pass gauges
+            (plex_host_cpu_utilization_ratio,
+            plex_host_memory_utilization_ratio, plex_transmit_bytes_total) go
+            on serving the values from an earlier cycle rather than going
+            absent. No series reports it: this path records no error and does
+            not touch plex_http_reachable, which still reads 1 because the
+            fetches earlier in the same cycle succeeded. The threshold of 3
+            excludes a single slow cycle; more than that means Plex has been
+            answering slowly for minutes. Check the Plex server's own load.
