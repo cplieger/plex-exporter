@@ -11,7 +11,7 @@ require (
 	github.com/cplieger/webhttp/v2 v2.1.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 	pgregory.net/rapid v1.3.0
 )
 
@@ -24,6 +24,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/common v0.71.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
