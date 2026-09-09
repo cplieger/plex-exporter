@@ -12,12 +12,12 @@ github.com/cplieger/pathinside/v2 v2.0.1 h1:tsCGs+7/U1v/c2q7lcHK9UYUbiyYrvjUxL2h
 github.com/cplieger/pathinside/v2 v2.0.1/go.mod h1:M+uGHbsTS0Zb1hqRMbkoMI/3RkryUZRnJ+P0gxhBjyE=
 github.com/cplieger/plexapi/v2 v2.0.7 h1:JqdhD2DR2lIXjKOizbQjq2z30IrqhREjvYhZd45te5Q=
 github.com/cplieger/plexapi/v2 v2.0.7/go.mod h1:8og/b/O2B4U+wlQaF2r2TkMqR7k1vRSsTBYejfCoGYY=
-github.com/cplieger/runesafe/v2 v2.0.1 h1:TWTX4OPjz4pqgidBavkbglEh3XdwrJgq8dC/LFf89u0=
-github.com/cplieger/runesafe/v2 v2.0.1/go.mod h1:cB0JYmCjfU+VzKAFWnhYfJL8OK0+d196ZSwh+Ohr+0k=
+github.com/cplieger/runesafe/v2 v2.1.0 h1:MTFMH5VDk9+bhbUces9LweBAO9Bsayy/hKLFBOqewj8=
+github.com/cplieger/runesafe/v2 v2.1.0/go.mod h1:cB0JYmCjfU+VzKAFWnhYfJL8OK0+d196ZSwh+Ohr+0k=
 github.com/cplieger/slogx v1.6.5 h1:KzQqC5QcfA83CnpMlkikoEFzMgo0+7bsyi6+dipUys0=
 github.com/cplieger/slogx v1.6.5/go.mod h1:Ac6vL8Ymaa8USg++ELEQKwNIBgk0nG2HWO+6wDuQNmw=
-github.com/cplieger/webhttp/v2 v2.1.0 h1:+uczCpVxI5QmHJcjSQA8MGPcT+HtNaOMMt2vBfS7pB0=
-github.com/cplieger/webhttp/v2 v2.1.0/go.mod h1:g0vbWk/TRByvS72jimOby/VGBdCJzx7/hvUXG+KbeXE=
+github.com/cplieger/webhttp/v2 v2.2.0 h1:o1iHw6ZxWKPRbUaL7arO36XAewhYXgq2arZ8KjkVwyc=
+github.com/cplieger/webhttp/v2 v2.2.0/go.mod h1:g0vbWk/TRByvS72jimOby/VGBdCJzx7/hvUXG+KbeXE=
 github.com/cplieger/xmlx v1.0.4 h1:4j/igac38D0ZGShrl1wj30Xj3cB8ZjuA+T2q0hzRfJw=
 github.com/cplieger/xmlx v1.0.4/go.mod h1:YAi22L3+hkEsgPsMcodlGb8pkfU5AkpJ4afJmyuC6Ig=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
