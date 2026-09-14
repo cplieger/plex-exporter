@@ -32,4 +32,4 @@ jobs:
     # preset disables the github-actions manager on all six synced workflow
     # filenames, so sync cannot be raced. Only in cplieger/ci itself (and two other
     # named exclusions) does Renovate track this pin.
-    uses: cplieger/ci/.github/workflows/coverage.yaml@66ad734e5f46645713bb832038126dcb7547e2c5 # v2
+    uses: cplieger/ci/.github/workflows/coverage.yaml@ed622a04454a0db219926be607fa3bba52b55f87 # v2
