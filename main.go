@@ -25,7 +25,7 @@ import (
 	"github.com/cplieger/plex-exporter/v2/internal/server"
 	"github.com/cplieger/plexapi/v2"
 	"github.com/cplieger/slogx"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/webhttp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
