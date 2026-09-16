@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788913928930,
+  "lastUpdate": 1789518847959,
   "repoUrl": "https://github.com/cplieger/ci",
   "entries": {
     "Benchmark": [
@@ -379,6 +379,133 @@ window.BENCHMARK_DATA = {
             "name": "BenchmarkTruncLabel/short",
             "value": 2.1155,
             "range": "± 0.0045",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Christopher Plieger",
+            "username": "cplieger",
+            "email": "917744+cplieger@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "d34f4d66d9b0502ee912cd650306671ec71ff3d9",
+          "message": "chore(deps): update benchmark-action/github-action-benchmark action to v1.22.2 (#615)",
+          "timestamp": "2026-09-15T11:02:29Z",
+          "url": "https://github.com/cplieger/ci/commit/d34f4d66d9b0502ee912cd650306671ec71ff3d9"
+        },
+        "date": 1789518847013,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkCollect/sessions_0 - B/op",
+            "value": 9472,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_0 - allocs/op",
+            "value": 267,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_0",
+            "value": 5134.5,
+            "range": "± 136",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_20 - B/op",
+            "value": 161129,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_20 - allocs/op",
+            "value": 3910,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_20",
+            "value": 91307,
+            "range": "± 2311.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_5 - B/op",
+            "value": 47360,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_5 - allocs/op",
+            "value": 1178,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_5",
+            "value": 27302.5,
+            "range": "± 566.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/long - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/long - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/long",
+            "value": 0.9089,
+            "range": "± 0.0096",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/short - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/short - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/short",
+            "value": 0.9123,
+            "range": "± 0.0909",
             "unit": "ns/op",
             "extra": "10 samples, median"
           }
