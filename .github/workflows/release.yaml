@@ -48,10 +48,10 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-# Top-level permissions are read-only (OpenSSF Scorecard Token-Permissions);
-# the release job declares the write scopes it actually needs. GitHub takes the
-# intersection of these job-level grants and what the called reusable workflow
-# declares, so scoping them to the job is functionally equivalent.
+# Top-level permissions are read-only (least privilege); the release job declares
+# the write scopes it actually needs. GitHub takes the intersection of these
+# job-level grants and what the called reusable workflow declares, so scoping
+# them to the job is functionally equivalent.
 permissions:
   contents: read
 
