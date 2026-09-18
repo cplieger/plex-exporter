@@ -1,68 +1,17 @@
 #!/bin/sh
-# Runtime image smoke-test harness — CANONICAL COPY in cplieger/ci
-# (configs/image-smoke.sh), synced to each serving app's tests/image-smoke.sh
-# by scripts/classify-repos.py (a repo enrolls by committing a
-# tests/image-smoke.conf; see below). DO NOT edit the synced copy in an app
-# repo — change it here and let the sync land it.
-#
-# Invoked by the shared CI docker job:  sh tests/image-smoke.sh <image-ref>
-#
-# It starts the assembled image and waits for the container's own HEALTHCHECK
-# to report "healthy" — proving the binary runs in the final image, loads its
-# config, binds any listener, and its health probe works, catching failures the
-# build cannot see (a broken //go:embed frontend, a missing runtime dependency,
-# a server that never binds, a broken HEALTHCHECK). It fails fast on an early
-# exit (a crash-boot is reported by its exit code, more debuggable than
-# "unhealthy") and dumps the container log tail only on failure.
-#
-# Per-app knobs come from tests/image-smoke.conf beside this script; everything
-# below the config block is identical across apps. The .conf is a POSIX-sh
-# fragment sourced for these variables (all optional):
-#
-#   SMOKE_APP_NAME   label for log lines + container name (default: "image")
-#   SMOKE_TIMEOUT    seconds to wait for "healthy" (default: 120). Size it to
-#                    cover the image's HEALTHCHECK start-period plus a couple of
-#                    intervals; a slow-but-OK cold boot must not be failed early.
-#   SMOKE_RUN_ARGS   extra `docker run` args (env, tmpfs, ...) as a word-split
-#                    string, e.g. "-e FOO=bar --tmpfs /input". Values must not
-#                    contain spaces (these are controlled test configs).
-#   SMOKE_LOG_PATTERN  optional post-start assertion: a fixed string that must
-#                    appear in the container log before the run passes (default:
-#                    empty = health alone is the verdict). For an app whose
-#                    HEALTHCHECK deliberately does not cover a surface - a
-#                    listener started asynchronously, a feature whose failure is
-#                    logged without flipping health - the log line it emits on
-#                    success is the only evidence available to the harness. The
-#                    wait shares the SMOKE_TIMEOUT deadline: the container must
-#                    be healthy AND have logged the pattern before it expires.
-#
-# A .conf may also override smoke_verify() (default: no-op) for app-specific
-# assertions that need the RUNNING healthy container - e.g. asserting that
-# every target of a served importmap answers 200, which no static check can
-# prove because the targets are produced during the image build. It runs once,
-# after health (and SMOKE_LOG_PATTERN, when set), with $SMOKE_CONTAINER holding
-# the container name; it runs in a subshell under `set -e`, so the first failing
-# command fails the smoke test (a non-zero return does too). The harness never
-# publishes ports, so probe from INSIDE the container (`docker exec
-# "$SMOKE_CONTAINER" curl ...`) rather than assuming host reachability.
-#
-# A .conf that creates host state of its own (a `mktemp -d` fixture dir, a
-# generated key) overrides the smoke_cleanup() function to remove it; the
-# harness's EXIT trap calls it after removing the container, so acquisition and
-# release live side by side in the .conf and every invocation - local or CI -
-# leaves nothing behind.
-#
-# The harness also sets $SMOKE_DIR (this script's own absolute directory)
-# before sourcing the .conf, so an app that needs a config/fixture file on disk
-# can bind-mount a committed fixture dir, e.g.:
-#   SMOKE_RUN_ARGS="-e SYNC_INTERVAL=off -v ${SMOKE_DIR}/fixtures:/config:ro"
+# Runtime image smoke-test harness: start the assembled image, wait for the
+# container's own HEALTHCHECK to report healthy, fail fast on an early exit, dump the
+# container log tail only on failure. Per-app knobs and hooks come from
+# tests/image-smoke.conf beside this script; smoke-tests.md "Pattern B" documents
+# every knob, every hook and what each tier proves.
+# CANONICAL COPY in cplieger/ci (configs/image-smoke.sh), synced to each enrolled
+# app's tests/image-smoke.sh: edit it there, never here.
 set -eu
 
 IMG="${1:?usage: image-smoke.sh <image-ref>}"
 
-# Absolute directory of this script (also holds image-smoke.conf and any per-app
-# fixtures). Exposed to the .conf as $SMOKE_DIR so a .conf can bind-mount a
-# committed fixture dir with an absolute source path (docker -v requires one).
+# Exposed to the .conf as $SMOKE_DIR so it can bind-mount a committed fixture dir:
+# `docker -v` requires an absolute source path.
 SMOKE_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 # Per-app config lives beside this script (repo-local, NOT synced). Pre-set the
@@ -71,15 +20,13 @@ SMOKE_APP_NAME=""
 SMOKE_TIMEOUT=""
 SMOKE_RUN_ARGS=""
 SMOKE_LOG_PATTERN=""
-# Default app cleanup hook: a .conf that creates host state overrides it. Defined
-# BEFORE the source so the EXIT trap can always call it, and so a .conf that
-# creates nothing needs no boilerplate.
+# A .conf that creates host state overrides this. Defined BEFORE the source so the
+# EXIT trap can always call it.
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap's cleanup()
 smoke_cleanup() {
   :
 }
-# Default post-health verification hook: a .conf overrides it for assertions
-# that need the running healthy container (see the header). Same
+# A .conf overrides this for assertions needing the running healthy container. Same
 # define-before-source shape as smoke_cleanup.
 # shellcheck disable=SC2329  # invoked only when health is reached
 smoke_verify() {
@@ -104,23 +51,21 @@ NAME="smoke-${APP}-$$"
 # shellcheck disable=SC2317,SC2329  # invoked indirectly via trap
 cleanup() {
   code=$?
-  # Dump container logs only on failure (a passing run stays quiet).
   if [ "$code" -ne 0 ]; then
     printf '%s\n' "--- container logs (tail) ---" >&2
     docker logs "$NAME" 2>&1 | tail -40 >&2 || true
-    # The HEALTHCHECK's own output is the direct evidence for an "unhealthy"
-    # verdict; a shell-less image often logs nothing about its probe.
+    # A shell-less image often logs nothing about its probe, so the HEALTHCHECK's own
+    # output is the only evidence for an "unhealthy" verdict.
     printf '%s\n' "--- healthcheck probe log ---" >&2
     docker inspect --format '{{ if .State.Health }}{{ range .State.Health.Log }}exit={{ .ExitCode }}: {{ .Output }}{{ end }}{{ end }}' "$NAME" 2>/dev/null >&2 || true
   fi
   docker rm -f "$NAME" >/dev/null 2>&1 || true
-  # The app's own fixture teardown, after the container that consumed it is gone.
-  # Never allowed to change the run's verdict.
+  # Fixture teardown, after the container that consumed it is gone; never allowed to
+  # change the run's verdict.
   smoke_cleanup || true
 }
 # An EXIT trap runs on SIGINT but NOT on SIGTERM/SIGHUP (measured under dash and sh),
-# so convert those into a normal exit and let the one EXIT trap below remove the
-# container and call smoke_cleanup exactly once.
+# so convert those into a normal exit and let the one EXIT trap do the teardown once.
 trap 'exit 143' TERM HUP
 trap cleanup EXIT
 
@@ -134,8 +79,7 @@ deadline=$((start + TIMEOUT))
 # skips the loop body entirely.
 status=starting
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  # Fail fast on an early exit: poll .State.Running before the health status so
-  # a crash-boot is caught by its exit code (more debuggable than "unhealthy")
+  # Poll .State.Running BEFORE health: a crash-boot is then caught by its exit code,
   # and the verdict never depends on what health a stopped container reports.
   if [ "$(docker inspect --format '{{ .State.Running }}' "$NAME" 2>/dev/null || echo missing)" != "true" ]; then
     ec=$(docker inspect --format '{{ .State.ExitCode }}' "$NAME" 2>/dev/null || echo '?')
@@ -145,24 +89,21 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   status=$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}no-healthcheck{{ end }}' "$NAME" 2>/dev/null || echo gone)
   case "$status" in
     healthy)
-      # An app-specific post-start assertion (SMOKE_LOG_PATTERN) keeps waiting
-      # inside the same deadline: healthy alone does not prove a surface the
-      # HEALTHCHECK deliberately does not cover actually came up.
+      # SMOKE_LOG_PATTERN keeps waiting inside the SAME deadline: healthy alone does
+      # not prove a surface the HEALTHCHECK deliberately does not cover came up.
       if [ -n "$SMOKE_LOG_PATTERN" ] && ! docker logs "$NAME" 2>&1 | grep -qF -- "$SMOKE_LOG_PATTERN"; then
         sleep 1
         continue
       fi
-      # App-specific verification against the running container, once, after
-      # health. A failure is a real verdict, not a retry: health said up, so
-      # anything smoke_verify finds missing is missing from the image.
+      # A failure here is a verdict, not a retry: health said up, so anything
+      # smoke_verify finds missing is missing from the image.
       # shellcheck disable=SC2034  # consumed by the sourced .conf's smoke_verify
       SMOKE_CONTAINER="$NAME"
-      # Run the hook in a child shell that CARRIES errexit, capturing its status
-      # outside any condition context. `if ! smoke_verify` puts the whole hook body
-      # in an errexit-ignored context (verified in dash and bash), so a hook whose
-      # early probe fails but whose last command succeeds would PASS. The subshell
-      # also contains a hook that installs its own EXIT trap, which in-process would
-      # REPLACE the harness's cleanup trap and leak the container.
+      # A child shell that CARRIES errexit, with its status captured outside any
+      # condition context: `if ! smoke_verify` runs the whole hook body in an
+      # errexit-ignored context (dash and bash), so a hook whose early probe fails
+      # but whose last command succeeds would PASS. It also contains a hook whose
+      # own EXIT trap would otherwise REPLACE ours and leak the container.
       set +e
       (
         set -e
