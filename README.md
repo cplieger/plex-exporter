@@ -146,6 +146,22 @@ The shipped dashboard ([`grafana-dashboard.json`](grafana-dashboard.json)) handl
 
 Do this **only for a single-replica deployment**. Those labels are what distinguishes one replica's series from another's, so dropping all three on a multi-replica ServiceMonitor makes two replicas emit identical label sets, which Prometheus [warns against explicitly](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config). With more than one replica, keep `pod` and aggregate in the query instead.
 
+The dashboard is versioned with the app: the JSON at release `<tag>` matches the metrics that image emits, and its `uid` is stable, so a re-import updates the existing dashboard in place. Pin it the way you pin the image, using the tag of the image you run. The release asset is `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json`, with `grafana-dashboard.json.sha256` beside it; it works as grafana-operator `spec.url`, as the Grafana Helm chart `dashboards.<provider>.<name>.url`, or as a Terraform `http` data source. The OCI artifact is `ghcr.io/cplieger/plex-exporter/dashboard:<tag>` for grafana-operator `spec.oci`. Renovate tracks either form: the `github-releases` datasource for the URL, the `docker` datasource for the OCI tag.
+
+```yaml
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: plex-exporter
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  oci:
+    reference: ghcr.io/cplieger/plex-exporter/dashboard:<tag>
+    path: grafana-dashboard.json
+```
+
 ## Metrics reference
 
 ### HTTP Endpoints
