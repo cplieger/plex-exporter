@@ -118,7 +118,6 @@ exclude_paths = [
   "**/*_test.go",
   "**/*.test.ts",
   "**/*.spec.ts",
-  "**/grafana-dashboard.json", # imported via UI, never in an image
   "**/package-lock.json",      # lock file maintenance commits
   # Repo-metadata dotfiles a fix:-typed commit can plausibly touch alone
   # (e.g. "fix: correct docker build context" editing only .dockerignore).
