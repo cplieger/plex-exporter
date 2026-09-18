@@ -6,8 +6,10 @@
 #
 # The six rules here read series the exporter publishes on /metrics (port 9594
 # by default): scrape that endpoint and evaluate them with Prometheus or the
-# Mimir ruler. They need nothing beyond the scrape itself, because every series
-# they read is registered unconditionally, and no setting can silence one.
+# Mimir ruler. They need nothing beyond the scrape itself. The four exporter
+# series are published from the first scrape and no setting can silence one;
+# plex_library_items, which PlexLibraryItemsCollapsed reads, appears once the
+# exporter has learned the server identity and read a library count.
 #
 # Thresholds, the "for" windows, and the severity labels are starting points;
 # adjust them to your deployment. The scrape "job" label is yours to set, so it
@@ -65,7 +67,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Plex API unreachable to its exporter on {{ $labels.server }}"
+          summary: "Plex API unreachable to its exporter at {{ $labels.instance }}"
           description: >
             plex-exporter is running but its authenticated poll of the Plex API
             has returned plex_http_reachable=0 for 10m - most often a
@@ -78,7 +80,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Plex session poll failing on {{ $labels.server }}"
+          summary: "Plex session poll failing at {{ $labels.instance }}"
           description: >
             plex-exporter's /status/sessions poll has returned
             plex_session_poll_reachable=0 for 10m while the rest of the Plex

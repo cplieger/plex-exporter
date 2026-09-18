@@ -40,8 +40,9 @@ const (
 	FallbackOther = "other"
 )
 
-// Prometheus descriptors emitted by the collector. Names, help text, and
-// label sets are part of the public metric contract and must not change.
+// Prometheus descriptors emitted by the collector. Names, help text and
+// label sets are the public metric contract; changing any of them is a
+// breaking release.
 var (
 	DescServerInfo = prometheus.NewDesc(
 		"plex_server_info", "Plex server information",
@@ -93,22 +94,24 @@ var (
 		append(SrvLabels, "session", "user", "location"), nil,
 	)
 	DescHTTPReachable = prometheus.NewDesc(
-		"plex_http_reachable", "HTTP polling reachability (1=last refresh succeeded, 0=failed)",
-		SrvLabels, nil,
+		"plex_http_reachable",
+		"Whether the exporter's last poll of the configured Plex server succeeded (1) or failed (0)",
+		nil, nil,
 	)
 	DescSessionPollReachable = prometheus.NewDesc(
-		"plex_session_poll_reachable", "Session poll reachability (1=last /status/sessions poll succeeded, 0=failed)",
-		SrvLabels, nil,
+		"plex_session_poll_reachable",
+		"Whether the exporter's last /status/sessions poll succeeded (1) or failed (0)",
+		nil, nil,
 	)
 	DescHTTPRetries = prometheus.NewDesc(
 		"plex_http_retries_total",
-		"Total HTTP retries performed by the Plex client's retry round-tripper (httpx) across all requests",
-		SrvLabels, nil,
+		"HTTP retries the exporter's Plex client performed across all requests",
+		nil, nil,
 	)
 	DescErrors = prometheus.NewDesc(
 		"plex_exporter_errors_total",
-		"Plex exporter error count by type",
-		append(SrvLabels, "type"), nil,
+		"Exporter errors by type",
+		[]string{"type"}, nil,
 	)
 )
 

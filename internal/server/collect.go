@@ -32,22 +32,31 @@ func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	snap := s.Snapshot()
 
-	ch <- prometheus.MustNewConstMetric(metrics.DescServerInfo, prometheus.GaugeValue, 1,
-		snap.Name, snap.ID, snap.Version, snap.Platform, snap.PlatformVersion, snap.PlexPass)
-	ch <- prometheus.MustNewConstMetric(metrics.DescHostCPU, prometheus.GaugeValue, snap.HostCPU, snap.Name, snap.ID)
-	ch <- prometheus.MustNewConstMetric(metrics.DescHostMem, prometheus.GaugeValue, snap.HostMem, snap.Name, snap.ID)
-	ch <- prometheus.MustNewConstMetric(metrics.DescTransmitBytes, prometheus.CounterValue, snap.TransmitBytes, snap.Name, snap.ID)
-	ch <- prometheus.MustNewConstMetric(metrics.DescActiveTranscodes, prometheus.GaugeValue,
-		float64(snap.ActiveTranscodes), snap.Name, snap.ID)
-	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPReachable, prometheus.GaugeValue, snap.HTTPReachable, snap.Name, snap.ID)
-	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable, snap.Name, snap.ID)
-	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPRetries, prometheus.CounterValue, snap.Retries, snap.Name, snap.ID)
-
+	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPReachable, prometheus.GaugeValue, snap.HTTPReachable)
+	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable)
+	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPRetries, prometheus.CounterValue, snap.Retries)
 	// Emit one sample per known error type so rate()/increase() return zero
 	// rather than stale values.
 	for _, typ := range metrics.ErrorTypes {
-		ch <- prometheus.MustNewConstMetric(metrics.DescErrors, prometheus.CounterValue,
-			snap.ErrorCounts[typ], snap.Name, snap.ID, typ)
+		ch <- prometheus.MustNewConstMetric(metrics.DescErrors, prometheus.CounterValue, snap.ErrorCounts[typ], typ)
+	}
+
+	// Prometheus drops an empty label value, so a server-scoped sample emitted
+	// before Plex has answered lands on a different series than the healthy one.
+	if snap.ID == "" {
+		return
+	}
+
+	ch <- prometheus.MustNewConstMetric(metrics.DescServerInfo, prometheus.GaugeValue, 1,
+		snap.Name, snap.ID, snap.Version, snap.Platform, snap.PlatformVersion, snap.PlexPass)
+	ch <- prometheus.MustNewConstMetric(metrics.DescActiveTranscodes, prometheus.GaugeValue,
+		float64(snap.ActiveTranscodes), snap.Name, snap.ID)
+	if snap.ResourcesRead {
+		ch <- prometheus.MustNewConstMetric(metrics.DescHostCPU, prometheus.GaugeValue, snap.HostCPU, snap.Name, snap.ID)
+		ch <- prometheus.MustNewConstMetric(metrics.DescHostMem, prometheus.GaugeValue, snap.HostMem, snap.Name, snap.ID)
+	}
+	if snap.BandwidthRead {
+		ch <- prometheus.MustNewConstMetric(metrics.DescTransmitBytes, prometheus.CounterValue, snap.TransmitBytes, snap.Name, snap.ID)
 	}
 
 	for _, lib := range snap.Libraries {

@@ -39,6 +39,7 @@ func TestRefreshResources_updates_host_metrics(t *testing.T) {
 	srv.mu.Lock()
 	cpu := srv.HostCPU
 	mem := srv.HostMem
+	read := srv.ResourcesRead
 	srv.mu.Unlock()
 
 	// API returns percentages (0-100); code divides by 100 to get ratios.
@@ -47,6 +48,9 @@ func TestRefreshResources_updates_host_metrics(t *testing.T) {
 	}
 	if mem != 0.65 {
 		t.Errorf("hostMem = %v, want 0.65", mem)
+	}
+	if !read {
+		t.Error("ResourcesRead = false after a sample was applied, want true")
 	}
 }
 
@@ -68,10 +72,14 @@ func TestRefreshResources_empty_stats_no_update(t *testing.T) {
 
 	srv.mu.Lock()
 	cpu := srv.HostCPU
+	read := srv.ResourcesRead
 	srv.mu.Unlock()
 
 	if cpu != 0.99 {
 		t.Errorf("hostCPU = %v, want 0.99 (unchanged)", cpu)
+	}
+	if read {
+		t.Error("ResourcesRead = true after an empty answer, want false: no value was applied")
 	}
 }
 
@@ -91,6 +99,7 @@ func TestRefreshResources_404_no_update(t *testing.T) {
 	srv.mu.Lock()
 	cpu := srv.HostCPU
 	mem := srv.HostMem
+	read := srv.ResourcesRead
 	srv.mu.Unlock()
 
 	if cpu != 0.11 {
@@ -98,6 +107,9 @@ func TestRefreshResources_404_no_update(t *testing.T) {
 	}
 	if mem != 0.22 {
 		t.Errorf("hostMem = %v, want 0.22 (unchanged after 404)", mem)
+	}
+	if read {
+		t.Error("ResourcesRead = true after a 404, want false")
 	}
 }
 
@@ -108,6 +120,7 @@ func TestRefreshBandwidth(t *testing.T) {
 		initAt       int
 		wantTransmit float64
 		wantLastAt   int
+		wantRead     bool
 	}{
 		{
 			name:         "accumulates_bytes",
@@ -115,6 +128,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       1500,
 			wantTransmit: 500,
 			wantLastAt:   3000,
+			wantRead:     true,
 		},
 		{
 			name:         "404_no_update",
@@ -122,6 +136,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       42,
 			wantTransmit: 999,
 			wantLastAt:   42,
+			wantRead:     false,
 		},
 		{
 			name:         "empty_stats",
@@ -129,6 +144,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       100,
 			wantTransmit: 0,
 			wantLastAt:   100,
+			wantRead:     true,
 		},
 		{
 			name:         "exact_boundary_not_counted",
@@ -136,6 +152,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       1000,
 			wantTransmit: 200,
 			wantLastAt:   2000,
+			wantRead:     true,
 		},
 		{
 			name:         "all_old_entries_skipped",
@@ -143,6 +160,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       1000,
 			wantTransmit: 0,
 			wantLastAt:   1000,
+			wantRead:     true,
 		},
 		{
 			name:         "negative_inversion",
@@ -150,6 +168,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       500,
 			wantTransmit: 600,
 			wantLastAt:   3000,
+			wantRead:     true,
 		},
 		{
 			name:         "duplicate_timestamps",
@@ -157,6 +176,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       1000,
 			wantTransmit: 600,
 			wantLastAt:   3000,
+			wantRead:     true,
 		},
 		{
 			name:         "single_new_entry",
@@ -164,6 +184,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			initAt:       4000,
 			wantTransmit: 500,
 			wantLastAt:   5000,
+			wantRead:     true,
 		},
 	}
 
@@ -191,6 +212,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			srv.mu.Lock()
 			transmit := srv.TransmitBytes
 			lastAt := srv.LastBandwidthAt
+			read := srv.BandwidthRead
 			srv.mu.Unlock()
 
 			if transmit != tc.wantTransmit {
@@ -198,6 +220,9 @@ func TestRefreshBandwidth(t *testing.T) {
 			}
 			if lastAt != tc.wantLastAt {
 				t.Errorf("lastBandwidthAt = %d, want %d", lastAt, tc.wantLastAt)
+			}
+			if read != tc.wantRead {
+				t.Errorf("BandwidthRead = %t, want %t", read, tc.wantRead)
 			}
 		})
 	}
@@ -516,6 +541,8 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 		PlexPass:          true,
 		HTTPReachable:     true,
 		SessionsReachable: true,
+		ResourcesRead:     true,
+		BandwidthRead:     true,
 		Sessions:          sessions.NewTracker(),
 		ErrorCounts:       map[string]float64{"refresh": 3},
 		Libraries: []library.Library{
@@ -533,6 +560,12 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 	}
 	if snap.SessionsReachable != 1.0 {
 		t.Errorf("sessionsReachable = %v, want 1.0", snap.SessionsReachable)
+	}
+	if !snap.ResourcesRead {
+		t.Error("ResourcesRead = false, want true")
+	}
+	if !snap.BandwidthRead {
+		t.Error("BandwidthRead = false, want true")
 	}
 	if snap.ErrorCounts["refresh"] != 3 {
 		t.Errorf("errorCounts[refresh] = %v, want 3", snap.ErrorCounts["refresh"])
@@ -560,6 +593,12 @@ func TestSnapshot_false_booleans(t *testing.T) {
 	}
 	if snap.SessionsReachable != 0.0 {
 		t.Errorf("sessionsReachable = %v, want 0.0", snap.SessionsReachable)
+	}
+	if snap.ResourcesRead {
+		t.Error("ResourcesRead = true, want false")
+	}
+	if snap.BandwidthRead {
+		t.Error("BandwidthRead = true, want false")
 	}
 }
 
