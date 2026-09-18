@@ -352,6 +352,8 @@ func TestRefreshLibraryItems_successful_zero_is_published_as_zero(t *testing.T) 
 	defer ts.Close()
 
 	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.ID = "id1"
+	srv.Name = "Srv"
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 900, ItemsKnown: true},
 	}
@@ -384,6 +386,8 @@ func TestRefreshLibraryItems_fetch_failure_keeps_previous_count(t *testing.T) {
 	defer ts.Close()
 
 	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.ID = "id1"
+	srv.Name = "Srv"
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 900, ItemsKnown: true},
 	}
@@ -416,6 +420,8 @@ func TestRefreshLibraryItems_unread_library_publishes_nothing(t *testing.T) {
 	defer ts.Close()
 
 	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.ID = "id1"
+	srv.Name = "Srv"
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}

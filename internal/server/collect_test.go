@@ -2,13 +2,18 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
 
 	"github.com/cplieger/plex-exporter/v2/internal/library"
 	"github.com/cplieger/plex-exporter/v2/internal/metrics"
+	"github.com/cplieger/plex-exporter/v2/internal/plextest"
 	"github.com/cplieger/plex-exporter/v2/internal/sessions"
 	"github.com/cplieger/plexapi/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -468,6 +473,8 @@ func TestCollectServerMetrics(t *testing.T) {
 		HostMem:          0.65,
 		TransmitBytes:    12345,
 		ActiveTranscodes: 2,
+		ResourcesRead:    true,
+		BandwidthRead:    true,
 		Libraries: []library.Library{
 			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 1000, StorageTotal: 2000, ItemsCount: 50, ItemsKnown: true},
 			{ID: "2", Name: "TV Shows", Type: library.TypeShow, DurationTotal: 3000, StorageTotal: 4000},
@@ -480,8 +487,9 @@ func TestCollectServerMetrics(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base: server_info, cpu, mem, transmit, active_transcodes,
-	// http_reachable, session_poll_reachable, http_retries + len(metrics.ErrorTypes) error counters.
+	// Base: http_reachable, session_poll_reachable, http_retries, server_info,
+	// active_transcodes, cpu + mem (ResourcesRead), transmit (BandwidthRead)
+	// + len(metrics.ErrorTypes) error counters.
 	// Plus: 2x lib_duration, 2x lib_storage, 1x lib_items (only Movies has a count that was read)
 	want := 8 + len(metrics.ErrorTypes) + 5
 	if len(ms) != want {
@@ -505,11 +513,22 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base: server_info, cpu, mem, transmit, active_transcodes,
-	// http_reachable, session_poll_reachable, http_retries + len(metrics.ErrorTypes) error counters.
-	want := 8 + len(metrics.ErrorTypes)
+	// Base: http_reachable, session_poll_reachable, http_retries, server_info,
+	// active_transcodes + len(metrics.ErrorTypes) error counters. The statistics
+	// endpoints were never read, so cpu, mem and transmit are absent.
+	want := 5 + len(metrics.ErrorTypes)
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
+	}
+
+	ch = make(chan prometheus.Metric, 50)
+	srv.Collect(ch)
+	close(ch)
+	byDesc := collectByDesc(ch)
+	for _, d := range []*prometheus.Desc{metrics.DescHostCPU, metrics.DescHostMem, metrics.DescTransmitBytes} {
+		if got := byDesc[descKey(d)]; len(got) != 0 {
+			t.Errorf("Collect emitted %d %s samples, want 0 while the Plex Pass endpoint was never read", len(got), d.String())
+		}
 	}
 }
 
@@ -546,6 +565,8 @@ func TestCollectWithActiveSessions(t *testing.T) {
 		HostMem:          0.7,
 		TransmitBytes:    50000,
 		ActiveTranscodes: 1,
+		ResourcesRead:    true,
+		BandwidthRead:    true,
 		Libraries: []library.Library{
 			{ID: "1", Name: "Movies", Type: library.TypeMovie, DurationTotal: 5000, StorageTotal: 10000, ItemsCount: 100, ItemsKnown: true},
 		},
@@ -583,9 +604,9 @@ func TestCollectMultipleLibraries(t *testing.T) {
 	close(ch)
 
 	ms := drainMetrics(ch)
-	// Base 8 (+ metrics.ErrorTypes) + 3x lib_duration, 3x lib_storage,
-	// 3x lib_items.
-	want := 8 + len(metrics.ErrorTypes) + 9
+	// Base 5 (no host or bandwidth read) (+ metrics.ErrorTypes) + 3x lib_duration,
+	// 3x lib_storage, 3x lib_items.
+	want := 5 + len(metrics.ErrorTypes) + 9
 	if len(ms) != want {
 		t.Errorf("Collect multi-lib produced %d metrics, want %d", len(ms), want)
 	}
@@ -594,11 +615,12 @@ func TestCollectMultipleLibraries(t *testing.T) {
 func TestCollect_host_metrics_values(t *testing.T) {
 	// Verify actual numeric values of host CPU and memory metrics.
 	srv := &Server{
-		Name:     "Srv",
-		ID:       "id1",
-		HostCPU:  0.42,
-		HostMem:  0.65,
-		Sessions: sessions.NewTracker(),
+		Name:          "Srv",
+		ID:            "id1",
+		HostCPU:       0.42,
+		HostMem:       0.65,
+		ResourcesRead: true,
+		Sessions:      sessions.NewTracker(),
 	}
 
 	ch := make(chan prometheus.Metric, 20)
@@ -698,5 +720,225 @@ func TestSessionIndex(t *testing.T) {
 				t.Errorf("sessionIndex(%s) = %q, want %q", tc.json, got, tc.want)
 			}
 		})
+	}
+}
+
+// --- Tests: the identity gate ---
+
+func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
+	// A transient failure on the first Refresh starts the exporter degraded:
+	// it has never learned who the server is, so it publishes its own four
+	// metrics and no server-scoped series (which would carry an empty
+	// identity and land on a series no alert or dashboard matches).
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+	if err := srv.Refresh(t.Context()); err == nil {
+		t.Fatal("Refresh() error = nil, want an error from a server answering 500")
+	}
+	srv.RecordError("refresh")
+	srv.SetHTTPReachable(false)
+
+	ch := make(chan prometheus.Metric, 50)
+	srv.Collect(ch)
+	close(ch)
+	ms := drainMetrics(ch)
+
+	// Three single-sample exporter metrics plus one error counter per type.
+	// Fails without the identity gate: plex_server_info alone adds one.
+	if want := 3 + len(metrics.ErrorTypes); len(ms) != want {
+		t.Errorf("Collect produced %d metrics while blind, want %d", len(ms), want)
+		for i, m := range ms {
+			t.Logf("  [%d] %s", i, m.Desc().String())
+		}
+	}
+
+	byDesc := make(map[string][]prometheus.Metric)
+	for _, m := range ms {
+		byDesc[descKey(m.Desc())] = append(byDesc[descKey(m.Desc())], m)
+	}
+	for _, d := range []*prometheus.Desc{
+		metrics.DescServerInfo, metrics.DescHostCPU, metrics.DescActiveTranscodes, metrics.DescLibDuration,
+	} {
+		if got := byDesc[descKey(d)]; len(got) != 0 {
+			t.Errorf("Collect emitted %d %s samples while blind, want 0", len(got), d.String())
+		}
+	}
+
+	// Fails if SrvLabels returns to any of the four exporter descriptors.
+	for _, m := range ms {
+		labels, _ := metricSnapshot(t, m)
+		for _, name := range []string{metrics.LabelServer, metrics.LabelServerID} {
+			if v, ok := labels[name]; ok {
+				t.Errorf("%s carries %s=%q while blind, want no identity label", m.Desc().String(), name, v)
+			}
+		}
+	}
+
+	reach := byDesc[descKey(metrics.DescHTTPReachable)]
+	if len(reach) != 1 {
+		t.Fatalf("Collect emitted %d plex_http_reachable samples, want 1", len(reach))
+	}
+	if _, v := metricSnapshot(t, reach[0]); v != 0 {
+		t.Errorf("plex_http_reachable = %v while blind, want 0", v)
+	}
+
+	var refreshErrors float64
+	for _, m := range byDesc[descKey(metrics.DescErrors)] {
+		labels, v := metricSnapshot(t, m)
+		if labels["type"] == "refresh" {
+			refreshErrors = v
+		}
+	}
+	if refreshErrors != 1 {
+		t.Errorf("plex_exporter_errors_total{type=refresh} = %v, want 1", refreshErrors)
+	}
+}
+
+func TestCollect_plex_pass_gauges_absent_until_read(t *testing.T) {
+	// Host CPU/memory publish only once /statistics/resources has answered,
+	// and transmit bytes only once /statistics/bandwidth has: both 404 without
+	// Plex Pass, and a value nothing read must not be published as 0.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/statistics/resources" {
+			fmt.Fprint(w, `{"MediaContainer":{"StatisticsResources":[
+				{"hostCpuUtilization":25.0,"hostMemoryUtilization":50.0},
+				{"hostCpuUtilization":42.0,"hostMemoryUtilization":65.0}
+			]}}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv.ID = "id1"
+	srv.Name = "Srv"
+
+	ch := make(chan prometheus.Metric, 50)
+	srv.Collect(ch)
+	close(ch)
+	byDesc := collectByDesc(ch)
+
+	if got := byDesc[descKey(metrics.DescServerInfo)]; len(got) != 1 {
+		t.Errorf("Collect emitted %d plex_server_info samples with identity known, want 1", len(got))
+	}
+	// Fails without the ResourcesRead and BandwidthRead gates: each would
+	// publish a 0 before its endpoint was ever read.
+	for _, d := range []*prometheus.Desc{metrics.DescHostCPU, metrics.DescHostMem, metrics.DescTransmitBytes} {
+		if got := byDesc[descKey(d)]; len(got) != 0 {
+			t.Errorf("Collect emitted %d %s samples before the endpoint was read, want 0", len(got), d.String())
+		}
+	}
+
+	srv.refreshResources(t.Context())
+
+	ch = make(chan prometheus.Metric, 50)
+	srv.Collect(ch)
+	close(ch)
+	byDesc = collectByDesc(ch)
+
+	// Fails if refreshResources forgets to set ResourcesRead.
+	cpu := byDesc[descKey(metrics.DescHostCPU)]
+	if len(cpu) != 1 {
+		t.Fatalf("Collect emitted %d plex_host_cpu_utilization_ratio samples after a read, want 1", len(cpu))
+	}
+	if _, v := metricSnapshot(t, cpu[0]); v != 0.42 {
+		t.Errorf("plex_host_cpu_utilization_ratio = %v, want 0.42", v)
+	}
+	mem := byDesc[descKey(metrics.DescHostMem)]
+	if len(mem) != 1 {
+		t.Fatalf("Collect emitted %d plex_host_memory_utilization_ratio samples after a read, want 1", len(mem))
+	}
+	if _, v := metricSnapshot(t, mem[0]); v != 0.65 {
+		t.Errorf("plex_host_memory_utilization_ratio = %v, want 0.65", v)
+	}
+	if got := byDesc[descKey(metrics.DescTransmitBytes)]; len(got) != 0 {
+		t.Errorf("Collect emitted %d plex_transmit_bytes_total samples while bandwidth 404s, want 0", len(got))
+	}
+}
+
+func TestCollect_identity_persists_across_failed_refresh(t *testing.T) {
+	// Identity is overwritten only by a successful providers fetch, so a
+	// Refresh that fails after one that worked keeps plex_server_info on the
+	// earlier identity while plex_http_reachable reads 0.
+	var fail atomic.Bool
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if fail.Load() {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		switch r.URL.Path {
+		case "/media/providers":
+			fmt.Fprint(w, `{"MediaContainer":{
+				"friendlyName":"TestPlex","machineIdentifier":"abc123","version":"1.40.0",
+				"MediaProvider":[{"identifier":"com.plexapp.plugins.library","Feature":[
+					{"type":"content","Directory":[
+						{"title":"Movies","id":"1","type":"movie","durationTotal":1000,"storageTotal":2000}
+					]}
+				]}]
+			}}`)
+		case "/":
+			fmt.Fprint(w, `{"MediaContainer":{
+				"friendlyName":"TestPlex","machineIdentifier":"abc123",
+				"version":"1.40.0","platform":"Linux","platformVersion":"6.1"
+			}}`)
+		case "/statistics/resources":
+			fmt.Fprint(w, `{"MediaContainer":{"StatisticsResources":[]}}`)
+		case "/statistics/bandwidth":
+			fmt.Fprint(w, `{"MediaContainer":{"StatisticsBandwidth":[]}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	srv := New(plextest.NewTestClientFromServer(t, ts))
+	if err := srv.Refresh(t.Context()); err != nil {
+		t.Fatalf("first Refresh() error = %v, want nil", err)
+	}
+	srv.SetHTTPReachable(true)
+
+	// Force the providers fetch again so the failure lands before s.ID is
+	// assigned, the path a degraded start takes.
+	srv.mu.Lock()
+	srv.LastProvidersRefresh = time.Time{}
+	srv.mu.Unlock()
+	fail.Store(true)
+	if err := srv.Refresh(t.Context()); err == nil {
+		t.Fatal("second Refresh() error = nil, want an error from a server answering 500")
+	}
+	srv.SetHTTPReachable(false)
+
+	ch := make(chan prometheus.Metric, 50)
+	srv.Collect(ch)
+	close(ch)
+	byDesc := collectByDesc(ch)
+
+	// Fails if identity were cleared on error, and fails if the gate were
+	// widened to "identity known AND reachable".
+	info := byDesc[descKey(metrics.DescServerInfo)]
+	if len(info) != 1 {
+		t.Fatalf("Collect emitted %d plex_server_info samples after a failed refresh, want 1", len(info))
+	}
+	labels, _ := metricSnapshot(t, info[0])
+	if labels[metrics.LabelServer] != "TestPlex" || labels[metrics.LabelServerID] != "abc123" {
+		t.Errorf("plex_server_info labels = server=%q server_id=%q, want TestPlex abc123",
+			labels[metrics.LabelServer], labels[metrics.LabelServerID])
+	}
+
+	reach := byDesc[descKey(metrics.DescHTTPReachable)]
+	if len(reach) != 1 {
+		t.Fatalf("Collect emitted %d plex_http_reachable samples, want 1", len(reach))
+	}
+	labels, v := metricSnapshot(t, reach[0])
+	if v != 0 {
+		t.Errorf("plex_http_reachable = %v after a failed refresh, want 0", v)
+	}
+	if _, ok := labels[metrics.LabelServer]; ok {
+		t.Errorf("plex_http_reachable carries server=%q, want no identity label", labels[metrics.LabelServer])
 	}
 }

@@ -29,9 +29,10 @@ Connects to your Plex Media Server and exposes metrics (active sessions, library
 
 ### Limitations
 
-- **Plex Pass features degrade gracefully.** CPU/memory utilization
-  and bandwidth statistics require Plex Pass. Without it, those
-  metrics are simply absent; every other metric still works.
+- **Plex Pass features degrade gracefully.** Host CPU and memory
+  utilization and the bandwidth counter come from statistics endpoints
+  that only answer with Plex Pass, so those three series are absent until
+  the endpoints have answered once; every other metric still works.
 - **Library item counts are cached.** Episode, track, and item
   counts are refreshed every 15 minutes to avoid hammering the
   Plex API. Counts may lag slightly after large library scans.
@@ -86,7 +87,7 @@ Pick the configuration that matches your Plex server:
 
 ### Hardened and Kubernetes deployments
 
-The health probe writes a marker file to `/tmp/.healthy` (see [Healthcheck](#healthcheck)), so **a read-only root filesystem needs a writable `/tmp`**. Without one the probe can never pass and the container is reported unhealthy while the exporter itself works. A small in-memory mount is enough; the marker is an empty file.
+The exporter records readiness by writing a marker file to `/tmp/.healthy` (see [Healthcheck](#healthcheck)), so **a read-only root filesystem needs a writable `/tmp`**. Without one the marker is never written. The image's Docker `HEALTHCHECK` still reports healthy after one warning at startup, so a missing mount does not restart a working container. `/api/health`, however, answers 503 for as long as the exporter runs, so any Kubernetes probe on that endpoint fails. A small in-memory mount is enough; the marker is an empty file.
 
 Docker Compose:
 
@@ -110,9 +111,32 @@ Kubernetes, alongside `securityContext.readOnlyRootFilesystem: true`:
         mountPath: /tmp
 ```
 
+Probes are a starting point; both read `/api/health`, so with `readOnlyRootFilesystem: true` they need the `/tmp` mount above:
+
+```yaml
+    livenessProbe:
+      httpGet:
+        path: /api/health
+        port: 9594
+      initialDelaySeconds: 0
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: /api/health
+        port: 9594
+      initialDelaySeconds: 0
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+```
+
+Running the exporter as a sidecar in the Plex pod with `PLEX_URL=http://localhost:32400` is a supported shape. It needs the `/tmp` mount only when an HTTP probe on `/api/health` is configured; with no probe the exporter logs one warning at start and runs.
+
 One more thing worth knowing on Kubernetes: the Prometheus Operator adds `pod`, `endpoint` and `container` labels to every scraped series, and the `pod` value changes on each restart. A panel reading a single gauge over a time range therefore renders one entry per dead pod until the old series ages out.
 
-The shipped dashboard handles this by asking current-state tiles for an instant value rather than a range, so stale pod series cannot appear. If you need those labels gone at ingestion instead, drop them in the ServiceMonitor:
+The shipped dashboard ([`grafana-dashboard.json`](grafana-dashboard.json)) handles this by asking current-state tiles for an instant value rather than a range, so stale pod series cannot appear. If you deliver that dashboard through a Flux Kustomization with `postBuild.substitute`, note that its `${datasource}` is Grafana's datasource variable and Flux rewrites every `${...}`, so escape it as `$${datasource}` or set `kustomize.toolkit.fluxcd.io/substitute: disabled` on the ConfigMap. If you need those labels gone at ingestion instead, drop them in the ServiceMonitor:
 
 ```yaml
     metricRelabelings:
@@ -140,10 +164,12 @@ Do this **only for a single-replica deployment**. Those labels are what distingu
 | `plex_host_memory_utilization_ratio` | Gauge | `server`, `server_id` | Host memory utilization as a ratio (0.0–1.0). Requires Plex Pass. |
 | `plex_transmit_bytes_total` | Counter | `server`, `server_id` | Cumulative bytes transmitted (from Plex bandwidth API). Requires Plex Pass. Resets on container restart; indicative only. |
 | `plex_active_transcode_sessions` | Gauge | `server`, `server_id` | Number of active video transcode sessions (from root endpoint, no Plex Pass needed) |
-| `plex_http_reachable` | Gauge | `server`, `server_id` | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed |
-| `plex_session_poll_reachable` | Gauge | `server`, `server_id` | Session poll reachability: `1` = last `/status/sessions` poll succeeded, `0` = failed |
-| `plex_http_retries_total` | Counter | `server`, `server_id` | Total HTTP retries performed by the Plex client's retry round-tripper across all requests |
-| `plex_exporter_errors_total` | Counter | `server`, `server_id`, `type` | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
+| `plex_http_reachable` | Gauge | _none_ | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed |
+| `plex_session_poll_reachable` | Gauge | _none_ | Session poll reachability: `1` = last `/status/sessions` poll succeeded, `0` = failed |
+| `plex_http_retries_total` | Counter | _none_ | Total HTTP retries performed by the Plex client's retry round-tripper across all requests |
+| `plex_exporter_errors_total` | Counter | `type` | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
+
+The four exporter metrics carry no server labels so that each keeps one series identity from the first scrape, before Plex has answered. Every other metric names the server it describes and appears once the exporter has learned that identity from Plex, so `absent(plex_server_info)` means it never has.
 
 ### Library Metrics
 
@@ -231,7 +257,7 @@ left to scrape: a configuration the exporter refuses outright reaches
 
 ## Healthcheck
 
-The image ships a `HEALTHCHECK` (the CLI probe `/plex-exporter health`) that verifies the HTTP server is listening; `/api/health` serves the same status over HTTP. The container exits (and Docker restarts it) only on a non-recoverable startup error: a bad token or other 4xx (except 408 and 429), the wrong server (404), a TLS/certificate misconfiguration, or a metrics-server start failure. A transient startup failure (DNS, dial, timeout, a 408 or 429, or a 5xx from a Plex that is still starting up) instead brings the exporter up degraded but healthy: it binds `/metrics`, reports `plex_http_reachable=0`, and recovers automatically once Plex is reachable again.
+The image ships a `HEALTHCHECK` (the CLI probe `/plex-exporter health`) that verifies the exporter reached its listening state; `/api/health` reports the same marker over HTTP. Both read the `/tmp/.healthy` marker, so a read-only root filesystem needs the writable `/tmp` described under [Hardened and Kubernetes deployments](#hardened-and-kubernetes-deployments): without it the CLI probe still reports healthy while `/api/health` answers 503. The container exits (and Docker restarts it) only on a non-recoverable startup error: a bad token or other 4xx (except 408 and 429), the wrong server (404), a TLS/certificate misconfiguration, or a metrics-server start failure. A transient startup failure (DNS, dial, timeout, a 408 or 429, or a 5xx from a Plex that is still starting up) instead brings the exporter up degraded but healthy: it binds `/metrics`, reports `plex_http_reachable=0`, and recovers automatically once Plex is reachable again.
 
 ## Security
 

@@ -43,6 +43,8 @@ type Server struct {
 	HTTPReachable        bool
 	SessionsReachable    bool
 	PlexPass             bool
+	ResourcesRead        bool
+	BandwidthRead        bool
 }
 
 // New returns an initialised Server for the given Plex HTTP client.
@@ -220,6 +222,8 @@ type Snapshot struct {
 	HTTPReachable     float64
 	SessionsReachable float64
 	Retries           float64
+	ResourcesRead     bool
+	BandwidthRead     bool
 }
 
 // Snapshot returns a consistent point-in-time copy of the server's
@@ -238,6 +242,8 @@ func (s *Server) Snapshot() Snapshot {
 		HostMem:          s.HostMem,
 		TransmitBytes:    s.TransmitBytes,
 		ActiveTranscodes: s.ActiveTranscodes,
+		ResourcesRead:    s.ResourcesRead,
+		BandwidthRead:    s.BandwidthRead,
 		Libraries:        make([]library.Library, len(s.Libraries)),
 		ErrorCounts:      make(map[string]float64, len(s.ErrorCounts)),
 	}
@@ -377,6 +383,7 @@ func (s *Server) refreshResources(ctx context.Context) {
 	s.mu.Lock()
 	s.HostCPU = latest.HostCPUUtilization / 100
 	s.HostMem = latest.HostMemoryUtilization / 100
+	s.ResourcesRead = true
 	s.mu.Unlock()
 }
 
@@ -400,6 +407,7 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 	// README already labels indicative-only.
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.BandwidthRead = true
 	highest := s.LastBandwidthAt
 	for _, u := range updates {
 		if u.At > s.LastBandwidthAt {
