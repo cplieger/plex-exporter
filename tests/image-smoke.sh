@@ -65,7 +65,7 @@ cleanup() {
     # A shell-less image often logs nothing about its probe, so the HEALTHCHECK's own
     # output is the only evidence for an "unhealthy" verdict.
     printf '%s\n' "--- healthcheck probe log ---" >&2
-    docker inspect --format '{{ if .State.Health }}{{ range .State.Health.Log }}exit={{ .ExitCode }}: {{ .Output }}{{ end }}{{ end }}' "$NAME" 2>/dev/null >&2 || true
+    docker inspect --format '{{ if .State.Health }}{{ range .State.Health.Log }}exit={{ .ExitCode }}: {{ .Output }}{{ end }}{{ end }}' "$NAME" >&2 2>/dev/null || true
   fi
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   # Fixture teardown, after the container that consumed it is gone; never allowed to
@@ -106,9 +106,11 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       # Read through `docker cp`, since a distroless image has no shell to exec.
       if [ "$SMOKE_LICENSE_TREE" = 1 ]; then
         tree=$(mktemp -d)
-        if ! docker cp "$NAME:/usr/share/licenses" "$tree/" >/dev/null 2>&1; then
+        # The daemon's own message is the diagnosis (a missing path reads differently
+        # from a refused read), so it is kept, not swallowed.
+        if ! cp_err=$(docker cp "$NAME:/usr/share/licenses" "$tree/" 2>&1 >/dev/null); then
           rm -rf "$tree"
-          printf 'FAIL: %s image has no /usr/share/licenses tree\n' "$APP" >&2
+          printf 'FAIL: %s image has no readable /usr/share/licenses tree: %s\n' "$APP" "$cp_err" >&2
           exit 1
         fi
         if [ ! -f "$tree/licenses/$APP/LICENSE" ]; then
