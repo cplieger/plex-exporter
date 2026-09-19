@@ -1,0 +1,8 @@
+# Third-party notices
+
+No third-party code is included in this repository, and that claim is load-bearing: both upstreams named below are AGPL-3.0, which this repository's GPL-3.0-or-later license cannot carry, so nothing was copied from either and no license text is reproduced here.
+
+Two designs are followed, each named at the lines of ours that follow it:
+
+- The metric and label vocabulary in `internal/metrics/descs.go` follows [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) (AGPL-3.0), the Grafana Hackathon 2022 exporter this project builds on. Ours is the three-tier server, library and play label hierarchy (`internal/metrics/descs.go:11-20`) and the descriptors that reuse it: `plex_server_info` (`:47`), `plex_host_cpu_utilization_ratio` and `plex_host_memory_utilization_ratio` (`:51` and `:55`), `plex_library_duration_milliseconds` (`:59`), `plex_library_storage_bytes` (`:63`), `plex_transmit_bytes_total` (`:71`) and `plex_play_seconds_total` (`:83`), which carry upstream's `server_info`, `host_cpu_util`, `host_mem_util`, `library_duration_total`, `library_storage_total`, `transmit_bytes_total` and `play_seconds_total` under a `plex_` prefix with the unit in the name. The code behind them is unrelated: upstream tracks sessions over a websocket event stream, this exporter polls `/status/sessions` and reconciles the snapshots in `internal/sessions`.
+- Three label additions follow the [@timothystewart6 fork](https://github.com/timothystewart6/prometheus-plex-exporter) (AGPL-3.0) of that exporter: `plex_library_items` with its `content_type` label (`internal/metrics/descs.go:67`), and the `transcode_type` and `subtitle_action` play labels (`internal/metrics/descs.go:19`).
