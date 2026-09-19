@@ -20,6 +20,7 @@ SMOKE_APP_NAME=""
 SMOKE_TIMEOUT=""
 SMOKE_RUN_ARGS=""
 SMOKE_LOG_PATTERN=""
+SMOKE_LICENSE_TREE=""
 # A .conf that creates host state overrides this. Defined BEFORE the source so the
 # EXIT trap can always call it.
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap's cleanup()
@@ -43,6 +44,13 @@ TIMEOUT="${SMOKE_TIMEOUT:-120}"
 case "$TIMEOUT" in
   '' | *[!0-9]*)
     printf 'FAIL: SMOKE_TIMEOUT must be a non-negative integer, got "%s"\n' "$TIMEOUT" >&2
+    exit 1
+    ;;
+esac
+case "$SMOKE_LICENSE_TREE" in
+  '' | 0 | 1) ;;
+  *)
+    printf 'FAIL: SMOKE_LICENSE_TREE must be 1, 0 or unset, got "%s"\n' "$SMOKE_LICENSE_TREE" >&2
     exit 1
     ;;
 esac
@@ -94,6 +102,27 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       if [ -n "$SMOKE_LOG_PATTERN" ] && ! docker logs "$NAME" 2>&1 | grep -qF -- "$SMOKE_LOG_PATTERN"; then
         sleep 1
         continue
+      fi
+      # Read through `docker cp`, since a distroless image has no shell to exec.
+      if [ "$SMOKE_LICENSE_TREE" = 1 ]; then
+        tree=$(mktemp -d)
+        if ! docker cp "$NAME:/usr/share/licenses" "$tree/" >/dev/null 2>&1; then
+          rm -rf "$tree"
+          printf 'FAIL: %s image has no /usr/share/licenses tree\n' "$APP" >&2
+          exit 1
+        fi
+        if [ ! -f "$tree/licenses/$APP/LICENSE" ]; then
+          rm -rf "$tree"
+          printf 'FAIL: %s image lacks /usr/share/licenses/%s/LICENSE\n' "$APP" "$APP" >&2
+          exit 1
+        fi
+        components=$(find "$tree/licenses" -mindepth 1 -maxdepth 1 -type d ! -name "$APP" | wc -l)
+        rm -rf "$tree"
+        if [ "$components" -lt 1 ]; then
+          printf 'FAIL: %s license tree holds only the image'\''s own files; no bundled component\n' "$APP" >&2
+          exit 1
+        fi
+        printf '%s license tree: own LICENSE plus %s bundled component(s)\n' "$APP" "$components"
       fi
       # A failure here is a verdict, not a retry: health said up, so anything
       # smoke_verify finds missing is missing from the image.

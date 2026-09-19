@@ -135,6 +135,24 @@ exclude_paths = [
   # form would miss it (measured on the pinned cliff v2.13.1 — bare excludes the
   # root file only, `**/` excludes both, and a real code commit still bumps).
   "**/.punused-ignore",
+  # knip suppressions and enrolment: the TS twin of .punused-ignore, read by
+  # ts-ci's unused-deps/exports gate. Dev-only, never in an artifact, and a
+  # suppression-only commit ships nothing — but `refactor:` is a RELEASING type,
+  # so a config-only commit was minting a version and a changelog line.
+  # release.yaml's EXCLUDE_PATTERNS already dropped it from the BUILD gate; this
+  # is the RELEASE gate catching up. All eight forms knip itself loads
+  # (KNIP_CONFIG_LOCATIONS in knip/dist/constants.js), since only knip.json is
+  # in use today and the others must not reopen the gap. `**/` not bare: every
+  # enrolled config lives beside its package.json, which in a hybrid repo is a
+  # subdirectory (static-src/, web/, internal/server/static-src/).
+  "**/knip.json",
+  "**/knip.jsonc",
+  "**/.knip.json",
+  "**/.knip.jsonc",
+  "**/knip.ts",
+  "**/knip.js",
+  "**/knip.config.ts",
+  "**/knip.config.js",
 ]
 
 commit_parsers = [
