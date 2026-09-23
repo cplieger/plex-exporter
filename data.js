@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1790124200038,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/plex-exporter",
   "entries": {
     "Benchmark": [
       {
@@ -641,19 +641,19 @@ window.BENCHMARK_DATA = {
       {
         "commit": {
           "author": {
-            "name": "Christopher Plieger",
+            "name": "cplieger",
             "username": "cplieger",
             "email": "917744+cplieger@users.noreply.github.com"
           },
           "committer": {
-            "name": "GitHub",
-            "username": "web-flow",
-            "email": "noreply@github.com"
+            "name": "Christopher Plieger",
+            "username": "cplieger",
+            "email": "917744+cplieger@users.noreply.github.com"
           },
-          "id": "f9577db6c2f2096d9cc325c89450a48686d66346",
-          "message": "chore(deps): update cplieger/ci digest to aa0a018 (#649)",
-          "timestamp": "2026-09-20T08:02:03Z",
-          "url": "https://github.com/cplieger/ci/commit/f9577db6c2f2096d9cc325c89450a48686d66346"
+          "id": "a6e86ac93951c07e93b333d5e06f57752c69f2a2",
+          "message": "docs: link every README badge so they render on one row\n\nA bare badge image is a block element under any stylesheet built on Tailwind\nPreflight, so the Platforms and base badges each took their own line and the\nsurrounding prose margin wherever the README is rendered outside GitHub, the\nUnraid Community Applications listing included.\n\nWrapping both in links restores inline flow: Platforms points at the GHCR package\npage that lists the platforms it claims, and base at the Dockerfile that holds\nthe pin.",
+          "timestamp": "2026-09-20T13:23:58Z",
+          "url": "https://github.com/cplieger/plex-exporter/commit/a6e86ac93951c07e93b333d5e06f57752c69f2a2"
         },
         "date": 1790124199804,
         "tool": "customSmallerIsBetter",
