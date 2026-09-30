@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1790732377248,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/plex-exporter",
   "entries": {
     "Benchmark": [
       {
@@ -777,10 +777,10 @@ window.BENCHMARK_DATA = {
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "48d1c682390d6a54c634f3df4594be7c938087f9",
-          "message": "chore(deps): update cplieger/ci digest to 1cc06fd (#659)",
-          "timestamp": "2026-09-24T22:02:23Z",
-          "url": "https://github.com/cplieger/ci/commit/48d1c682390d6a54c634f3df4594be7c938087f9"
+          "id": "56e523e18b0a09532f2770bae8e39a67996572be",
+          "message": "chore(deps): update module github.com/prometheus/common to v0.72.0 (#633)",
+          "timestamp": "2026-09-28T11:10:05Z",
+          "url": "https://github.com/cplieger/plex-exporter/commit/56e523e18b0a09532f2770bae8e39a67996572be"
         },
         "date": 1790732376326,
         "tool": "customSmallerIsBetter",
