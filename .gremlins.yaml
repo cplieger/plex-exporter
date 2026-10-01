@@ -17,7 +17,7 @@
 #   - retry/backoff loops with time.Sleep — mutations to timing constants are
 #     unkillable without integration tests
 #
-# Per-repo bespoke exclusions (e.g., vibekit's hub/sse subsystem) live in this
+# Per-repo bespoke exclusions (e.g., marotte's hub/sse subsystem) live in this
 # config too — append to exclude-files. Resist the urge to make this per-repo;
 # centralization is the point.
 #
@@ -91,7 +91,7 @@ unleash:
     - '(^|/)wiring/wiring\.go$'
     - '(^|/)composition/composition\.go$'
 
-    # Hub / SSE / mcp subsystems (vibekit) — heavily concurrent, need
+    # Hub / SSE / mcp subsystems (marotte) — heavily concurrent, need
     # integration to kill mutations
     - '(^|/)hub/sse\.go$'
     - '(^|/)hub/sse_controller\.go$'
