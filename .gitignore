@@ -6,3 +6,6 @@
 # Go workspace
 go.work
 go.work.sum
+
+# Agent workflow scratch
+.agents/
