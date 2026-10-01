@@ -13,11 +13,13 @@
 # and always runs the markdown lint.
 name: CI
 
+# Both branches stay listed: a repo that has not adopted a dev branch keeps
+# its checks on main, and one that has gets them on dev.
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   pull_request:
-    branches: [main]
+    branches: [dev, main]
   workflow_dispatch:
 
 permissions:

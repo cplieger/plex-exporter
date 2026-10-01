@@ -1,17 +1,11 @@
 # Synced from cplieger/ci/.github/workflow-templates/release.yml — DO NOT EDIT.
-# The release pipeline is fully centralized; all logic and per-repo policy
-# lives in cplieger/ci/.github/workflows/release.yaml. This file just calls it.
-#
-# Behavior:
-#   - On every push to main and on workflow_dispatch, the central detect job
-#     computes the cliff version, classifies the repo type (docker/go/ts),
-#     identifies which paths actually changed, and dispatches to the right
-#     downstream branch (Docker build/sign/publish, Go tag, TS publish to
-#     npm+JSR, or any combination for hybrid repos with subpackages).
-#   - To change behavior for this repo (e.g., disable Docker Hub mirror,
-#     force arm64-only), edit the "Resolve repo policy" step in
-#     cplieger/ci/.github/workflows/release.yaml — there is no per-repo
-#     override surface here.
+# The release pipeline is fully centralized in
+# cplieger/ci/.github/workflows/release.yaml; this file only calls it. The
+# central pipeline selects the channel from the branch it runs on (main is the
+# stable channel), computes the version, detects the repo type and the changed
+# paths, and publishes. This file triggers on main only until the pinned
+# pipeline is one that publishes a dev channel from a dev push. Per-repo
+# behaviour is the "Resolve repo policy" step there; no override surface here.
 name: Release
 
 on:
@@ -19,17 +13,9 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      # Set by the scheduled staleness rebuild in cplieger/ci
-      # (rebuild-stale.yaml): a dispatched rebuild publishes only when the
-      # rebuilt image's package inventory differs from what :latest already
-      # ships. Deliberately NOT forwarded via `with:` below; the central
-      # pipeline reads it from this run's dispatch context
-      # (github.event.inputs, which inside a reusable workflow is the
-      # caller's), so this stub stays valid even while its pinned SHA predates
-      # the input (a `with:` key the pinned workflow does not declare would
-      # fail every run until Renovate moves the pin). Plain manual dispatches
-      # keep today's always-publish semantics (default false). Docker-type
-      # repos only; go/ts releases ignore it.
+      # Read by the v2 pipeline's no-change gate through github.event.inputs
+      # (deliberately not forwarded via `with:`); the scheduled staleness
+      # rebuild dispatches with it while a repo's default branch is main.
       skip_if_unchanged:
         description: "Skip publishing when the rebuilt image is package-identical to :latest (used by the scheduled staleness rebuild)."
         type: boolean
@@ -59,6 +45,7 @@ jobs:
   release:
     permissions:
       contents: write
+      statuses: write
       packages: write
       id-token: write
       attestations: write

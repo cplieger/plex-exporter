@@ -82,13 +82,14 @@ conventional_commits = true
 filter_unconventional = false
 split_commits = false
 protect_breaking_commits = false
-# Anchored: tag_pattern is a REGEX (unlike git describe's whole-name glob), so
-# an unanchored "v[0-9].*" also matches prefixed tags like "yamlenv/v2.0.0"
-# (a nested-module or component tag) and poisons the version base — verified
-# on git-cliff v2.13.1: with root at v1.1.0 and a yamlenv/v2.0.0 tag present,
-# --bumped-version returned "yamlenv/v2.0.1" as the ROOT next version. The
-# probe (scripts/test-cliff-bump-semantics.sh, state G) pins this.
-tag_pattern = "^v[0-9]"
+# Anchored at both ends: tag_pattern is a REGEX (unlike git describe's
+# whole-name glob), so anything looser also matches a prefixed lane tag
+# ("yamlenv/v2.0.0") or a pre-release ("v1.3.0-dev.7") and computes the next
+# stable version from it (measured on git-cliff 2.14.2: "^v[0-9]" answered
+# v1.3.0-dev.2 where v1.3.0 was due). A TOML literal string, because "\." is
+# not a valid escape in a basic string. States G and M of
+# scripts/test-cliff-bump-semantics.sh pin both hazards.
+tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
 
 # Path-level noise filter: a commit whose changed files ALL match these globs
 # never appears in the changelog and never drives a version bump (exclusions

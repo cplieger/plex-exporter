@@ -7,11 +7,13 @@
 # chore(sync) would clobber a local change. Edit it HERE.
 name: CodeQL
 
+# Both branches stay listed: a repo that has not adopted a dev branch keeps
+# its analysis on main, and one that has gets it on dev.
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   pull_request:
-    branches: [main]
+    branches: [dev, main]
   workflow_dispatch:
 
 permissions:
