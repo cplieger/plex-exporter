@@ -5,9 +5,10 @@ services:
     container_name: plex-exporter
     restart: unless-stopped
 
+    # Set both values in a .env file next to this one before the first start.
     environment:
-      PLEX_URL: "http://plex:32400"  # full URL including scheme and port
-      PLEX_TOKEN: "your-plex-token"  # admin token from Plex Web settings
+      - PLEX_URL  # the address you open Plex at from another device, such as http://192.0.2.10:32400
+      - PLEX_TOKEN  # your Plex admin token, found with Plex's guide "Finding an authentication token"
 
     ports:
       - "9594:9594"
