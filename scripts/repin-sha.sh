@@ -1,9 +1,8 @@
 #!/bin/sh
+# Synced from cplieger/ci/configs/repin-sha.sh. Change it there.
 # Recompute a Dockerfile sha256 integrity pin after Renovate moved its version
 # literal, run from postUpgradeTasks because no datasource publishes a sha256.
 # Marker convention and enrollment: ci-renovate.md, "Automated sha-pin recompute".
-# CANONICAL COPY in cplieger/ci (configs/repin-sha.sh), synced to every repo with a
-# root Dockerfile: edit it there, never here.
 # A marker it cannot honour exits non-zero rather than skipping, because a silent
 # miss reproduces the stale-pin build failure the pin exists to catch.
 set -eu

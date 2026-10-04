@@ -1,3 +1,4 @@
+# Synced from cplieger/ci/.golangci.yaml. Change it there.
 version: "2"
 
 run:

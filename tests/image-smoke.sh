@@ -1,11 +1,10 @@
 #!/bin/sh
+# Synced from cplieger/ci/configs/image-smoke.sh. Change it there.
 # Runtime image smoke-test harness: start the assembled image, wait for the
 # container's own HEALTHCHECK to report healthy, fail fast on an early exit, dump the
 # container log tail only on failure. Per-app knobs and hooks come from
 # tests/image-smoke.conf beside this script; smoke-tests.md "Pattern B" documents
 # every knob, every hook and what each tier proves.
-# CANONICAL COPY in cplieger/ci (configs/image-smoke.sh), synced to each enrolled
-# app's tests/image-smoke.sh: edit it there, never here.
 set -eu
 
 IMG="${1:?usage: image-smoke.sh <image-ref>}"

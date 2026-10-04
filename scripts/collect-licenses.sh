@@ -1,8 +1,7 @@
 #!/bin/sh
+# Synced from cplieger/ci/configs/collect-licenses.sh. Change it there.
 # Copy every linked Go module's license files into the /usr/share/licenses tree of
 # attribution.md section 4. usage: collect-licenses.sh --name IMAGE [--out DIR] [--src DIR] [PACKAGE ...]
-# CANONICAL COPY in cplieger/ci (configs/collect-licenses.sh), synced to each
-# root-Dockerfile repo's scripts/collect-licenses.sh: edit it there, never here.
 # A module with no license file fails the build rather than being skipped, because a
 # missing text is a section 4(a) breach and the fix is a human decision.
 set -eu

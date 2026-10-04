@@ -1,6 +1,5 @@
-# Central Gremlins (Go mutation testing) config — synced into every Go-having
-# consumer repo as `.gremlins.yaml`. Edit this file in cplieger/ci to change
-# the policy org-wide.
+# Synced from cplieger/ci/configs/gremlins.yaml. Change it there.
+# Central Gremlins (Go mutation testing) config for every Go-having repo.
 #
 # Source: distilled from per-repo analysis (cplieger/ci subagent research,
 # 2026-06-04). Patterns capture the common "unkillable without integration"
