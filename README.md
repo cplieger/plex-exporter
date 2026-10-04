@@ -3,44 +3,34 @@
 [![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/size.json)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter) [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)](https://github.com/cplieger/plex-exporter/pkgs/container/plex-exporter) [![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)](https://github.com/cplieger/plex-exporter/blob/main/Dockerfile) [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/plex-exporter/badges/mutation.json)](https://github.com/cplieger/plex-exporter/issues?q=label%3Agremlins-tracker) [![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/plex-exporter/releases)
 
 <!-- hub-overview BEGIN -->
-See what your Plex server is doing in Grafana: sessions, libraries, bandwidth, transcoding.
+plex-exporter puts your Plex server's streams, transcodes, bandwidth and library sizes into Prometheus, so you can watch them in Grafana and get alerts. It only reads from Plex. Your own Prometheus and Grafana store and show the data.
+
+![The bundled Grafana dashboard showing server status, active streams and transcodes, library totals, a table of six active sessions and storage per library](docs/images/header.png)
 
 ## What it does
 
-Connects to your Plex Media Server and exposes metrics (active sessions, library sizes, bandwidth, transcoding status) in a format that Prometheus can scrape and Grafana can visualize.
+plex-exporter lets you follow your Plex server in Grafana and get alerts when it has a problem.
 
-**Key metrics exposed:**
+- Shows who is watching what, on which device, and whether it plays directly or is transcoded.
+- Tracks each stream's bandwidth and bitrate, and whether the viewer is local or remote.
+- Counts the items, total length and disk space of each library.
+- Adds host CPU, memory and total bandwidth on a server with Plex Pass.
+- Comes with a Grafana dashboard and nine alert rules, one of them for a revoked token.
 
-- Library duration, storage, and item counts (movies, episodes, tracks)
-- Active session details (user, device, resolution, stream type)
-- Transcode type detection (video/audio/both) and subtitle handling
-- Session bandwidth and location (LAN/WAN)
-- Host CPU and memory utilization (Plex Pass)
-- Bandwidth transmission totals (Plex Pass)
-- HTTP polling reachability
-- Active transcode session count
+## Who it is for
 
-### Why this design
+plex-exporter is built for Plex server owners who already run Grafana and Prometheus, or another Prometheus-compatible scraper such as Grafana Alloy. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
 
-- **Polling `/status/sessions` for real-time session tracking:** polls the Plex sessions API every 5s, so new sessions appear within seconds; the tracker prunes sessions after 60s of inactivity
-- **Single binary:** direct dependencies are `prometheus/client_golang` and a few small helper libraries (see [Dependencies](#dependencies)); everything else is the standard library
-- **Distroless and rootless:** runs on `gcr.io/distroless/static-debian13` as UID 65532 with no shell or package manager, minimizing attack surface
-- **Prometheus-native:** exposes a standard `/metrics` endpoint that works with any Prometheus-compatible scraper and any Grafana dashboard, no custom visualization layer
+You need a Plex Media Server and its admin token, plus a scraper and Grafana, which this image does not include. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
 
-### Limitations
+Consider [Tautulli](https://github.com/Tautulli/Tautulli) if you want a web app made for Plex, with watch history, per-user statistics and notifications for streams and recently added media.
 
-- **Plex Pass features degrade gracefully.** Host CPU and memory
-  utilization and the bandwidth counter come from statistics endpoints
-  that only answer with Plex Pass, so those three series are absent until
-  the endpoints have answered once; every other metric still works.
-- **Library item counts are cached.** Episode, track, and item
-  counts are refreshed every 15 minutes to avoid hammering the
-  Plex API. Counts may lag slightly after large library scans.
+plex-exporter is free software under the GPL-3.0-or-later license.
 <!-- hub-overview END -->
 
 ## Quick start
 
-Available from both `ghcr.io/cplieger/plex-exporter` and `docker.io/cplieger/plex-exporter`; identical images and tags.
+The image is on GitHub Container Registry and Docker Hub, for `amd64` and `arm64`. Both have the same images and tags. This is the [`compose.yaml`](compose.yaml) in this repository.
 
 ```yaml
 services:
@@ -49,279 +39,115 @@ services:
     container_name: plex-exporter
     restart: unless-stopped
 
+    # Set both values in a .env file next to this one before the first start.
     environment:
-      PLEX_URL: "http://plex:32400"  # full URL including scheme and port
-      PLEX_TOKEN: "your-plex-token"  # admin token from Plex Web settings
+      - PLEX_URL  # the address you open Plex at from another device, such as http://192.0.2.10:32400
+      - PLEX_TOKEN  # your Plex admin token, found with Plex's guide "Finding an authentication token"
 
     ports:
       - "9594:9594"
 ```
 
+1. Sign in to Plex Web as the server's owner and find your token with Plex's guide, [Finding an authentication token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/).
+2. Next to `compose.yaml`, create a file named `.env` with these two lines. Put in your token and the address you open Plex at from another device on your network, not `localhost`.
+
+   ```text
+   PLEX_URL=http://192.0.2.10:32400
+   PLEX_TOKEN=your-plex-token
+   ```
+
+   Use `http://plex:32400` only when your Plex container is named `plex` and shares a Docker network with this one.
+3. Run `docker compose up -d`.
+4. Add this scrape job to your Prometheus configuration, with your Docker host's address in place of `192.0.2.20`. The shipped alert rules expect the job name `plex-exporter`.
+
+```yaml
+scrape_configs:
+  - job_name: plex-exporter
+    static_configs:
+      - targets: ["192.0.2.20:9594"]
+```
+
+Run `docker logs plex-exporter`. You should see `connected to plex server` with your server's name. If you see `cannot connect to plex server` with `401 Unauthorized`, the token is wrong.
+
+On Unraid, open the **Apps** tab, search for plex-exporter and click **Install**.
+
+## Adding the Grafana dashboard
+
+The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), a dashboard built on these metrics.
+
+1. In Grafana, open **Dashboards**, click **New**, then **Import**.
+2. Upload `grafana-dashboard.json` and choose your Prometheus data source.
+
+Take the file from the release that matches your image tag, because each release's dashboard matches the metrics that image serves. Its `uid` stays the same, so importing a newer copy updates the dashboard in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
+
 ## Configuration reference
 
-### Environment variables
+Every setting is an environment variable, read once at start. Run `docker compose up -d` again after a change.
 
-| Variable | Description | Default | Required |
-| --- | --- | --- | --- |
-| `PLEX_URL` | Full URL of your Plex Media Server including scheme and port (e.g. `http://192.0.2.100:32400`) | _none_ | Yes |
-| `PLEX_TOKEN` | Plex authentication token for the server administrator. Get it from Plex Web → Settings → XML view → myPlexAccessToken. Also readable from a file: see `PLEX_TOKEN_FILE` below | _none_ | Yes |
-| `PLEX_TOKEN_FILE` | Path to a file holding the Plex token (a Docker or Podman secret). When set it takes precedence over `PLEX_TOKEN` and keeps the token out of the container environment, so it does not appear in `docker inspect`. One trailing line ending is stripped; a file holding only whitespace is rejected at startup | _(unset)_ | No |
-| `LISTEN_ADDR` | Address and port for the metrics HTTP server | `:9594` | No |
-| `PLEX_CA_CERT_PATH` | Path to a PEM file with the CA that signed your Plex server's certificate; TLS verification stays on, pinned to that CA. See [TLS / certificate setup](#tls--certificate-setup). | _(unset)_ | No |
+| Variable | Description | Default |
+| --- | --- | --- |
+| `PLEX_URL` | Your Plex server's address with scheme and port, such as `http://192.0.2.10:32400` | required |
+| `PLEX_TOKEN` | The admin token of your Plex server. Leave it out when `PLEX_TOKEN_FILE` is set | required |
+| `PLEX_TOKEN_FILE` | Path to a file holding the token, such as a Docker secret. It takes precedence over `PLEX_TOKEN` and keeps the token out of `docker inspect` | _(unset)_ |
+| `LISTEN_ADDR` | Address and port the metrics server listens on | `:9594` |
+| `PLEX_CA_CERT_PATH` | Path inside the container to the PEM file of the CA that signed your Plex certificate. TLS verification stays on | _(unset)_ |
 
-### TLS / certificate setup
+The exporter strips one trailing line ending from the token file, and refuses to start when the file holds only whitespace.
 
-Pick the configuration that matches your Plex server:
+Which TLS setting you need depends on your `PLEX_URL`:
 
 | Your `PLEX_URL` looks like | What to do |
 | --- | --- |
-| `http://plex:32400` (Docker network, LAN, etc.) | nothing; TLS isn't in use |
-| `https://<hash>.plex.direct:32400` (Plex's official cert) | nothing; Let's Encrypt is trusted by default |
-| `https://192.0.2.100:32400` or `https://plex.local` (self-signed / private CA) | set `PLEX_CA_CERT_PATH` to the PEM file of the CA that signed your Plex cert |
-
-### Ports
+| `http://plex:32400` or another `http://` address | Nothing, because TLS is not in use |
+| `https://<hash>.plex.direct:32400`, with Plex's own certificate | Nothing, because a public CA signed it |
+| `https://192.0.2.10:32400` or `https://plex.local`, with a self-signed or private CA | Mount the CA's PEM file and set `PLEX_CA_CERT_PATH` to its path |
 
 | Port | Description |
 | --- | --- |
-| `9594` | Prometheus metrics endpoint (`/metrics`) and health check (`/api/health`) |
+| `9594` | Prometheus metrics at `/metrics` and the health check at `/api/health` |
 
-### Hardened and Kubernetes deployments
-
-The exporter records readiness by writing a marker file to `/tmp/.healthy` (see [Healthcheck](#healthcheck)), so **a read-only root filesystem needs a writable `/tmp`**. Without one the marker is never written. The image's Docker `HEALTHCHECK` still reports healthy after one warning at startup, so a missing mount does not restart a working container. `/api/health`, however, answers 503 for as long as the exporter runs, so any Kubernetes probe on that endpoint fails. A small in-memory mount is enough; the marker is an empty file.
-
-Docker Compose:
-
-```yaml
-    read_only: true
-    tmpfs:
-      - "/tmp:size=1m,mode=1777,noexec,nosuid,nodev"
-```
-
-Kubernetes, alongside `securityContext.readOnlyRootFilesystem: true`:
-
-```yaml
-    volumes:
-      - name: tmp
-        emptyDir:
-          medium: Memory
-          sizeLimit: 8Mi
-    # in the container spec
-    volumeMounts:
-      - name: tmp
-        mountPath: /tmp
-```
-
-Probes are a starting point; both read `/api/health`, so with `readOnlyRootFilesystem: true` they need the `/tmp` mount above:
-
-```yaml
-    livenessProbe:
-      httpGet:
-        path: /api/health
-        port: 9594
-      initialDelaySeconds: 0
-      periodSeconds: 30
-      timeoutSeconds: 5
-      failureThreshold: 3
-    readinessProbe:
-      httpGet:
-        path: /api/health
-        port: 9594
-      initialDelaySeconds: 0
-      periodSeconds: 30
-      timeoutSeconds: 5
-      failureThreshold: 3
-```
-
-Running the exporter as a sidecar in the Plex pod with `PLEX_URL=http://localhost:32400` is a supported shape. It needs the `/tmp` mount only when an HTTP probe on `/api/health` is configured; with no probe the exporter logs one warning at start and runs.
-
-One more thing worth knowing on Kubernetes: the Prometheus Operator adds `pod`, `endpoint` and `container` labels to every scraped series, and the `pod` value changes on each restart. A panel reading a single gauge over a time range therefore renders one entry per dead pod until the old series ages out.
-
-The shipped dashboard ([`grafana-dashboard.json`](grafana-dashboard.json)) handles this by asking current-state tiles for an instant value rather than a range, so stale pod series cannot appear. If you deliver that dashboard through a Flux Kustomization with `postBuild.substitute`, note that its `${datasource}` is Grafana's datasource variable and Flux rewrites every `${...}`, so escape it as `$${datasource}` or set `kustomize.toolkit.fluxcd.io/substitute: disabled` on the ConfigMap. If you need those labels gone at ingestion instead, drop them in the ServiceMonitor:
-
-```yaml
-    metricRelabelings:
-      - action: labeldrop
-        regex: (pod|endpoint|container)
-```
-
-Do this **only for a single-replica deployment**. Those labels are what distinguishes one replica's series from another's, so dropping all three on a multi-replica ServiceMonitor makes two replicas emit identical label sets, which Prometheus [warns against explicitly](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config). With more than one replica, keep `pod` and aggregate in the query instead.
-
-The dashboard is versioned with the app: the JSON at release `<tag>` matches the metrics that image emits, and its `uid` is stable, so a re-import updates the existing dashboard in place. Pin it the way you pin the image, using the tag of the image you run. The release asset is `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json`, with `grafana-dashboard.json.sha256` beside it; it works as grafana-operator `spec.url`, as the Grafana Helm chart `dashboards.<provider>.<name>.url`, or as a Terraform `http` data source. The OCI artifact is `ghcr.io/cplieger/plex-exporter/dashboard:<tag>` for grafana-operator `spec.oci`. Renovate tracks either form: the `github-releases` datasource for the URL, the `docker` datasource for the OCI tag.
-
-```yaml
-apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaDashboard
-metadata:
-  name: plex-exporter
-spec:
-  instanceSelector:
-    matchLabels:
-      dashboards: grafana
-  oci:
-    reference: ghcr.io/cplieger/plex-exporter/dashboard:<tag>
-    path: grafana-dashboard.json
-```
-
-## Metrics reference
-
-### HTTP Endpoints
-
-| Endpoint | Method | Description |
-| --- | --- | --- |
-| `/metrics` | GET | Prometheus metrics (see below) |
-| `/api/health` | GET | Returns `{"status":"OK"}` when ready, 503 when starting/stopping |
-
-### Server Metrics
-
-| Metric | Type | Labels | Description |
-| --- | --- | --- | --- |
-| `plex_server_info` | Gauge (always 1) | `server`, `server_id`, `version`, `platform`, `platform_version`, `plex_pass` | Server metadata and Plex Pass status |
-| `plex_host_cpu_utilization_ratio` | Gauge | `server`, `server_id` | Host CPU utilization as a ratio (0.0–1.0). Requires Plex Pass. |
-| `plex_host_memory_utilization_ratio` | Gauge | `server`, `server_id` | Host memory utilization as a ratio (0.0–1.0). Requires Plex Pass. |
-| `plex_transmit_bytes_total` | Counter | `server`, `server_id` | Cumulative bytes transmitted (from Plex bandwidth API). Requires Plex Pass. Resets on container restart; indicative only. |
-| `plex_active_transcode_sessions` | Gauge | `server`, `server_id` | Number of active video transcode sessions (from root endpoint, no Plex Pass needed) |
-| `plex_http_reachable` | Gauge | _none_ | HTTP polling reachability: `1` = last refresh succeeded, `0` = failed |
-| `plex_session_poll_reachable` | Gauge | _none_ | Session poll reachability: `1` = last `/status/sessions` poll succeeded, `0` = failed |
-| `plex_http_retries_total` | Counter | _none_ | Total HTTP retries performed by the Plex client's retry round-tripper across all requests |
-| `plex_exporter_errors_total` | Counter | `type` | Exporter error count by type. Types: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`. |
-
-The four exporter metrics carry no server labels so that each keeps one series identity from the first scrape, before Plex has answered. Every other metric names the server it describes and appears once the exporter has learned that identity from Plex, so `absent(plex_server_info)` means it never has.
-
-### Library Metrics
-
-| Metric | Type | Labels | Description |
-| --- | --- | --- | --- |
-| `plex_library_duration_milliseconds` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total duration of all items in the library (ms) |
-| `plex_library_storage_bytes` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Total storage used by the library (bytes) |
-| `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Number of items in the library. `content_type` is `movies`, `episodes`, `tracks`, `photos`, or `items`. Refreshed every 15 minutes. Absent until the count is read once; a library read as empty reports `0`. |
-
-### Session Metrics
-
-| Metric | Type | Labels | Description |
-| --- | --- | --- | --- |
-| `plex_plays_active` | Gauge | `server`, `server_id`, `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `grandchild_index`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location`, `local` | Currently active play sessions (1 per session). Reported once the exporter has seen the session playing, so a stream that was already paused when the exporter started is absent until it resumes. Use `count(plex_plays_active)` for total stream count. Removed after 60s of inactivity. |
-| `plex_play_seconds_total` | Counter | _(same as above)_ | Cumulative play time for the session (seconds) |
-| `plex_session_bandwidth_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Real-time session bandwidth from the Plex Sessions API (kbps) |
-| `plex_session_bitrate_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Live stream bitrate per session (kbps). Kept as its own series rather than a label on the play metrics, so adaptive-streaming bitrate changes cannot inflate label cardinality. |
-
-### Session Label Reference
-
-| Label | Values | Description |
-| --- | --- | --- |
-| `stream_type` | `directplay`, `copy`, `transcode` | How the stream is being delivered |
-| `transcode_type` | `none`, `video`, `audio`, `both` | What is being transcoded |
-| `subtitle_action` | `none`, `burn`, `copy`, `transcode` | How subtitles are handled |
-| `location` | `lan`, `wan` | Client network location |
-| `local` | `true`, `false` | Whether the client is on the local network |
-| `media_type` | `movie`, `episode`, `track`, etc. | Plex media type |
-
-For episodes: `title` = show name, `child_title` = season,
-`grandchild_title` = episode title, `grandchild_index` = episode
-number (track number for music). For movies: `title` = movie
-name, others are empty.
-
-Beyond the values above, every user-controlled label value is
-normalized to a bounded set, so an unexpected Plex response can never
-explode Prometheus cardinality: a value outside the documented set
-becomes `other` and missing data becomes `unknown`. This covers
-`stream_type`, `media_type`, `location`, `subtitle_action`, and the
-resolution labels. An empty Plex `subtitleDecision` is reported as
-`subtitle_action="none"`.
-
-## Alerting
-
-plex-exporter exposes Prometheus metrics on `/metrics` (see
-[Metrics reference](#metrics-reference)) and writes its own diagnostics to its
-container log. The rules ship as one file per expression language: scrape
-`/metrics` and evaluate the six PromQL rules in
-[`alerts/promql.yaml`](alerts/promql.yaml) with Prometheus or the Mimir ruler,
-and ship the container's logs to Loki (Grafana Alloy's Docker log discovery does
-this with no configuration) to evaluate the three LogQL rules in
-[`alerts/logql.yaml`](alerts/logql.yaml) with Loki's ruler. Load each half into
-its own ruler: neither ruler parses the other's expressions. Firing alerts
-deliver through your Alertmanager either way. They cover:
-
-| Alert | Fires when | Severity |
-| --- | --- | --- |
-| `PlexExporterTargetDown` | no successful scrape of the exporter for 15m, so the scrape itself is failing | warning |
-| `PlexExporterTargetAbsent` | the exporter has no `up` series at all for 15m, so the target has left service discovery | warning |
-| `PlexAPIUnreachable` | the authenticated Plex API poll reports `plex_http_reachable=0` for 10m (often a revoked or invalid `PLEX_TOKEN`) | warning |
-| `PlexSessionPollFailing` | the `/status/sessions` poll reports `plex_session_poll_reachable=0` for 10m while the rest of the API answers, so every session metric is absent or stale | warning |
-| `PlexExporterCollectionErrors` | the `plex_exporter_errors_total` counter keeps rising for some `type` over 30m | warning |
-| `PlexLibraryItemsCollapsed` | a library's item count drops more than 50% versus its level ~1-2h earlier and stays down for 30m, a drop to exactly zero included | warning |
-| `PlexExporterFatalError` | the exporter logs an `ERROR`: a rejected config or token, a bind failure, a metrics-server failure, or a recovered panic | warning |
-| `PlexExporterSessionMapFull` | the session tracker is at its cap and drops new Plex sessions, so the session metrics undercount | warning |
-| `PlexExporterRefreshIncomplete` | a refresh cycle runs out of time before the Plex Pass gauges are read, so they keep serving values from an earlier cycle | warning |
-
-Thresholds, the `for:` windows, and the `severity` labels are starting points;
-add your scrape `job` label to the selectors if you run more than one instance,
-adjust the `container` selector to whatever your log collector sets, and route
-by whatever labels your Alertmanager uses.
-
-`PlexExporterTargetDown` and `PlexExporterTargetAbsent` are the two rules that
-must carry a `job` matcher, because they ask whether this exporter is visible at
-all. Set both to whatever your scrape config calls the exporter, and keep the
-matcher exact rather than a regex: a regex asks whether _any_ matching target is
-up, so one healthy replica masks a failed one, and it leaves the `absent()`
-result with no label to route on.
-
-Every metric rule reads a series the exporter publishes, so all of them go quiet
-together when it stops being scraped, which is what those two rules exist to
-catch. The three log rules are the ones that still fire when there is nothing
-left to scrape: a configuration the exporter refuses outright reaches
-`PlexExporterFatalError` before any series exists.
-
-## Healthcheck
-
-The image ships a `HEALTHCHECK` (the CLI probe `/plex-exporter health`) that verifies the exporter reached its listening state; `/api/health` reports the same marker over HTTP. Both read the `/tmp/.healthy` marker, so a read-only root filesystem needs the writable `/tmp` described under [Hardened and Kubernetes deployments](#hardened-and-kubernetes-deployments): without it the CLI probe still reports healthy while `/api/health` answers 503. The container exits (and Docker restarts it) only on a non-recoverable startup error: a bad token or other 4xx (except 408 and 429), the wrong server (404), a TLS/certificate misconfiguration, or a metrics-server start failure. A transient startup failure (DNS, dial, timeout, a 408 or 429, or a 5xx from a Plex that is still starting up) instead brings the exporter up degraded but healthy: it binds `/metrics`, reports `plex_http_reachable=0`, and recovers automatically once Plex is reachable again.
+The exporter needs no volumes.
 
 ## Security
 
-Connects outbound to Plex only. The `/metrics` endpoint serves
-read-only Prometheus data (standard for internal exporters).
-`PLEX_TOKEN` is never logged or exposed in metrics.
+Keep port 9594 on your own network. The metrics page has no login, and its labels carry Plex user names, device names and the titles being played.
 
-The Plex client sends the token in a request header, refuses
-redirects, restricts requests to the configured server, bounds
-response reads, and caps each request at 30s. TLS verification
-always stays on; `PLEX_CA_CERT_PATH` pins a private CA instead of
-disabling it. Rating keys are validated as integers before URL
-construction, and the metrics server sets explicit read, write,
-and header timeouts. The image runs as a non-root user on a
-distroless base with no shell or package manager.
+The exporter only connects out, to the Plex server you configure. It sends the token in a request header, never logs it and never puts it in a metric. TLS verification always stays on, and `PLEX_CA_CERT_PATH` adds a private CA instead of turning verification off. The image runs as a non-root user on a distroless base, with no shell or package manager.
 
-Static analysis and vulnerability scans run in CI on every change;
-current results are on the repository's Security tab. One accepted
-finding: semgrep reports two informational matches, both reviewed
-as false positives.
+[Security](docs/security.md) covers the read-only compose settings, the limits the exporter enforces and what the image contains.
 
-## Dependencies
+## Troubleshooting
 
-All dependencies are updated automatically via [Renovate](https://github.com/renovatebot/renovate) and pinned by digest or version for reproducibility.
+The image's healthcheck runs `/plex-exporter health`, which reads a marker file the exporter writes in `/tmp` once its metrics server is listening. `/api/health` reads the same marker and answers 503 while the exporter starts or stops.
 
-| Dependency | Source |
-| --- | --- |
-| golang | [Go](https://hub.docker.com/_/golang) |
-| gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
-| github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/cplieger/plexapi/v2 | [GitHub](https://github.com/cplieger/plexapi) |
-| github.com/cplieger/webhttp/v3 | [GitHub](https://github.com/cplieger/webhttp) |
-| github.com/cplieger/health | [GitHub](https://github.com/cplieger/health) |
-| github.com/cplieger/envx/v2 | [GitHub](https://github.com/cplieger/envx) |
-| github.com/cplieger/slogx | [GitHub](https://github.com/cplieger/slogx) |
-| github.com/cplieger/runesafe/v2 | [GitHub](https://github.com/cplieger/runesafe) |
-| golang.org/x/sync | [golang.org/x](https://pkg.go.dev/golang.org/x/sync) |
-| pgregory.net/rapid | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |
+At startup, the container exits on an error only you can fix, and Docker restarts it. That is a rejected token, any other 4xx status except 408 and 429, a certificate problem or a listen port it cannot bind. On a DNS error, a timeout, a 408, a 429 or a 5xx, it starts anyway with `plex_http_reachable` at `0`. Once started, it keeps running through Plex errors and retries every 5 seconds.
+
+- The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
+- The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
+- Host CPU, memory and `plex_transmit_bytes_total` are missing. They need Plex Pass, and appear once Plex has answered for them.
+- With `read_only: true` in your compose file, `/api/health` answers 503. Mount a writable `/tmp`, as [Security](docs/security.md#read-only-root-filesystem) shows.
+- A library's item count lags after a large scan, because counts are read every 15 minutes.
+
+## Monitoring
+
+plex-exporter serves 16 metrics on `/metrics`, for the exporter itself, the server, its libraries and each stream. Each stream adds at most four series, and the exporter tracks 256 streams at most. Six PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+
+## Documentation
+
+- [How plex-exporter works](docs/how-it-works.md) explains how often it reads Plex and when each metric appears.
+- [Monitoring and alerts](docs/monitoring.md) lists every metric and label, the dashboard downloads and the alert rules.
+- [Security](docs/security.md) covers the read-only compose settings, the exporter's limits and what the image contains.
+- [Running on Kubernetes](docs/kubernetes.md) covers the `/tmp` mount, probes, a sidecar setup and Prometheus Operator labels.
 
 ## Credits
 
-This is an original tool building on the Grafana Hackathon 2022 [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) lineage: the [@jsclayton](https://github.com/jsclayton) post-hackathon fork and the actively maintained [@timothystewart6](https://github.com/timothystewart6) fork. It also uses the [Plex Media Server API](https://developer.plex.tv/pms/) and [prometheus/client_golang](https://github.com/prometheus/client_golang).
+- The metric and label names follow [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) by [@jsclayton](https://github.com/jsclayton), the Grafana Hackathon 2022 exporter this project builds on.
+- The `plex_library_items` metric with its `content_type` label, and the `transcode_type` and `subtitle_action` labels, follow the [@timothystewart6 fork](https://github.com/timothystewart6/prometheus-plex-exporter) of that exporter.
+- It reads the [Plex Media Server API](https://developer.plex.tv/pms/) and serves its metrics with [prometheus/client_golang](https://github.com/prometheus/client_golang), the Go client library for Prometheus.
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first for
-larger changes so the approach can be discussed before implementation.
+Issues and pull requests are welcome. Please open an issue first for larger changes, and see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
 
