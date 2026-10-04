@@ -1,3 +1,4 @@
+# Synced from cplieger/ci/.gitattributes. Change it there.
 # Canonical line-ending + diff policy for all cplieger repos.
 #
 # Normalize every text file to LF in the repository and force LF on checkout,
@@ -7,9 +8,7 @@
 # LF-committed blobs. `text=auto` lets git detect binary files and leave them
 # untouched; `eol=lf` pins text checkouts to LF on every platform.
 #
-# Distributed to all releaseable + python repos via cplieger/ci's sync
-# workflow (see scripts/classify-repos.py). Keep this uniform across repos;
-# repos with extra needs (e.g. age-encrypted secret blobs) maintain their
+# Repos with extra needs (e.g. age-encrypted secret blobs) maintain their
 # own superset and are excluded from the sync.
 
 # Force LF for all text; auto-detect and leave binary files untouched.
