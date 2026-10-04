@@ -114,7 +114,7 @@ Keep port 9594 on your own network. The metrics page has no login, and its label
 
 The exporter only connects out, to the Plex server you configure. It sends the token in a request header, never logs it and never puts it in a metric. TLS verification always stays on, and `PLEX_CA_CERT_PATH` adds a private CA instead of turning verification off. The image runs as a non-root user on a distroless base, with no shell or package manager.
 
-[Security](docs/security.md) covers the read-only compose settings, the limits the exporter enforces and what the image contains.
+[Security](docs/hardening.md) covers the read-only compose settings, the limits the exporter enforces and what the image contains.
 
 ## Troubleshooting
 
@@ -125,7 +125,7 @@ At startup, the container exits on an error only you can fix, and Docker restart
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
 - Host CPU, memory and `plex_transmit_bytes_total` are missing. They need Plex Pass, and appear once Plex has answered for them.
-- With `read_only: true` in your compose file, `/api/health` answers 503. Mount a writable `/tmp`, as [Security](docs/security.md#read-only-root-filesystem) shows.
+- With `read_only: true` in your compose file, `/api/health` answers 503. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
 - A library's item count lags after a large scan, because counts are read every 15 minutes.
 
 ## Monitoring
@@ -136,7 +136,7 @@ plex-exporter serves 16 metrics on `/metrics`, for the exporter itself, the serv
 
 - [How plex-exporter works](docs/how-it-works.md) explains how often it reads Plex and when each metric appears.
 - [Monitoring and alerts](docs/monitoring.md) lists every metric and label, the dashboard downloads and the alert rules.
-- [Security](docs/security.md) covers the read-only compose settings, the exporter's limits and what the image contains.
+- [Security](docs/hardening.md) covers the read-only compose settings, the exporter's limits and what the image contains.
 - [Running on Kubernetes](docs/kubernetes.md) covers the `/tmp` mount, probes, a sidecar setup and Prometheus Operator labels.
 
 ## Credits

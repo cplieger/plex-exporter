@@ -18,7 +18,7 @@ The exporter writes its readiness marker to `/tmp/.healthy`. With `securityConte
         mountPath: /tmp
 ```
 
-Without it, `/api/health` answers 503 for as long as the exporter runs, so an HTTP probe on that endpoint fails. [Security](security.md#read-only-root-filesystem) explains why.
+Without it, `/api/health` answers 503 for as long as the exporter runs, so an HTTP probe on that endpoint fails. [Security](hardening.md#read-only-root-filesystem) explains why.
 
 ## Probes
 
