@@ -147,7 +147,7 @@ plex-exporter serves 16 metrics on `/metrics`, for the exporter itself, the serv
 
 ## Contributing
 
-Issues and pull requests are welcome. Please open an issue first for larger changes, and see [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
 
