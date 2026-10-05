@@ -21,8 +21,8 @@ import (
 
 	"github.com/cplieger/envx/v2"
 	"github.com/cplieger/health"
-	"github.com/cplieger/plex-exporter/v2/internal/plex"
-	"github.com/cplieger/plex-exporter/v2/internal/server"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/server"
 	"github.com/cplieger/plexapi/v2"
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/webhttp/v3"

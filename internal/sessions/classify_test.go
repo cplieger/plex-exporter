@@ -3,7 +3,7 @@ package sessions
 import (
 	"testing"
 
-	"github.com/cplieger/plex-exporter/v2/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plexapi/v2"
 	"pgregory.net/rapid"
 )
