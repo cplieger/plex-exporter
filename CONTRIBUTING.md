@@ -1,112 +1,17 @@
 # Contributing to plex-exporter
 
-A Prometheus exporter for Plex Media Server, written in Go. This guide
-covers what a contributor needs beyond what the code makes obvious.
+The [shared rules](https://github.com/cplieger/.github/blob/main/CONTRIBUTING.md) for commits, releases, synced files and checks apply here.
 
-## Architecture
+## Rules
 
-`main.go` is the composition root and holds wiring only: env parsing,
-constructing the concrete types from `internal/*`, the HTTP listener,
-and goroutine launch. Keep behaviour out of it; all logic lives in the
-`internal/` packages:
+- A new metric needs five edits. Add its descriptor in `internal/metrics/descs.go`, list it in `AllDescs`, emit it from `Collect` in `internal/server`, add its row to the metrics tables in `docs/monitoring.md` and raise the metric count in the README's `## Monitoring` section.
+- A new `type` value for `plex_exporter_errors_total` goes into `metrics.ErrorTypes` and into that metric's row in `docs/monitoring.md`. `RecordError` drops a type the list does not hold, so the counter never moves.
+- A new value for `stream_type`, `media_type`, `location` or a resolution label goes into its allowlist in `internal/metrics/descs.go` and into `docs/monitoring.md`. An unlisted value is reported as `other`.
+- The rules in `alerts/` and the panels in `grafana-dashboard.json` match metric names, label names and log messages as text. Update them with any rename. No test compares them, so a rename passes CI and breaks the alert or panel.
+- When code holds both, take the `Server` mutex before the session tracker's lock, because the reverse order can deadlock. A function passed to `Tracker.UpdateLibraryLabels` runs under the tracker's lock, so it must not call `RecordError` or anything that locks `Server`.
 
-- `internal/plex`: a thin adapter over the shared
-  `github.com/cplieger/plexapi/v2` client. The library owns the transport,
-  the Plex wire types, and the retry semantics. This package owns the
-  construction shape (the `Options` struct, the CA-cert path, and the retry
-  counter behind `plex_http_retries_total`). It also re-exports the
-  `ErrNotFound` sentinel, and status-code classification calls the library's
-  `IsConfigError` directly.
-- `internal/library`: the `Library` value type plus pure classification
-  helpers (`IsType`, `ContentTypeLabel`, `Build`, `ItemCountTypes`).
-  Deterministic and side-effect free.
-- `internal/sessions`: in-memory active-session tracker, updated by the
-  poll loop and snapshotted by the collector. Owns the prune logic and
-  the session bounds.
-- `internal/metrics`: the Prometheus descriptor set (labels, descs,
-  error-type allowlist). Exports descriptor variables only.
-- `internal/server`: the `Server` orchestrator: refresh loop,
-  per-subsystem refresh methods, and the Prometheus `Describe`/`Collect`
-  implementation that emits metrics from `Server` state.
+## Releases
 
-Sessions are tracked by polling `/status/sessions` every 5s; a stateful
-tracker reconciles poll snapshots into metric updates (prune after 60s
-idle). Per-session library metadata is cached by rating key after the
-first successful fetch (a rating-key change, e.g. episode auto-advance,
-refetches). Server identity/library metadata (`/media/providers`)
-refreshes every 60s, library item counts every 15 minutes; the root
-identity, resources, and bandwidth endpoints stay on the 5s tick because
-they carry live state.
+Renaming or removing a metric or a label, or changing when a series appears, breaks the dashboards and alerts users built on it. Mark such a commit as breaking with `!`.
 
-## Local development
-
-The module targets the Go version pinned in `go.mod`. There is no
-Makefile; use the standard Go toolchain:
-
-```sh
-go build ./...        # compile
-go test ./...         # run the suite
-golangci-lint run     # lint + vet (config in .golangci.yaml)
-golangci-lint fmt     # apply gofumpt + gci formatting
-```
-
-`golangci-lint run` reports unformatted files as issues, so formatting
-is enforced by the lint step. The config sets gofumpt with `extra-rules`
-(groups adjacent same-type params, forbids naked returns) and `gci`
-import ordering (standard → third-party → local). `sloglint` is
-`kv-only`, so write key/value `slog` calls, not attribute helpers.
-
-Tests are property-based (`pgregory.net/rapid`) plus table-driven, and
-live beside the code they test. Cover pure functions with properties;
-the poll path is covered by `session_poll_test.go`. Not tested: main
-event loop, ticker scheduling (I/O-bound runtime paths, monitored via
-`plex_http_reachable`).
-
-The container build is reproducible and rootless:
-
-```sh
-docker build -t plex-exporter .
-```
-
-It compiles with `CGO_ENABLED=0` and ships on
-`gcr.io/distroless/static-debian13:nonroot`: no shell, no package
-manager. Runtime config is via env (`PLEX_URL`, `PLEX_TOKEN`,
-`LISTEN_ADDR`, `PLEX_CA_CERT_PATH`); see the README for the
-full reference.
-
-## Conventions and gotchas
-
-- **Metric cardinality is load-bearing.** Per-session bitrate lives in
-  its own `plex_session_bitrate_kbps` gauge, _not_ as a label on
-  `plex_plays_active`/`plex_play_seconds_total`; adaptive streaming
-  reports changing bitrates that would otherwise explode label
-  cardinality. Don't add high-churn values as labels.
-- **Lock ordering.** When holding both, acquire the `Server` mutex
-  before the session tracker's mutex; the reverse risks deadlock.
-- **Plex Pass degrades gracefully.** Host CPU/memory and
-  bandwidth-transmission metrics come from undocumented endpoints that
-  404 without Plex Pass. Those paths must stay non-fatal; the exporter
-  keeps serving every other metric.
-- **New metrics:** add the descriptor in `internal/metrics`, emit it
-  from `Collect` in `internal/server`, and document it in the README's
-  metrics tables.
-- **Logs are UTC.** The `slogx` library (its `UTCTime` `ReplaceAttr`) forces every
-  record's timestamp to UTC, so the container needs no `TZ` and the binary
-  embeds no `time/tzdata`.
-
-## Commits and PRs
-
-Open an issue first for larger changes so the approach can be discussed.
-Commits follow
-[Conventional Commits](https://www.conventionalcommits.org/) and are
-parsed by git-cliff to generate release notes: `feat:`, `fix:`, and
-`sec:` drive releases; `chore:`/`ci:`/`docs:`/`style:`/`test:` do not.
-Write the subject as the changelog line a user would read.
-
-## Conduct & security
-
-By participating you agree to the
-[Code of Conduct](https://github.com/cplieger/.github/blob/main/CODE_OF_CONDUCT.md).
-Report security issues through the
-[security policy](https://github.com/cplieger/.github/blob/main/SECURITY.md),
-never in a public issue.
+A change to `grafana-dashboard.json` takes `fix:` or `feat:`. Under `chore:` or `docs:` it replaces the dashboard's OCI artifact at the current version tags, and the GitHub Release keeps the old file.
