@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/plex-exporter/v2/internal/library"
-	"github.com/cplieger/plex-exporter/v2/internal/metrics"
-	"github.com/cplieger/plex-exporter/v2/internal/sessions"
+	"github.com/cplieger/plex-exporter/internal/library"
+	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/cplieger/plexapi/v2"
 	"github.com/cplieger/runesafe/v2"
 	"github.com/prometheus/client_golang/prometheus"

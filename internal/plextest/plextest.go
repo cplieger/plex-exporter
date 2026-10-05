@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cplieger/plex-exporter/v2/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/plex"
 )
 
 // TestToken is the fixed credential used by NewTestClientFromServer and
