@@ -1,40 +1,17 @@
-# Recommended alert rules for plex-exporter, the PromQL half: the six rules a
-# Prometheus or Mimir ruler evaluates. The other three are LogQL and live in
-# alerts/logql.yaml, because the exporter carries its operational state in two
-# places and a condition with no series still has a log line. Load each half
-# into its own ruler: neither ruler parses the other's expressions.
+# plex-exporter alert rules, the PromQL half, for a Prometheus or Mimir ruler.
+# The three LogQL rules live in alerts/logql.yaml. Load each file into its own
+# ruler, because neither ruler parses the other's expressions.
 #
-# The six rules here read series the exporter publishes on /metrics (port 9594
-# by default): scrape that endpoint and evaluate them with Prometheus or the
-# Mimir ruler. They need nothing beyond the scrape itself. The four exporter
-# series are published from the first scrape and no setting can silence one;
-# plex_library_items, which PlexLibraryItemsCollapsed reads, appears once the
-# exporter has learned the server identity and read a library count.
-#
-# Thresholds, the "for" windows, and the severity labels are starting points;
-# adjust them to your deployment. The scrape "job" label is yours to set, so it
-# is intentionally left out of the metric selectors; PlexExporterTargetDown and
-# PlexExporterTargetAbsent are the two exceptions and say why.
+# Scrape /metrics, port 9594 by default. Thresholds, "for" windows and severity
+# labels are starting points. The scrape "job" label is yours to set, so the
+# metric selectors leave it out. The two target rules are the exception.
+# docs/monitoring.md explains each rule.
 groups:
   - name: plex-exporter
     rules:
-      # Every other rule here reads a gauge the exporter itself publishes, so
-      # every other rule goes silent when the exporter dies. This one is the
-      # floor under them.
-      #
-      # Two arms, because neither covers the other. `up == 0` catches a target
-      # that is configured and failing, and keeps its labels so the alert names
-      # which instance. `absent(up{...})` catches a target that stopped EXISTING
-      # — a deleted Kubernetes pod or ServiceMonitor, a dropped scrape target, a
-      # removed scrape config — where `up` has no series at all and `up == 0` can
-      # never match.
-      #
-      # Use an EXACT job matcher, not a regex. A regex form
-      # (absent(up{job=~".*x.*"} == 1)) looks tidier and is wrong twice: with
-      # several replicas on one job it asks whether ANY of them is up, so one
-      # healthy replica masks every failed one; and the synthetic result carries
-      # no job label at all, so the alert reaches your Alertmanager with nothing
-      # to route or group on.
+      # The floor under every other rule, which all go silent when the
+      # exporter dies. Pair it with TargetAbsent and keep the job matcher
+      # exact. docs/monitoring.md explains both choices.
       - alert: PlexExporterTargetDown
         expr: up{job="plex-exporter"} == 0
         for: 15m
@@ -44,11 +21,8 @@ groups:
           summary: "plex-exporter is not being scraped successfully"
           description: >
             No successful scrape of plex-exporter for 15m, so every Plex metric
-            is stale and every other rule in this group is blind. Either the
-            scrape is failing (container down, wrong port, network) or the
-            target is gone from service discovery entirely. Check the container
-            and your scrape config. Set the job matcher to whatever your scrape
-            config calls this exporter.
+            is stale and the other rules are blind. Check the container, its
+            port and your scrape config.
       - alert: PlexExporterTargetAbsent
         expr: absent(up{job="plex-exporter"})
         for: 15m
@@ -57,10 +31,9 @@ groups:
         annotations:
           summary: "plex-exporter has no scrape target at all"
           description: >
-            There is no up{job="plex-exporter"} series, so plex-exporter is not merely
-            failing to scrape but is no longer a configured target: a dropped
-            scrape target, a removed scrape config, or a deleted Kubernetes pod
-            or ServiceMonitor. Every other rule in this group is blind.
+            No up{job="plex-exporter"} series exists, so the exporter is no
+            longer a configured scrape target. Every other rule is blind. Check
+            service discovery and your scrape config.
       - alert: PlexAPIUnreachable
         expr: plex_http_reachable == 0
         for: 10m
@@ -70,8 +43,8 @@ groups:
           summary: "Plex API unreachable to its exporter at {{ $labels.instance }}"
           description: >
             plex-exporter is running but its authenticated poll of the Plex API
-            has returned plex_http_reachable=0 for 10m - most often a
-            revoked/invalid PLEX_TOKEN. Metrics are stale until resolved.
+            has returned plex_http_reachable=0 for 10m. The usual cause is a
+            revoked or invalid PLEX_TOKEN. Metrics are stale until it recovers.
       - alert: PlexSessionPollFailing
         expr: >
           plex_session_poll_reachable == 0
@@ -82,13 +55,9 @@ groups:
         annotations:
           summary: "Plex session poll failing at {{ $labels.instance }}"
           description: >
-            plex-exporter's /status/sessions poll has returned
-            plex_session_poll_reachable=0 for 10m while the rest of the Plex
-            API still answers (plex_http_reachable=1). Every session metric
-            (plex_plays_active, plex_play_seconds_total, the bandwidth and
-            bitrate gauges) is absent or stale until it recovers. A poll that
-            fails only while something is playing points at the session
-            payload itself, so read the exporter log for a decode error.
+            The /status/sessions poll has failed for 10m while the rest of the
+            Plex API answers, so every session metric is absent or stale. If it
+            fails only during playback, look for a decode error in the log.
       - alert: PlexExporterCollectionErrors
         expr: sum by (type) (rate(plex_exporter_errors_total[15m])) > 0
         for: 30m
@@ -97,10 +66,10 @@ groups:
         annotations:
           summary: "Plex exporter erroring on '{{ $labels.type }}' collection"
           description: >
-            plex-exporter has logged '{{ $labels.type }}' errors continuously
-            for 30m (rate>0 over 15m). Plex metrics of that category are
-            degraded/incomplete; typically a Plex API change after a server
-            upgrade, or an auth issue.
+            plex-exporter has counted '{{ $labels.type }}' errors in every 15m
+            window for 30m, so Plex metrics of that type are incomplete. The
+            usual causes are a Plex API change after a server upgrade or an
+            auth issue.
       - alert: PlexLibraryItemsCollapsed
         expr: >
           (max_over_time(plex_library_items[2h] offset 30m) - plex_library_items)
@@ -112,14 +81,7 @@ groups:
         annotations:
           summary: "Plex library '{{ $labels.library }}' lost >50% of its items"
           description: >
-            Item count for Plex library '{{ $labels.library }}' has fallen by
-            more than 50% versus its level ~1-2h ago and stayed down for 30m.
-            Likely a partly lost media mount or an accidental bulk delete.
-            Check the media bind mount and the library on the Plex server.
-            A collapse all the way to zero is covered too: the exporter
-            publishes plex_library_items=0 once it reads a library as empty, so
-            the drop is a full 100% and this expression sees it. A library whose
-            count cannot be READ is a different condition and deliberately does
-            not fire here — the series holds its last value and the fetch
-            failure raises plex_exporter_errors_total{type="library_items"},
-            which PlexExporterCollectionErrors alerts on.
+            Plex library '{{ $labels.library }}' has held less than half its
+            item count of 1 to 2 hours ago for 30m. Likely a partly lost media
+            mount or a bulk delete. Check the media mount and the library in
+            Plex.
