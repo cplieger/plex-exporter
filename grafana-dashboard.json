@@ -1,1223 +1,3399 @@
 {
-  "annotations": {
-    "list": []
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "plex-exporter"
   },
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "links": [],
-  "panels": [
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 100,
-      "title": "Server Overview",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "text": "Unreachable",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "Online",
-                  "color": "green"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "noValue": "exporter not scraped"
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 0,
-        "y": 1
-      },
-      "id": 1,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Server Status",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "plex_http_reachable",
-          "legendFormat": "{{ instance }}",
-          "instant": true,
-          "range": false
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "text": "Unreachable",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "Reachable",
-                  "color": "green"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "noValue": "exporter not scraped"
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 5,
-        "y": 1
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Session Poll",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "plex_session_poll_reachable",
-          "legendFormat": "{{ instance }}",
-          "instant": true,
-          "range": false
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "unknown"
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 10,
-        "y": 1
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "textMode": "name",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Plex Version",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "plex_server_info{server=~\"$server\"}",
-          "legendFormat": "{{ version }}",
-          "instant": true,
-          "range": false
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "orange",
-                "value": 3
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "noValue": "unknown"
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 14,
-        "y": 1
-      },
-      "id": 40,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Active Streams",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "count(plex_play_seconds_total{server=~\"$server\"}) or (0 * count(plex_server_info{server=~\"$server\"}))",
-          "legendFormat": ""
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "orange",
-                "value": 3
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          }
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 19,
-        "y": 1
-      },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Active Transcodes",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "plex_active_transcode_sessions{server=~\"$server\"}",
-          "legendFormat": "{{ server }}",
-          "instant": true,
-          "range": false
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          }
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 6,
-        "x": 0,
-        "y": 4
-      },
-      "id": 42,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Total Items",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "sum(plex_library_items{server=~\"$server\"})",
-          "legendFormat": ""
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "decbytes",
-          "thresholds": {
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          }
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 6,
-        "x": 6,
-        "y": 4
-      },
-      "id": 43,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Total Storage",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "sum(plex_library_storage_bytes{server=~\"$server\"})",
-          "legendFormat": ""
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "thresholds": {
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          }
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 6,
-        "x": 12,
-        "y": 4
-      },
-      "id": 44,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Total Duration",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "sum(plex_library_duration_milliseconds{server=~\"$server\"})",
-          "legendFormat": ""
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "text": "No",
-                  "color": "yellow"
-                },
-                "1": {
-                  "text": "Yes",
-                  "color": "green"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "steps": [
-              {
-                "color": "yellow",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "noValue": "unknown"
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 6,
-        "x": 18,
-        "y": 4
-      },
-      "id": 41,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "title": "Plex Pass",
-      "type": "stat",
-      "targets": [
-        {
-          "expr": "count(plex_server_info{server=~\"$server\",plex_pass=\"true\"}) or (0 * count(plex_server_info{server=~\"$server\"}))",
-          "legendFormat": ""
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 7
-      },
-      "id": 102,
-      "title": "Active Sessions",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Play Time"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              },
-              {
-                "id": "custom.width",
-                "value": 110
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "User"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 150
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Client"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 130
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Title"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 240
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Season"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 100
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Episode"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 95
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Library"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 105
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Stream"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 110
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Resolution"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 115
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "File Res"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 95
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Transcode"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 115
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Subs"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 75
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Location"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 105
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Local"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
-      "id": 20,
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Play Time",
-            "desc": true
-          }
-        ]
-      },
-      "title": "Active Sessions",
-      "type": "table",
-      "targets": [
-        {
-          "expr": "plex_play_seconds_total{server=~\"$server\"}",
-          "legendFormat": "",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "server": true,
-              "server_id": true,
-              "__name__": true,
-              "instance": true,
-              "job": true,
-              "library_id": true,
-              "library_type": true,
-              "media_type": true,
-              "session": true,
-              "device": true,
-              "hostname": true,
-              "__tenant_id__": true,
-              "grandchild_title": true
-            },
-            "indexByName": {
-              "user": 0,
-              "device_type": 1,
-              "title": 2,
-              "child_title": 3,
-              "grandchild_index": 4,
-              "library": 6,
-              "stream_type": 7,
-              "stream_resolution": 8,
-              "stream_file_resolution": 9,
-              "transcode_type": 10,
-              "subtitle_action": 11,
-              "location": 12,
-              "local": 13,
-              "Value": 14
-            },
-            "renameByName": {
-              "library": "Library",
-              "title": "Title",
-              "child_title": "Season",
-              "grandchild_index": "Episode",
-              "user": "User",
-              "device_type": "Client",
-              "stream_type": "Stream",
-              "stream_resolution": "Resolution",
-              "stream_file_resolution": "File Res",
-              "transcode_type": "Transcode",
-              "subtitle_action": "Subs",
-              "location": "Location",
-              "local": "Local",
-              "Value": "Play Time"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "kbps",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20
-          }
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 38
-      },
-      "id": 21,
-      "options": {
-        "tooltip": {
-          "mode": "multi"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "title": "Session Bandwidth",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "sum(plex_session_bandwidth_kbps{server=~\"$server\"}) by (server)",
-          "legendFormat": "{{ server }}"
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "kbps",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20
-          }
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 38
-      },
-      "id": 22,
-      "options": {
-        "tooltip": {
-          "mode": "multi"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "title": "Session Bitrate",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "sum(plex_session_bitrate_kbps{server=~\"$server\"}) by (server)",
-          "legendFormat": "{{ server }}"
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 101,
-      "title": "Library Details",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Items"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "none"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Storage"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "decbytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Duration"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
-        "y": 17
-      },
-      "id": 10,
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Storage",
-            "desc": true
-          }
-        ],
-        "footer": {
-          "show": true,
-          "reducer": [
-            "sum"
-          ],
-          "countRows": false,
-          "fields": [
-            "Items",
-            "Storage",
-            "Duration"
-          ]
-        }
-      },
-      "title": "",
-      "type": "table",
-      "targets": [
-        {
-          "expr": "sum by (library) (plex_library_items{server=~\"$server\"})",
-          "legendFormat": "",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        },
-        {
-          "expr": "sum by (library) (plex_library_storage_bytes{server=~\"$server\"})",
-          "legendFormat": "",
-          "format": "table",
-          "instant": true,
-          "refId": "B"
-        },
-        {
-          "expr": "sum by (library) (plex_library_duration_milliseconds{server=~\"$server\"})",
-          "legendFormat": "",
-          "format": "table",
-          "instant": true,
-          "refId": "C"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "library",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time #A": true,
-              "Time #B": true,
-              "Time #C": true
-            },
-            "indexByName": {
-              "library": 0,
-              "Value #A": 1,
-              "Value #B": 2,
-              "Value #C": 3
-            },
-            "renameByName": {
-              "library": "Library",
-              "Value #A": "Items",
-              "Value #B": "Storage",
-              "Value #C": "Duration"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 29
-      },
-      "id": 103,
-      "title": "Resources",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20
-          }
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 30
-      },
-      "id": 30,
-      "options": {
-        "tooltip": {
-          "mode": "multi"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "title": "CPU Utilization",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "plex_host_cpu_utilization_ratio{server=~\"$server\"}",
-          "legendFormat": "{{ server }}"
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 20
-          }
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 30
-      },
-      "id": 31,
-      "options": {
-        "tooltip": {
-          "mode": "multi"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "title": "Memory Utilization",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "plex_host_memory_utilization_ratio{server=~\"$server\"}",
-          "legendFormat": "{{ server }}"
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "stacking": {
-              "mode": "normal"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 46
-      },
-      "id": 50,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "title": "Items Added per Day",
-      "description": "Net change in each library section per day. Removing some items from a library shows as a bar below zero. Deleting a library, or emptying it completely, shows as NO bar rather than a negative one, because the exporter stops publishing a section once it holds no items. Buckets follow the dashboard zoom but never go below one day, and the current day appears once it has two samples.",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "last_over_time(plex_library_items{server=~\"$server\"}[$__interval]) - first_over_time(plex_library_items{server=~\"$server\"}[$__interval])",
-          "legendFormat": "{{library}}",
-          "refId": "A"
-        }
-      ],
-      "interval": "1d"
-    }
-  ],
-  "schemaVersion": 39,
-  "tags": [
-    "plex",
-    "prometheus"
-  ],
-  "templating": {
-    "list": [
+  "spec": {
+    "annotations": [
       {
-        "name": "datasource",
-        "label": "Data source",
-        "type": "datasource",
-        "query": "prometheus",
-        "current": {
-          "text": "Mimir",
-          "value": "mimir"
-        },
-        "hide": 0
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "spec": {}
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "builtIn": true,
+          "legacyOptions": {
+            "type": "dashboard"
+          }
+        }
+      }
+    ],
+    "cursorSync": "Crosshair",
+    "description": "Shows whether plex-exporter can reach your Plex Media Server, who is streaming and how, and how busy the host is. The Libraries and Streaming history tabs go deeper, and the host panels show only for a server with Plex Pass.",
+    "editable": true,
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "id": 1,
+          "title": "Server status",
+          "description": "Shows whether plex-exporter reached your Plex server on its last check, a few seconds ago. Online is normal. Unreachable means Plex is down, restarting or rejecting the token, and the other panels stop updating. Exporter not scraped means no metrics arrive at all, so check the exporter container and your scrape job.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_http_reachable",
+                        "instant": true,
+                        "legendFormat": "{{ instance }}",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "Unreachable",
+                          "color": "red"
+                        },
+                        "1": {
+                          "text": "Online",
+                          "color": "green"
+                        }
+                      }
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "red"
+                      },
+                      {
+                        "value": 1,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Exporter not scraped"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-10": {
+        "kind": "Panel",
+        "spec": {
+          "id": 10,
+          "title": "Library sizes",
+          "description": "Items, disk space and total length per library, largest first, with totals in the footer. Use it to see which library takes the most space. Items refresh every 15 minutes, and disk space and length every minute. No libraries yet means plex-exporter has not read the library list.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (library) (plex_library_items{server=~\"$server\"})",
+                        "format": "table",
+                        "instant": true,
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (library) (plex_library_storage_bytes{server=~\"$server\"})",
+                        "format": "table",
+                        "instant": true,
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (library) (plex_library_duration_milliseconds{server=~\"$server\"})",
+                        "format": "table",
+                        "instant": true,
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "joinByField",
+                  "spec": {
+                    "options": {
+                      "byField": "library",
+                      "mode": "outer"
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "Time #A": true,
+                        "Time #B": true,
+                        "Time #C": true
+                      },
+                      "indexByName": {
+                        "Value #A": 1,
+                        "Value #B": 2,
+                        "Value #C": 3,
+                        "library": 0
+                      },
+                      "renameByName": {
+                        "Value #A": "Items",
+                        "Value #B": "Storage",
+                        "Value #C": "Duration",
+                        "library": "Library"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "footer": {
+                  "countRows": false,
+                  "fields": [
+                    "Items",
+                    "Storage",
+                    "Duration"
+                  ],
+                  "reducer": [
+                    "sum"
+                  ],
+                  "show": true
+                },
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": true,
+                    "displayName": "Storage"
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "No libraries yet"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Items"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "none"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Storage"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "decbytes"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Duration"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "ms"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "id": 2,
+          "title": "Session poll",
+          "description": "Shows whether the last read of current playback worked. plex-exporter reads it every 5 seconds. Reachable is normal. Unreachable while Server status reads Online means only that request fails, so Active sessions and the stream counts are out of date.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_session_poll_reachable",
+                        "instant": true,
+                        "legendFormat": "{{ instance }}",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "Unreachable",
+                          "color": "red"
+                        },
+                        "1": {
+                          "text": "Reachable",
+                          "color": "green"
+                        }
+                      }
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "red"
+                      },
+                      {
+                        "value": 1,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Exporter not scraped"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-20": {
+        "kind": "Panel",
+        "spec": {
+          "id": 20,
+          "title": "Active sessions",
+          "description": "One row per stream that is playing, paused or stopped in the last minute, longest first. Stream shows how Plex delivers it. Direct play sends the file as it is, direct stream repackages it and transcode converts it, which costs the most CPU. Location shows whether the player connects from your network or over the internet.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_play_seconds_total{server=~\"$server\"}",
+                        "format": "table",
+                        "instant": true,
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true,
+                        "__name__": true,
+                        "__tenant_id__": true,
+                        "device": true,
+                        "grandchild_title": true,
+                        "hostname": true,
+                        "instance": true,
+                        "job": true,
+                        "library_id": true,
+                        "library_type": true,
+                        "media_type": true,
+                        "server": true,
+                        "server_id": true,
+                        "session": true,
+                        "local": true
+                      },
+                      "indexByName": {
+                        "Value": 14,
+                        "child_title": 3,
+                        "device_type": 1,
+                        "grandchild_index": 4,
+                        "library": 6,
+                        "location": 12,
+                        "stream_file_resolution": 9,
+                        "stream_resolution": 8,
+                        "stream_type": 7,
+                        "subtitle_action": 11,
+                        "title": 2,
+                        "transcode_type": 10,
+                        "user": 0
+                      },
+                      "renameByName": {
+                        "Value": "Play time",
+                        "child_title": "Season",
+                        "device_type": "Client",
+                        "grandchild_index": "Episode",
+                        "library": "Library",
+                        "location": "Location",
+                        "stream_file_resolution": "File resolution",
+                        "stream_resolution": "Resolution",
+                        "stream_type": "Stream",
+                        "subtitle_action": "Subtitles",
+                        "title": "Title",
+                        "transcode_type": "Transcode",
+                        "user": "User"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": true,
+                    "displayName": "Play time"
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "Nobody is streaming"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Play time"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 120
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "User"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 90
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Client"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 130
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Title"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 200
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Season"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 100
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Episode"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 85
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Library"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 105
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Stream"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 110
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "copy": {
+                                "index": 1,
+                                "text": "Direct stream"
+                              },
+                              "directplay": {
+                                "index": 0,
+                                "text": "Direct play"
+                              },
+                              "other": {
+                                "index": 4,
+                                "text": "Other"
+                              },
+                              "transcode": {
+                                "index": 2,
+                                "text": "Transcode"
+                              },
+                              "unknown": {
+                                "index": 3,
+                                "text": "Unknown"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Resolution"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 100
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "1080": {
+                                "index": 4,
+                                "text": "1080p"
+                              },
+                              "2160": {
+                                "index": 6,
+                                "text": "4K"
+                              },
+                              "480": {
+                                "index": 1,
+                                "text": "480p"
+                              },
+                              "4k": {
+                                "index": 5,
+                                "text": "4K"
+                              },
+                              "576": {
+                                "index": 2,
+                                "text": "576p"
+                              },
+                              "720": {
+                                "index": 3,
+                                "text": "720p"
+                              },
+                              "other": {
+                                "index": 7,
+                                "text": "Other"
+                              },
+                              "sd": {
+                                "index": 0,
+                                "text": "SD"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "File resolution"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 130
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "1080": {
+                                "index": 4,
+                                "text": "1080p"
+                              },
+                              "2160": {
+                                "index": 6,
+                                "text": "4K"
+                              },
+                              "480": {
+                                "index": 1,
+                                "text": "480p"
+                              },
+                              "4k": {
+                                "index": 5,
+                                "text": "4K"
+                              },
+                              "576": {
+                                "index": 2,
+                                "text": "576p"
+                              },
+                              "720": {
+                                "index": 3,
+                                "text": "720p"
+                              },
+                              "other": {
+                                "index": 7,
+                                "text": "Other"
+                              },
+                              "sd": {
+                                "index": 0,
+                                "text": "SD"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Transcode"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 128
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "audio": {
+                                "index": 2,
+                                "text": "Audio"
+                              },
+                              "both": {
+                                "index": 3,
+                                "text": "Video and audio"
+                              },
+                              "none": {
+                                "index": 0,
+                                "text": "No"
+                              },
+                              "video": {
+                                "index": 1,
+                                "text": "Video"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Subtitles"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 104
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "burn": {
+                                "index": 1,
+                                "text": "Burned in"
+                              },
+                              "copy": {
+                                "index": 2,
+                                "text": "Copied"
+                              },
+                              "none": {
+                                "index": 0,
+                                "text": "None"
+                              },
+                              "other": {
+                                "index": 4,
+                                "text": "Other"
+                              },
+                              "transcode": {
+                                "index": 3,
+                                "text": "Converted"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Location"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 112
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "lan": {
+                                "index": 0,
+                                "text": "Your network"
+                              },
+                              "other": {
+                                "index": 3,
+                                "text": "Other"
+                              },
+                              "unknown": {
+                                "index": 2,
+                                "text": "Unknown"
+                              },
+                              "wan": {
+                                "index": 1,
+                                "text": "Internet"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-21": {
+        "kind": "Panel",
+        "spec": {
+          "id": 21,
+          "title": "Session bandwidth",
+          "description": "Network bandwidth Plex reports for all streams together, per server. Compare it with your upload speed when remote streams buffer. It reads 0 when nobody is streaming, and a gap means plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (server) (plex_session_bandwidth_kbps{server=~\"$server\"}) or (0 * group by (server) (plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "{{ server }}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Kbits",
+                  "min": 0,
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "fillOpacity": 20,
+                    "lineWidth": 2
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-22": {
+        "kind": "Panel",
+        "spec": {
+          "id": 22,
+          "title": "Session bitrate",
+          "description": "The bitrate of the media being streamed, added up across all streams, per server. A high value points to large files, such as 4K remuxes, that strain your upload or your players. It reads 0 when nobody is streaming, and a gap means plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (server) (plex_session_bitrate_kbps{server=~\"$server\"}) or (0 * group by (server) (plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "{{ server }}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Kbits",
+                  "min": 0,
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "fillOpacity": 20,
+                    "lineWidth": 2
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "id": 3,
+          "title": "Active transcodes",
+          "description": "Streams Plex is converting right now on the selected servers, because the player cannot play the file as it is. Transcoding uses the most CPU, so a high count explains a slow server. The tile turns yellow at 1 transcode and orange at 3, and zero is normal when your players support your files. Unknown means plex-exporter has not identified the server yet.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_active_transcode_sessions{server=~\"$server\"})",
+                        "instant": true,
+                        "legendFormat": "{{ server }}",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      },
+                      {
+                        "value": 1,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 3,
+                        "color": "orange"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Unknown"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-30": {
+        "kind": "Panel",
+        "spec": {
+          "id": 30,
+          "title": "Host CPU",
+          "description": "CPU use of the whole machine Plex runs on, from Plex's own statistics. A yellow dashed line marks 80% and a red one marks 90%. Sustained use above 80% slows transcodes and library scans, and above 90% streams can stutter. An empty panel means Plex reported no host statistics for the selected servers.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_host_cpu_utilization_ratio{server=~\"$server\"}",
+                        "legendFormat": "{{ server }}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit",
+                  "min": 0,
+                  "max": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 0.8,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 0.9,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "fillOpacity": 20,
+                    "lineWidth": 2,
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-31": {
+        "kind": "Panel",
+        "spec": {
+          "id": 31,
+          "title": "Host memory",
+          "description": "Memory use of the whole machine Plex runs on, from Plex's own statistics. A yellow dashed line marks 80% and a red one marks 90%. Use above 80% leaves little room for new streams, and sustained use above 90% risks slowdowns and failed transcodes. An empty panel means Plex reported no host statistics for the selected servers.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_host_memory_utilization_ratio{server=~\"$server\"}",
+                        "legendFormat": "{{ server }}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit",
+                  "min": 0,
+                  "max": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 0.8,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 0.9,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "fillOpacity": 20,
+                    "lineWidth": 2,
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "Plex version",
+          "description": "The Plex Media Server version running now. Use it to confirm that an update went through. Unknown means plex-exporter has not identified the server yet, which happens for a few seconds after it starts or while Plex is unreachable.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_server_info{server=~\"$server\"}",
+                        "instant": true,
+                        "legendFormat": "{{ version }}",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "none",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "textMode": "name"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Unknown"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-40": {
+        "kind": "Panel",
+        "spec": {
+          "id": 40,
+          "title": "Active streams",
+          "description": "Streams playing or paused right now on the selected servers, with the trend over the time range. A stream drops out about a minute after it stops. The colour turns yellow at 1 stream, orange at 3 and red at 5, because each stream uses upload bandwidth and server time. Unknown means plex-exporter has not identified the server yet.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "count(plex_play_seconds_total{server=~\"$server\"}) or (0 * count(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 1,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 3,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 5,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Unknown"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-41": {
+        "kind": "Panel",
+        "spec": {
+          "id": 41,
+          "title": "Plex Pass",
+          "description": "Shows whether each selected server's owner account has Plex Pass. Host CPU and host memory need it, so the Host resources row shows only for a server with Plex Pass and No explains why it is missing. Unknown means plex-exporter has not identified the server yet.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max by (server) (plex_server_info{server=~\"$server\",plex_pass=\"true\"}) or on (server) (0 * max by (server) (plex_server_info{server=~\"$server\"}))",
+                        "instant": true,
+                        "legendFormat": "{{server}}",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "No",
+                          "color": "yellow"
+                        },
+                        "1": {
+                          "text": "Yes",
+                          "color": "green"
+                        }
+                      }
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 1,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Unknown"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-42": {
+        "kind": "Panel",
+        "spec": {
+          "id": 42,
+          "title": "Total items",
+          "description": "Movies, episodes, tracks and photos across the selected libraries, added together. plex-exporter counts them every 15 minutes, so the number can lag after a large scan. Not counted yet means the first count since plex-exporter started has not finished.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_library_items{server=~\"$server\"})",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Not counted yet"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-43": {
+        "kind": "Panel",
+        "spec": {
+          "id": 43,
+          "title": "Total storage",
+          "description": "Disk space the selected libraries use, as Plex reports it. Compare it with the free space on your media drives. Unknown means plex-exporter has not read the library list yet.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_library_storage_bytes{server=~\"$server\"})",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "decbytes",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Unknown"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-44": {
+        "kind": "Panel",
+        "spec": {
+          "id": 44,
+          "title": "Total duration",
+          "description": "How long it would take to play everything in the selected libraries back to back. It grows when you add media and drops when you remove it. Unknown means plex-exporter has not read the library list yet.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_library_duration_milliseconds{server=~\"$server\"})",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "ms",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "Unknown"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-50": {
+        "kind": "Panel",
+        "spec": {
+          "id": 50,
+          "title": "Library change per day",
+          "description": "Items added minus items removed in each library, per day. A bar below zero means items were removed. A deleted or emptied library shows no bar, because plex-exporter stops reporting a library once it holds no items. Bars follow the dashboard zoom but never get narrower than one day, and today's bar appears once it has two samples.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "last_over_time(plex_library_items{server=~\"$server\"}[$__interval]) - first_over_time(plex_library_items{server=~\"$server\"}[$__interval])",
+                        "legendFormat": "{{library}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "interval": "1d"
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "displayMode": "table",
+                  "placement": "right"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "drawStyle": "bars",
+                    "fillOpacity": 80,
+                    "stacking": {
+                      "mode": "normal"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-60": {
+        "kind": "Panel",
+        "spec": {
+          "id": 60,
+          "title": "Items by content type",
+          "description": "Movies, episodes, tracks and photos across the selected servers, counted from every library of that type. Use it to see what your collection is mostly made of. No libraries yet means plex-exporter has not counted the items.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (content_type) (plex_library_items{server=~\"$server\"})",
+                        "legendFormat": "{{content_type}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "valueMode": "color",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "noValue": "No libraries yet",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-61": {
+        "kind": "Panel",
+        "spec": {
+          "id": 61,
+          "title": "Average length per item",
+          "description": "Total running time of each library divided by its item count, so a show library gives the average episode length. A photo library has no running time and reads 0. A library with no items is left out.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (library) (plex_library_duration_milliseconds{server=~\"$server\"}) / (sum by (library) (plex_library_items{server=~\"$server\"}) > 0)",
+                        "legendFormat": "{{library}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "valueMode": "color",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "ms",
+                  "noValue": "No libraries yet",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-62": {
+        "kind": "Panel",
+        "spec": {
+          "id": 62,
+          "title": "Average size per item",
+          "description": "Disk space of each library divided by its item count. A high average in a movie library usually means many 4K or remux files. A library with no items is left out.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (library) (plex_library_storage_bytes{server=~\"$server\"}) / (sum by (library) (plex_library_items{server=~\"$server\"}) > 0)",
+                        "legendFormat": "{{library}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "valueMode": "color",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "decbytes",
+                  "noValue": "No libraries yet",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-63": {
+        "kind": "Panel",
+        "spec": {
+          "id": 63,
+          "title": "Storage change in this range",
+          "description": "How much disk space each library gained over the selected time range, estimated from the first and last reading. A negative bar means files were removed or replaced by smaller ones. Pick a longer range in the time picker to see slow growth.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (library) (delta(plex_library_storage_bytes{server=~\"$server\"}[$__range]))",
+                        "legendFormat": "{{library}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "valueMode": "color",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "decbytes",
+                  "noValue": "No change measured yet",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-70": {
+        "kind": "Panel",
+        "spec": {
+          "id": 70,
+          "title": "Plays by delivery",
+          "description": "Streams playing at each moment, split by how Plex delivers them. Direct play sends the file as it is, direct stream repackages it without re-encoding, and transcode re-encodes it on the server. A large transcode share means devices or bandwidth limits force conversions, so check the Active sessions table for which ones. Unknown counts streams Plex reported with no delivery decision or with one this exporter does not recognise, so the stack always adds up to every active stream.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", stream_type=\"directplay\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Direct play"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", stream_type=\"copy\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Direct stream"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", stream_type=\"transcode\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Transcode"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", stream_type=~\"unknown|other\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Unknown"
+                      }
+                    },
+                    "refId": "D",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "min": 0,
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 1,
+                    "fillOpacity": 30,
+                    "stacking": {
+                      "mode": "normal"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-71": {
+        "kind": "Panel",
+        "spec": {
+          "id": 71,
+          "title": "Plays by network",
+          "description": "Streams playing at each moment, split by whether the player is on your home network or connects from outside. Remote plays use your upload bandwidth, so a rise there explains slow remote streams. The line sits at 0 while nobody is watching. Unknown counts streams Plex reported with no network location or with one this exporter does not recognise, so the stack always adds up to every active stream.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", location=\"lan\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Home network"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", location=\"wan\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Remote"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_plays_active{server=~\"$server\", location=~\"unknown|other\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Unknown"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "min": 0,
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 1,
+                    "fillOpacity": 30,
+                    "stacking": {
+                      "mode": "normal"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-72": {
+        "kind": "Panel",
+        "spec": {
+          "id": 72,
+          "title": "Watch time by user",
+          "description": "Time each user spent playing in the selected range, longest first. Times are estimates from plex-exporter's 5-second session check, and history reaches back only as far as your Prometheus keeps metrics. Each stream can lose up to one scrape interval, so short streams count low or are missed. No watch time in this range means nothing played, or plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sort_desc(sum by (user) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])))",
+                        "legendFormat": "{{user}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "valueMode": "color",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "namePlacement": "top"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "min": 0,
+                  "noValue": "No watch time in this range",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-73": {
+        "kind": "Panel",
+        "spec": {
+          "id": 73,
+          "title": "Watch time by library",
+          "description": "Time spent playing from each library in the selected range, longest first. Times are estimates from plex-exporter's 5-second session check, and history reaches back only as far as your Prometheus keeps metrics. Each stream can lose up to one scrape interval, so short streams count low or are missed. No watch time in this range means nothing played, or plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sort_desc(sum by (library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])))",
+                        "legendFormat": "{{library}}",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "displayMode": "basic",
+                "orientation": "horizontal",
+                "showUnfilled": true,
+                "valueMode": "color",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "namePlacement": "top"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "min": 0,
+                  "noValue": "No watch time in this range",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "blue"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "blue"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-74": {
+        "kind": "Panel",
+        "spec": {
+          "id": 74,
+          "title": "Most watched titles",
+          "description": "The 20 titles played longest in the selected range, with the show, season and episode for TV and the artist, album and track for music. Times are estimates from plex-exporter's 5-second session check, and history reaches back only as far as your Prometheus keeps metrics. Each stream can lose up to one scrape interval, so short streams count low or are missed. No plays in this range means nothing played, or plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "topk(20, sum by (title, child_title, grandchild_title) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])))",
+                        "legendFormat": "",
+                        "format": "table",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true
+                      },
+                      "indexByName": {
+                        "title": 0,
+                        "child_title": 1,
+                        "grandchild_title": 2,
+                        "Value": 3
+                      },
+                      "renameByName": {
+                        "title": "Title",
+                        "child_title": "Season or album",
+                        "grandchild_title": "Episode or track",
+                        "Value": "Watch time"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": true,
+                    "displayName": "Watch time"
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "No plays in this range",
+                  "custom": {
+                    "minWidth": 80,
+                    "wrapText": true,
+                    "wrapHeaderText": true
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Watch time"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 136
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-75": {
+        "kind": "Panel",
+        "spec": {
+          "id": 75,
+          "title": "Bandwidth by network",
+          "description": "Bandwidth Plex reports for the streams playing at each moment, split by home network and remote players. When remote streams buffer, compare the Remote band with your upload speed. Unknown covers streams with no network location or one this exporter does not recognise, so the stack adds up to all streams. The lines sit at 0 while nobody is streaming, and a gap means plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_session_bandwidth_kbps{server=~\"$server\", location=\"lan\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Home network"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_session_bandwidth_kbps{server=~\"$server\", location=\"wan\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Remote"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_session_bandwidth_kbps{server=~\"$server\", location=~\"unknown|other\"}) or (0 * sum(plex_server_info{server=~\"$server\"}))",
+                        "legendFormat": "Unknown"
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Kbits",
+                  "min": 0,
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 1,
+                    "fillOpacity": 30,
+                    "stacking": {
+                      "mode": "normal"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "TabsLayout",
+      "spec": {
+        "tabs": [
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "Overview",
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Server overview",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "maxColumnCount": 5,
+                            "columnWidthMode": "narrow",
+                            "rowHeightMode": "custom",
+                            "rowHeight": 106,
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-1"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-2"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-4"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-40"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-3"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-42"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-43"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-44"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-41"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Streaming",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-20"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 8,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-21"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 8,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-22"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Host resources",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-30"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-31"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "variables": [
+                          {
+                            "kind": "QueryVariable",
+                            "spec": {
+                              "name": "plex_pass_server",
+                              "current": {
+                                "text": "",
+                                "value": ""
+                              },
+                              "label": "Plex Pass server",
+                              "hide": "hideVariable",
+                              "refresh": "onTimeRangeChanged",
+                              "skipUrlSync": true,
+                              "query": {
+                                "kind": "DataQuery",
+                                "group": "prometheus",
+                                "version": "v0",
+                                "datasource": {
+                                  "name": "${datasource}"
+                                },
+                                "spec": {
+                                  "query": "label_values(plex_server_info{server=~\"$server\",plex_pass=\"true\"}, server)"
+                                }
+                              },
+                              "regex": "",
+                              "sort": "alphabeticalAsc",
+                              "definition": "label_values(plex_server_info{server=~\"$server\",plex_pass=\"true\"}, server)",
+                              "options": [],
+                              "multi": false,
+                              "includeAll": false,
+                              "allowCustomValue": false
+                            }
+                          }
+                        ],
+                        "conditionalRendering": {
+                          "kind": "ConditionalRenderingGroup",
+                          "spec": {
+                            "visibility": "show",
+                            "condition": "and",
+                            "items": [
+                              {
+                                "kind": "ConditionalRenderingVariable",
+                                "spec": {
+                                  "variable": "plex_pass_server",
+                                  "operator": "matches",
+                                  "value": ".+"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "Libraries",
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Libraries",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 12,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-10"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 12,
+                                  "width": 24,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-50"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Per item",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-61"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-62"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Content and growth",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-60"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-63"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "Streaming history",
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Watch time in this range",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-72"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-73"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 9,
+                                  "width": 24,
+                                  "height": 22,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-74"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Plays over time",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-70"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-71"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 9,
+                                  "width": 24,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-75"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "links": [],
+    "liveNow": false,
+    "preload": false,
+    "tags": [
+      "plex",
+      "media-server",
+      "streaming",
+      "transcoding"
+    ],
+    "timeSettings": {
+      "timezone": "browser",
+      "from": "now-7d",
+      "to": "now",
+      "autoRefresh": "30s",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "hideTimepicker": false,
+      "fiscalYearStartMonth": 0
+    },
+    "title": "Plex Media Server",
+    "variables": [
+      {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "name": "datasource",
+          "pluginId": "prometheus",
+          "refresh": "never",
+          "regex": "",
+          "current": {
+            "text": "Mimir",
+            "value": "mimir"
+          },
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "label": "Data source",
+          "hide": "dontHide",
+          "skipUrlSync": false,
+          "allowCustomValue": true
+        }
       },
       {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "definition": "label_values(plex_server_info, server)",
-        "includeAll": true,
-        "multi": true,
-        "name": "server",
-        "query": {
-          "query": "label_values(plex_server_info, server)"
-        },
-        "refresh": 2,
-        "type": "query"
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "server",
+          "current": {
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "label": "Server",
+          "hide": "dontHide",
+          "refresh": "onTimeRangeChanged",
+          "skipUrlSync": false,
+          "description": "The Plex servers to show, by the name each server reports. All adds every server together.",
+          "query": {
+            "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "spec": {
+              "query": "label_values(plex_server_info, server)"
+            }
+          },
+          "regex": "",
+          "sort": "alphabeticalAsc",
+          "definition": "label_values(plex_server_info, server)",
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".+",
+          "allowCustomValue": false
+        }
       }
     ]
-  },
-  "refresh": "30s",
-  "time": {
-    "from": "now-7d",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "",
-  "title": "Plex Media Server",
-  "uid": "plex-exporter",
-  "version": 6
+  }
 }

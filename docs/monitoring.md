@@ -68,14 +68,22 @@ A value outside the sets above becomes `other`. A missing `stream_type` or `loca
 
 ## Dashboard
 
-The dashboard is versioned with the app. The `grafana-dashboard.json` of release `<tag>` matches the metrics that image serves, and its `uid` stays the same, so a re-import updates the existing dashboard in place. Pin it the way you pin the image, with the tag of the image you run.
+[`grafana-dashboard.json`](../grafana-dashboard.json) needs Grafana 13.2 or newer. It has three tabs:
+
+- Overview shows whether the exporter reaches Plex, the library totals, the active streams with their bandwidth and bitrate, and, for a server with Plex Pass, the host's CPU and memory.
+- Libraries shows each library's size and change per day, the average length and size per item, the items by content type, and the storage each library gained in the selected range.
+- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched titles. It also shows the streams over time by delivery method and by home or remote network, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
+
+The dashboard is versioned with the app. The `grafana-dashboard.json` of release `<tag>` matches the metrics that image serves. The file sets `metadata.name` to `plex-exporter`, which Grafana uses as the dashboard UID. Because the name stays the same from release to release, a re-import over the existing one, or a file provider reading the newer file, updates it in place. Pin it the way you pin the image, with the tag of the image you run.
+
+On Grafana 13.1 or older, use the `grafana-dashboard.json` of release [v4.1.3](https://github.com/cplieger/plex-exporter/releases/tag/v4.1.3), the last one in the older dashboard format. That file gets no further changes, so you maintain it yourself.
 
 Each release attaches the file and its checksum:
 
-- `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json`, which works as grafana-operator `spec.url`, as the Grafana Helm chart's `dashboards.<provider>.<name>.url`, or as a Terraform `http` data source.
+- `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json`, which works as the Grafana Helm chart's `dashboards.<provider>.<name>.url` with `curlOptions: "-sLf"`, because the release URL redirects, or as a Terraform `http` data source.
 - `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json.sha256` beside it.
 
-The same file is the OCI artifact `ghcr.io/cplieger/plex-exporter/dashboard:<tag>`, for grafana-operator `spec.oci`. [Running on Kubernetes](kubernetes.md#delivering-the-dashboard) has a `GrafanaDashboard` example. Renovate can keep either form current, with its `github-releases` datasource for the URL and its `docker` datasource for the OCI tag.
+Renovate can keep the URL current with its `github-releases` datasource. The same file is also the OCI artifact `ghcr.io/cplieger/plex-exporter/dashboard:<tag>`, with the artifact type `application/vnd.grafana.dashboard.v2+json`. [Running on Kubernetes](kubernetes.md#delivering-the-dashboard) shows how to load the file with grafana-operator and with Terraform.
 
 The tiles that show the current state ask for an instant value rather than a range. So when a label splits a series, such as a new `version` after a Plex upgrade, each tile still shows one row.
 
