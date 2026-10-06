@@ -73,9 +73,11 @@ On Unraid, open the **Apps** tab, search for plex-exporter and click **Install**
 
 ## Adding the Grafana dashboard
 
-The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), a dashboard built on these metrics.
+The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), a dashboard built on these metrics. It needs Grafana 13.2 or newer.
 
-Load the copy from the release that matches your image tag, as [Importing an app's dashboard](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#importing-an-apps-dashboard) shows, because each release's dashboard matches the metrics that image serves. Its `uid` stays the same, so importing a newer copy updates the dashboard in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
+Load the copy from the release that matches your image tag into Grafana 13.2 or newer, as [Importing an app's dashboard](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#importing-an-apps-dashboard) shows, because each release's dashboard matches the metrics that image serves. Every release names the dashboard `plex-exporter`, so importing a newer copy and choosing **Import (Overwrite)** updates it in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
+
+On Grafana 13.1 or older, take `grafana-dashboard.json` from release [v4.1.3](https://github.com/cplieger/plex-exporter/releases/tag/v4.1.3), the last one in the older dashboard format. That file gets no further changes, so you maintain it yourself.
 
 ## Configuration reference
 
@@ -127,7 +129,7 @@ At startup, the container exits on an error only you can fix, and Docker restart
 
 ## Monitoring
 
-plex-exporter serves 16 metrics on `/metrics`, for the exporter itself, the server, its libraries and each stream. Each stream adds at most four series, and the exporter tracks 256 streams at most. Six PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+plex-exporter serves 16 metrics on `/metrics`, for the exporter itself, the server, its libraries and each stream. Each stream adds at most four series, and the exporter tracks 256 streams at most. Six PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
 
 ## Documentation
 

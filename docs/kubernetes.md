@@ -63,20 +63,45 @@ Do this only for a single-replica deployment. Those labels are what tell one rep
 
 ## Delivering the dashboard
 
-[Monitoring and alerts](monitoring.md#dashboard) lists the release download and the OCI artifact. This grafana-operator resource pulls the OCI artifact. Replace `<tag>` with the tag of the image you run.
+[Monitoring and alerts](monitoring.md#dashboard) lists the release download and the OCI artifact. The file is a Grafana dashboard resource with `apiVersion: dashboard.grafana.app/v2`, which grafana-operator's `GrafanaDashboard` does not accept. Load it with a `GrafanaManifest` instead, as grafana-operator's [dashboards v2 example](https://grafana.github.io/grafana-operator/docs/examples/manifests/dashboards-v2/) shows. A `GrafanaManifest` takes the dashboard inline and has no URL or OCI source. Copy the `spec` object of the release's `grafana-dashboard.json` in place of the comment below, and copy it again when you move to a new tag.
 
 ```yaml
 apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaDashboard
+kind: GrafanaManifest
 metadata:
   name: plex-exporter
 spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  oci:
-    reference: ghcr.io/cplieger/plex-exporter/dashboard:<tag>
-    path: grafana-dashboard.json
+  template:
+    apiVersion: dashboard.grafana.app/v2
+    kind: Dashboard
+    metadata:
+      name: plex-exporter
+    spec:
+      # The spec object of grafana-dashboard.json, unchanged.
 ```
 
-If you deliver the dashboard through a Flux Kustomization with `postBuild.substitute`, escape its `${datasource}`. That is Grafana's data source variable, and Flux rewrites every `${...}`. Write it as `$${datasource}`, or set `kustomize.toolkit.fluxcd.io/substitute: disabled` on the ConfigMap.
+For a Grafana instance the operator does not manage, also set `namespace` under `template.metadata` to that instance's namespace. You can leave it out when the `Grafana` resource sets `tenantNamespace` in `spec.external`.
+
+If a `GrafanaDashboard` already loads this dashboard from an older tag, keep it on that tag, including in any Renovate rule that bumps it. On grafana-operator v5.25.0, a `GrafanaDashboard` that receives a file in this format deletes the dashboard it manages. The issue is [grafana/grafana-operator#2955](https://github.com/grafana/grafana-operator/issues/2955). Replace it with the `GrafanaManifest` above.
+
+With Terraform, the Grafana provider's [`grafana_apps_dashboard_dashboard_v2`](https://registry.terraform.io/providers/grafana/grafana/latest/docs/resources/apps_dashboard_dashboard_v2) resource takes the file's `spec` object as JSON, and the dashboard's name as `uid`:
+
+```hcl
+data "http" "plex_exporter_dashboard" {
+  url = "https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json"
+}
+
+resource "grafana_apps_dashboard_dashboard_v2" "plex_exporter" {
+  metadata {
+    uid = "plex-exporter"
+  }
+  spec {
+    json = jsonencode(jsondecode(data.http.plex_exporter_dashboard.response_body).spec)
+  }
+}
+```
+
+If you deliver the dashboard through a Flux Kustomization with `postBuild.substitute`, escape its `${datasource}`. That is Grafana's data source variable, and Flux rewrites every `${...}`. Write it as `$${datasource}`, or set `kustomize.toolkit.fluxcd.io/substitute: disabled` on the `GrafanaManifest`.

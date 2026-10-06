@@ -8,6 +8,7 @@ The [shared rules](https://github.com/cplieger/.github/blob/main/CONTRIBUTING.md
 - A new `type` value for `plex_exporter_errors_total` goes into `metrics.ErrorTypes` and into that metric's row in `docs/monitoring.md`. `RecordError` drops a type the list does not hold, so the counter never moves.
 - A new value for `stream_type`, `media_type`, `location` or a resolution label goes into its allowlist in `internal/metrics/descs.go` and into `docs/monitoring.md`. An unlisted value is reported as `other`.
 - The rules in `alerts/` and the panels in `grafana-dashboard.json` match metric names, label names and log messages as text. Update them with any rename. No test compares them, so a rename passes CI and breaks the alert or panel.
+- Save a `grafana-dashboard.json` change made in the Grafana UI with Export, then Export as code, choosing the V2 Resource model.
 - When code holds both, take the `Server` mutex before the session tracker's lock, because the reverse order can deadlock. A function passed to `Tracker.UpdateLibraryLabels` runs under the tracker's lock, so it must not call `RecordError` or anything that locks `Server`.
 
 ## Releases
