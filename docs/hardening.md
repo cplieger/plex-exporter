@@ -11,7 +11,7 @@ The exporter connects out to the configured Plex server only, and its `/metrics`
 - TLS verification always stays on. `PLEX_CA_CERT_PATH` pins a private CA instead of turning verification off.
 - Rating keys from Plex are checked to be integers before the exporter builds a URL from them.
 - The metrics server sets a 5-second header timeout, a 5-second read timeout and a 10-second write timeout.
-- `PLEX_TOKEN` is never logged and never appears in a metric. `PLEX_TOKEN_FILE` also keeps it out of the container environment, so `docker inspect` does not show it.
+- `PLEX_TOKEN` is never logged and never appears in a metric. `PLEX_TOKEN_FILE` reads it from a [secret file](https://github.com/cplieger/docs/blob/main/docs/hardening.md#secrets-in-files) instead, so `docker inspect` does not show it.
 
 Current code-scanning and vulnerability results are on the repository's Security tab.
 

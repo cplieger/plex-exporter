@@ -81,12 +81,7 @@ The tiles that show the current state ask for an instant value rather than a ran
 
 ## Alerting
 
-plex-exporter serves Prometheus metrics on `/metrics` and writes its own diagnostics to its container log. The rules ship as one file per expression language, because neither ruler parses the other's expressions.
-
-- Scrape `/metrics` and load the six PromQL rules in [`alerts/promql.yaml`](../alerts/promql.yaml) into Prometheus or the Mimir ruler.
-- Ship the container's logs to Loki and load the three LogQL rules in [`alerts/logql.yaml`](../alerts/logql.yaml) into Loki's ruler. Grafana Alloy's Docker log discovery ships the logs with no extra configuration.
-
-Firing alerts go through your Alertmanager either way. They cover:
+plex-exporter serves Prometheus metrics on `/metrics` and writes its own diagnostics to its container log. The six PromQL rules in [`alerts/promql.yaml`](../alerts/promql.yaml) go to Prometheus or the Mimir ruler, and the three LogQL rules in [`alerts/logql.yaml`](../alerts/logql.yaml) go to Loki's ruler. [Loading metric alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-metric-alert-rules) and [Loading an app's alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-an-apps-alert-rules) show how. They cover:
 
 | Alert | Fires when | Severity |
 | --- | --- | --- |
