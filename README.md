@@ -19,9 +19,9 @@ plex-exporter lets you follow your Plex server in Grafana and get alerts when it
 
 ## Who it is for
 
-plex-exporter is built for Plex server owners who already run Grafana and Prometheus, or another Prometheus-compatible scraper such as Grafana Alloy. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
+plex-exporter is built for Plex server owners. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
 
-You need a Plex Media Server and its admin token, plus a scraper and Grafana, which this image does not include. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
+You need a Plex Media Server and its admin token. plex-exporter's graphs and six alerts come from your Prometheus, Grafana and Alertmanager, and three from Loki, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#the-smallest-stack-sends-notifications-only) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
 
 Consider [Tautulli](https://github.com/Tautulli/Tautulli) if you want a web app made for Plex, with watch history, per-user statistics and notifications for streams and recently added media.
 
@@ -75,10 +75,7 @@ On Unraid, open the **Apps** tab, search for plex-exporter and click **Install**
 
 The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), a dashboard built on these metrics.
 
-1. In Grafana, open **Dashboards**, click **New**, then **Import**.
-2. Upload `grafana-dashboard.json` and choose your Prometheus data source.
-
-Take the file from the release that matches your image tag, because each release's dashboard matches the metrics that image serves. Its `uid` stays the same, so importing a newer copy updates the dashboard in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
+Load the copy from the release that matches your image tag, as [Importing an app's dashboard](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#importing-an-apps-dashboard) shows, because each release's dashboard matches the metrics that image serves. Its `uid` stays the same, so importing a newer copy updates the dashboard in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
 
 ## Configuration reference
 
