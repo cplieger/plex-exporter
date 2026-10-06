@@ -1,9 +1,9 @@
 #!/bin/sh
 # Synced from cplieger/ci/configs/collect-licenses.sh. Change it there.
-# Copy every linked Go module's license files into the /usr/share/licenses tree of
-# attribution.md section 4. usage: collect-licenses.sh --name IMAGE [--out DIR] [--src DIR] [PACKAGE ...]
+# Copy every linked Go module's license files into the image's /usr/share/licenses
+# tree. usage: collect-licenses.sh --name IMAGE [--out DIR] [--src DIR] [PACKAGE ...]
 # A module with no license file fails the build rather than being skipped, because a
-# missing text is a section 4(a) breach and the fix is a human decision.
+# missing notice is a redistribution breach and the fix is a human decision.
 set -eu
 
 OUT=/out/usr/share/licenses

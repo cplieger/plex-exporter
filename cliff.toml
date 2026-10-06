@@ -43,7 +43,7 @@ header = ""
 #    author's indent depth decided whether a table survived (2 spaces became
 #    mush, 6 spaces became a code block) with nothing telling them which they
 #    picked. Unquoted, a fenced block in the commit footer reaches the reader as
-#    a fenced block. Authoring rules for footers are in git-commits.md.
+#    a fenced block.
 #
 # 3. `set_global` is required, and an attribute filter cannot replace it.
 #    breaking_description falls back to the SUBJECT when a commit has no
