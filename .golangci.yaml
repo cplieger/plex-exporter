@@ -84,8 +84,7 @@ linters:
     presets:
       # `comments` preset removed: revive's `exported` (every exported symbol
       # needs a doc comment starting with its name) and `package-comments`
-      # (every package needs a doc comment) are now enforced org-wide.
-      # All consumer repos were updated before this change was propagated.
+      # (every package needs a doc comment) are enforced.
       - std-error-handling
       - common-false-positives
       - legacy
@@ -97,14 +96,12 @@ linters:
       # (gocyclo + gocognit). Both over-fire on idiomatic Go test code: a
       # thorough table-driven / property / fuzz test is a loop + t.Run closures
       # + per-case assertion guards, which gocognit's nesting model scores high
-      # without that being a smell. A 2026-06 audit put clean gold-standard
-      # libraries' flagship tests at cognitive 36-72 (atomicfile TestPendingFile
-      # is 72) and ~320 test funcs org-wide over 15; gating those would force
-      # ~320 //nolint or the splitting of cohesive table tests, degrading the
-      # suites. golangci also can't set a test-only threshold (min-complexity is
-      # global), so the prod gate of 15 can't coexist with a lenient test bar.
-      # Test complexity is judged in context instead: the test-review agent's
-      # smell catalog (Eager Test, Conditional Test Logic) plus human review.
+      # without that being a smell: clean table tests score cognitive 36-72,
+      # and gating them would force a //nolint or the splitting of cohesive
+      # table tests. golangci also can't set a test-only threshold
+      # (min-complexity is global), so the prod gate of 15 can't coexist with a
+      # lenient test bar. Test complexity is judged in review instead (Eager
+      # Test, Conditional Test Logic).
       - path: _test\.go
         linters:
           - dupl
@@ -186,7 +183,7 @@ formatters:
 # builds one identical string ("G702: Command injection via taint analysis")
 # for every site and the processor keeps three of them.
 #
-# Measured 2026-08-27: a corpus where standalone gosec reported 15 G702
+# Measured: a corpus where standalone gosec reported 15 G702
 # findings reported 3 through golangci-lint, and which 3 survived depended on
 # processing order — which is also what made a `//nolint:gosec` directive on a
 # taint finding fail `nolintlint` as "unused" on some runs and not others.
