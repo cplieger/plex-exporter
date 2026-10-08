@@ -9,57 +9,21 @@ initial_tag = "v1.0.0"
 
 [changelog]
 header = ""
-# Migration steps lead, then the ordinary grouped log.
-#
-# Conventional-commit parsing strips the type AND the `!` from commit.message, so
-# a `feat!:` renders under "### Added" with nothing marking it breaking -- hence
-# the [**breaking**] marker in the group list, which is the INDEX of breaking
-# changes. The BREAKING CHANGE footer is where the migration steps live and was
-# discarded entirely -- hence the leading section, which is only the INSTRUCTIONS.
-#
-# Only the FOOTER is surfaced, never the commit body: a footer is written as an
-# instruction to the reader ("rename X to Y before upgrading"), while the body is
-# rationale that belongs in git log. Rendering bodies too was measured at ~105 KB
-# for one repo's release against ~13 KB for this shape.
-#
-# Three mechanics, all load-bearing rather than stylistic, and all paid for by
-# plex-language-sync v2.0.0 -- the first release this template rendered with three
-# breaking commits and one footer between them (2026-08-21).
-#
-# 1. A footer-bearing commit gets its own `####` subheading. The first shape put
-#    every breaking SUBJECT in a flat bullet list and then one quote block under
-#    it, so with three breaking commits and one footer the reader could not tell
-#    which subject the migration steps belonged to, and each subject was printed
-#    twice (3 bullets here + 3 marked lines in the groups = 6 lines for 3
-#    changes). Only footer-bearing commits appear here now; a breaking commit
-#    with no footer is named once, by its marker in the group list.
-#
-# 2. The footer is emitted as ORDINARY MARKDOWN, never quoted with `> `. A
-#    blockquote silently destroys pre-formatted content: measured through
-#    GitHub's own /markdown endpoint, an aligned env-var table inside `> ` comes
-#    back as `<p>` and the browser collapses its space runs, while the same text
-#    unquoted comes back as `<pre>` with the alignment intact. Worse, markdown's
-#    4-space code-block threshold applies AFTER the `> ` is stripped, so the
-#    author's indent depth decided whether a table survived (2 spaces became
-#    mush, 6 spaces became a code block) with nothing telling them which they
-#    picked. Unquoted, a fenced block in the commit footer reaches the reader as
-#    a fenced block.
-#
-# 3. `set_global` is required, and an attribute filter cannot replace it.
-#    breaking_description falls back to the SUBJECT when a commit has no
-#    BREAKING CHANGE footer, so `filter(attribute="breaking_description")` keeps
-#    EVERY breaking commit (verified: 2 of 2 footerless commits kept) and a
-#    release whose breaking commits all lack footers rendered a bare
-#    "### Breaking changes" heading with nothing beneath it. The flag emits the
-#    heading lazily, on the first commit whose description differs from its
-#    subject, so the section is absent when it would be empty. Verified both
-#    ways on the pinned git-cliff v2.13.1: a mixed set yields the heading plus
-#    one entry, an all-footerless set yields no heading at all.
+# A breaking commit renders once: with a BREAKING CHANGE footer as a `####`
+# subheading under "Breaking changes", footer unquoted (a `> ` quote collapses
+# tables and code blocks), else marked in its group. breaking_description
+# falls back to the subject, so "has a footer" is description != message.
+# CLIFF_NOTES_MODE=v3, set only by cplieger/ci's render-notes.sh, hides
+# deps/devdeps scopes and orders Security, Added, Fixed, Performance, Changed.
+# Tera rejects `in` inside a parenthesised condition, hence the `set` flags.
+# Only the footer renders, never the body, which is rationale for git log.
 body = """
-{% set brk = commits | filter(attribute="breaking", value=true) %}\
+{% set v3 = get_env(name="CLIFF_NOTES_MODE", default="") == "v3" %}\
 {% set_global shown = false %}\
-{% for commit in brk %}\
-{% if commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
+{% for commit in commits %}\
+{% set footer = commit.breaking and commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
+{% set hidden = v3 and commit.scope in ["deps", "devdeps"] %}\
+{% if footer and not hidden %}\
 {% if not shown %}
 ### Breaking changes
 {% set_global shown = true %}\
@@ -69,12 +33,52 @@ body = """
 {{ commit.breaking_description | trim | upper_first }}
 {% endif %}\
 {% endfor %}\
-{% for group, commits in commits | group_by(attribute="group") %}
-### {{ group | striptags | trim | upper_first }}
-{% for commit in commits %}
+{% if v3 %}\
+{% set_global sections = ["Security", "Added", "Fixed", "Performance", "Changed"] %}\
+{% for group, gcommits in commits | group_by(attribute="group") %}\
+{% set label = group | striptags | trim %}\
+{% if label not in sections %}\
+{% set_global sections = sections | concat(with=label) %}\
+{% endif %}\
+{% endfor %}\
+{% for section in sections %}\
+{% set_global keep = [] %}\
+{% for commit in commits %}\
+{% set label = commit.group | striptags | trim %}\
+{% set perf = commit.raw_message is starting_with("perf") %}\
+{% if section == "Performance" %}{% set wanted = label == "Changed" and perf %}\
+{% elif section == "Changed" %}{% set wanted = label == "Changed" and not perf %}\
+{% else %}{% set wanted = label == section %}{% endif %}\
+{% set footer = commit.breaking and commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
+{% set hidden = commit.scope in ["deps", "devdeps"] %}\
+{% if wanted and not hidden and not footer %}\
+{% set_global keep = keep | concat(with=commit) %}\
+{% endif %}\
+{% endfor %}\
+{% if keep | length > 0 %}
+### {{ section | upper_first }}
+{% for commit in keep %}
 - {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
 {% endfor %}
+{% endif %}\
+{% endfor %}\
+{% else %}\
+{% for group, gcommits in commits | group_by(attribute="group") %}\
+{% set_global keep = [] %}\
+{% for commit in gcommits %}\
+{% set footer = commit.breaking and commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
+{% if not footer %}\
+{% set_global keep = keep | concat(with=commit) %}\
+{% endif %}\
+{% endfor %}\
+{% if keep | length > 0 %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in keep %}
+- {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
 {% endfor %}
+{% endif %}\
+{% endfor %}\
+{% endif %}
 """
 trim = true
 
@@ -92,23 +96,23 @@ protect_breaking_commits = false
 # scripts/test-cliff-bump-semantics.sh pin both hazards.
 tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
 
-# Path-level noise filter: a commit whose changed files ALL match these globs
-# never appears in the changelog and never drives a version bump (exclusions
-# feed --bumped-version, so the release boolean agrees). A commit touching
-# both an excluded and a shipped path is still included. Bare patterns are
-# root-anchored; `**/` matches at any depth (git-cliff v2.13.1, verified).
-#
-# This list mirrors the build gate (EXCLUDE_PATTERNS in the central
-# release.yaml detect job) so "builds" and "releases" agree on significance.
-# Keep it a strict SUBSET of that list: never exclude here a path the build
-# gate treats as significant. Inclusion criterion: only paths that commits
-# with non-skipped types (feat/fix/sec/chore(deps)) realistically touch
-# exclusively — everything else (lint configs, .editorconfig, ...) arrives
-# via skip-typed commits (chore(sync):, lint:, ci:) and is filtered by type.
+# A commit whose changed files ALL match these globs is left out of the notes
+# and the version bump; one that also touches a shipped path still counts.
+# Bare patterns are root-anchored, `**/` matches at any depth. Invariant: a
+# strict subset of EXCLUDE_PATTERNS in cplieger/ci's
+# scripts/path-significance.sh, holding only paths a releasing-type commit
+# can touch alone.
 exclude_paths = [
   ".github/",                  # CI workflows + pins: never in the artifact
   "**/*.md",                   # docs, incl. fix:-typed README-only edits
   "LICENSE",
+  # README images, the subset of path-significance.sh's root docs/ image pattern.
+  "docs/**/*.png",
+  "docs/**/*.jpg",
+  "docs/**/*.jpeg",
+  "docs/**/*.webp",
+  "docs/**/*.gif",
+  "docs/**/*.svg",
   "alerts/",                   # README-companion alert rules, one file per
                                # expression language (a ruler parses every expr in
                                # the file it loads, and PromQL/LogQL are mutually
@@ -127,26 +131,14 @@ exclude_paths = [
   ".gitignore",
   ".gitattributes",
   ".editorconfig",
-  # punused adjudications: the repo-owned whitelist the go-ci unused-export gate
-  # reads. Dev-only, never in an artifact, and an adjudication-only commit ships
-  # nothing — but it is the one dotfile here a `refactor:`-typed commit plausibly
-  # touches alone (deleting dead code and recording the survivors is one change;
-  # recording them alone is the follow-up), and `refactor:` is a RELEASING type.
-  # `**/` not bare: go-ci reads this file relative to its working-directory, so a
-  # nested Go module's copy lives at <dir>/.punused-ignore and the root-anchored
-  # form would miss it (measured on the pinned cliff v2.13.1 — bare excludes the
-  # root file only, `**/` excludes both, and a real code commit still bumps).
+  # deadset's configuration, adjudications and cross-language edges, which a
+  # `refactor:` commit can touch alone. `**/`: each sits at its target root,
+  # which in a hybrid repo or a nested Go module is a subdirectory.
+  "**/deadset.json",
+  "**/deadset-ignore.json",
+  "**/deadset-edges.json",
+  # knip's configs, and the retired .punused-ignore repos carry until they delete it.
   "**/.punused-ignore",
-  # knip suppressions and enrolment: the TS twin of .punused-ignore, read by
-  # ts-ci's unused-deps/exports gate. Dev-only, never in an artifact, and a
-  # suppression-only commit ships nothing — but `refactor:` is a RELEASING type,
-  # so a config-only commit was minting a version and a changelog line.
-  # release.yaml's EXCLUDE_PATTERNS already dropped it from the BUILD gate; this
-  # is the RELEASE gate catching up. All eight forms knip itself loads
-  # (KNIP_CONFIG_LOCATIONS in knip/dist/constants.js), since only knip.json is
-  # in use today and the others must not reopen the gap. `**/` not bare: every
-  # enrolled config lives beside its package.json, which in a hybrid repo is a
-  # subdirectory (static-src/, web/, internal/server/static-src/).
   "**/knip.json",
   "**/knip.jsonc",
   "**/.knip.json",
@@ -170,6 +162,9 @@ commit_parsers = [
   # versions) share this commit type but are dropped by exclude_paths above
   # (.github/) before parsing ever sees them.
   { message = "^chore\\(deps\\)", group = "<!-- 4 -->Dependencies" },
+  # Renovate types runtime dependency updates `fix(deps)`; they are
+  # dependency bumps, not fixes.
+  { message = "^fix\\(deps\\)", group = "<!-- 4 -->Dependencies" },
   # Pure-meta commits never warrant a release. `no_increment_regex` is
   # documented to skip these but doesn't actually prevent the patch fallback
   # (cliff v2.13.1; upstream issue #1570, fixed on main after v2.13.1) —
