@@ -9,19 +9,19 @@ plex-exporter puts your Plex server's streams, transcodes, bandwidth and library
 
 ## What it does
 
-plex-exporter lets you follow your Plex server in Grafana and get alerts when it has a problem.
+plex-exporter lets you follow your Plex server in Grafana and alerts you to problems.
 
-- Shows who is watching what, on which device, and whether it plays directly or is transcoded.
+- Shows who watches what, on which device, and whether it plays directly or transcodes on your GPU or CPU.
 - Tracks each stream's bandwidth and bitrate, and whether the viewer is local or remote.
-- Counts the items, total length and disk space of each library.
-- Adds host CPU, memory and total bandwidth on a server with Plex Pass.
-- Comes with a Grafana dashboard and nine alert rules, one of them for a revoked token.
+- Counts each library's items, length and disk space, and lists its largest items with their last play.
+- Adds host CPU, memory and bandwidth with Plex Pass.
+- Comes with a Grafana dashboard and ten alert rules, one for a revoked token.
 
 ## Who it is for
 
 plex-exporter is built for Plex server owners. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
 
-You need a Plex Media Server and its admin token. plex-exporter's graphs and six alerts come from your Prometheus, Grafana and Alertmanager, and three from Loki, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#the-smallest-stack-sends-notifications-only) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
+You need a Plex Media Server and its admin token. plex-exporter's graphs and seven alerts come from your Prometheus, Grafana and Alertmanager, and three from Loki, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#the-smallest-stack-sends-notifications-only) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
 
 Consider [Tautulli](https://github.com/Tautulli/Tautulli) if you want a web app made for Plex, with watch history, per-user statistics and notifications for streams and recently added media.
 
@@ -129,7 +129,7 @@ At startup, the container exits on an error only you can fix, and Docker restart
 
 ## Monitoring
 
-plex-exporter serves 16 metrics on `/metrics`, for the exporter itself, the server, its libraries and each stream. Each stream adds at most four series, and the exporter tracks 256 streams at most. Six PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+plex-exporter serves 44 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Seven PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
 
 ## Documentation
 

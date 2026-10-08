@@ -1,5 +1,5 @@
 # plex-exporter alert rules, the LogQL half, for a Loki ruler.
-# The six PromQL rules live in alerts/promql.yaml. Load each file into its own
+# The seven PromQL rules live in alerts/promql.yaml. Load each file into its own
 # ruler, because neither ruler parses the other's expressions.
 #
 # Ship the container's logs to Loki. Grafana Alloy's Docker log discovery does

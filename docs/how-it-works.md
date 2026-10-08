@@ -11,6 +11,19 @@ The exporter polls Plex on four schedules:
 - Every 60 seconds, it reads `/media/providers`, which holds the server's identity and its library list with each library's total length and storage.
 - Every 15 minutes, it reads the episode, track and item counts of each library, so a count can lag after a large library scan.
 
+It also reads three background endpoints inside that 5-second refresh, whenever each is due. Each read has its own 10-second limit. A failure never fails the refresh, but a slow answer holds the refresh up until it arrives or the limit passes:
+
+- Every 30 seconds, `/activities`, for the scans and analysis Plex is running.
+- Every 60 seconds, `/library/sections`, for each library's last scan time.
+- Every 15 minutes, `/updater/status`, for whether a Plex update is out.
+
+Two longer reads run on schedules of their own, so they never hold up the refresh:
+
+- Every hour, every movie, show and home-video library, item by item in pages of 500, for the largest items, storage by resolution, codec and last play, and the newest arrivals. A pass that takes longer than an hour starts the next one straight after it. A show among a library's 10 largest or 10 newest items gets one more read for its year, once while it stays there.
+- At start, the whole watch history, then the new plays every 5 minutes and the last 30 days once a day.
+
+All five share one budget of 2 requests a second, so a large library takes longer to read rather than loading Plex harder. A refresh read waits for its turn inside its 10-second limit. A server with 100,000 episodes makes about 400 of these requests an hour.
+
 A refresh cycle has 45 seconds to finish, and a session poll has 30 seconds.
 
 For each stream, the exporter reads the item's library metadata once and keeps it with the session. It reads it again when the item changes, such as when the next episode starts.
@@ -30,6 +43,8 @@ Every other metric carries the `server` and `server_id` labels of the server it 
 Host CPU and memory and the bandwidth counter come from statistics endpoints that answer only with Plex Pass. Those three series are absent until the endpoints have answered once, and every other metric works without Plex Pass.
 
 A library's `plex_library_items` series is absent until its count has been read once. A library read as empty reports `0`.
+
+The library content series appear after a library's first complete item-by-item read, and a library that fails a later read keeps the figures of its last complete one. The watch figures appear only once watch history has been read in full. [Monitoring and alerts](monitoring.md#watch-figures) explains when they are hidden.
 
 ## Why it is built this way
 

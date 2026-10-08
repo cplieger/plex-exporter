@@ -85,3 +85,30 @@ groups:
             item count of 1 to 2 hours ago for 30m. Likely a partly lost media
             mount or a bulk delete. Check the media mount and the library in
             Plex.
+      # The threshold grows with the last pass's own duration, so a large
+      # server is not paged for being large. The uptime arm keeps a restart
+      # quiet until the first passes have had time to finish.
+      - alert: PlexLibraryWalkStale
+        expr: >
+          (
+            (time() - plex_library_walk_last_success_timestamp_seconds)
+              > on (server, server_id) group_left ()
+              (14400 + 2 * plex_library_walk_pass_duration_seconds)
+            or on (server, server_id, library_id)
+            (
+              plex_library_walkable
+                unless on (server, server_id, library_id)
+                plex_library_walk_last_success_timestamp_seconds
+            )
+          )
+          and on (job, instance) (time() - process_start_time_seconds > 21600)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Plex library {{ $labels.library_id }} has not been read item by item"
+          description: >
+            plex-exporter has not completed a read of library
+            {{ $labels.library_id }} for over 4h plus twice its last pass time.
+            The largest-items, storage and watch figures for it are out of
+            date. Check the exporter log for "library walk failed".

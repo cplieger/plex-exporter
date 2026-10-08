@@ -66,3 +66,33 @@ func SubtitleAction(ts *plexapi.TranscodeSession) string {
 	}
 	return metrics.FallbackOther
 }
+
+// Where Plex runs one half of a video transcode.
+const (
+	PipelineHardware = "hardware"
+	PipelineSoftware = "software"
+)
+
+// VideoPipeline reports where Plex decodes and encodes a video transcode,
+// each half hardware, software or unknown; ok is false when the session is
+// not transcoding video. A named hardware decoder or encoder means hardware;
+// a readable transcodeHwRequested without one means software; anything else
+// is unknown, because Plex sent no usable hardware fields.
+func VideoPipeline(ts *plexapi.TranscodeSession) (decode, encode string, ok bool) {
+	if !strings.EqualFold(strings.TrimSpace(ts.VideoDecision), metrics.ValTranscode) {
+		return "", "", false
+	}
+	return pipelineHalf(ts.TranscodeHwDecoding, ts.TranscodeHwRequested),
+		pipelineHalf(ts.TranscodeHwEncoding, ts.TranscodeHwRequested), true
+}
+
+func pipelineHalf(hw string, requested *plexapi.FlexBool) string {
+	switch {
+	case strings.TrimSpace(hw) != "":
+		return PipelineHardware
+	case requested != nil && requested.Valid():
+		return PipelineSoftware
+	default:
+		return metrics.ValUnknown
+	}
+}

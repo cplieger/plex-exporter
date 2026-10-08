@@ -72,6 +72,7 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 	s.collectSessions(ch, snap.Name, snap.ID, snap.Libraries)
+	s.collectCatalog(ch, &snap)
 }
 
 // collectSessions emits per-session Prometheus metrics, from a
@@ -101,6 +102,16 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 		}
 		ch <- prometheus.MustNewConstMetric(metrics.DescPlaySeconds, prometheus.CounterValue,
 			totalPlay.Seconds(), labelVals...)
+		if sess.VideoTranscoding {
+			// An ended session reads 0 while it waits to be pruned, so its
+			// row keeps the pipeline but it adds no transcode time.
+			transcoding := 1.0
+			if sess.State == sessions.StateStopped {
+				transcoding = 0
+			}
+			ch <- prometheus.MustNewConstMetric(metrics.DescSessionVideoTranscode, prometheus.GaugeValue, transcoding,
+				srvName, srvID, sessID, sess.VideoDecode, sess.VideoEncode, sess.SourceVideoCodec, sess.TargetVideoCodec)
+		}
 
 		user, _, bw := sessionElements(&sess.Meta)
 
