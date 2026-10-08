@@ -88,8 +88,8 @@ func TestWalkPass_failed_library_keeps_its_watched_set(t *testing.T) {
 	if got, _ := neverBytes(t, srv, "1"); got != before {
 		t.Errorf("never bytes after a failed walk = %v, want the previous %v", got, before)
 	}
-	if srv.History.LastPlayed(602) == 0 {
-		t.Error("LastPlayed(602) = 0 after a pass where its library failed, want its play kept")
+	if srv.History.Visit(602, 0) == 0 {
+		t.Error("Visit(602, 0) = 0 after a pass where its library failed, want its play kept")
 	}
 	if v, _ := valueOf(t, srv, metrics.DescWalkComplete, nil); v != 0 {
 		t.Errorf("walk_complete = %v after a failed library, want 0", v)
@@ -116,8 +116,8 @@ func TestWalkPass_failed_library_keeps_its_watched_set(t *testing.T) {
 	if got, _ := neverBytes(t, srv, "1"); got != before {
 		t.Errorf("never bytes after the recovered walk = %v, want %v", got, before)
 	}
-	if srv.History.LastPlayed(901) == 0 {
-		t.Error("LastPlayed(901) = 0, want the play made during the pass kept")
+	if srv.History.Visit(901, 0) == 0 {
+		t.Error("Visit(901, 0) = 0, want the play made during the pass kept")
 	}
 }
 

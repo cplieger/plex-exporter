@@ -101,8 +101,8 @@ func TestBootstrap_keeps_the_newest_play_per_item(t *testing.T) {
 	if st := s.Bootstrap(t.Context()); st != StatusComplete {
 		t.Fatalf("Bootstrap() = %q, want complete", st)
 	}
-	if got := s.LastPlayed(7); got != 300 {
-		t.Errorf("LastPlayed(7) = %d, want 300", got)
+	if got := s.Visit(7, 0); got != 300 {
+		t.Errorf("Visit(7, 0) = %d, want 300", got)
 	}
 	if v := s.View(); !v.Current || v.Unmatched != 0 {
 		t.Errorf("View() = %+v, want current with no unmatched rows", v)
@@ -122,8 +122,8 @@ func TestBootstrap_counts_unusable_rows_and_never_writes_them(t *testing.T) {
 		t.Errorf("View() Unmatched, Deleted = %d, %d, want 2, 1", v.Unmatched, v.Deleted)
 	}
 	for _, k := range []uint64{6, 12, 0} {
-		if got := s.LastPlayed(k); got != 0 {
-			t.Errorf("LastPlayed(%d) = %d, want 0: an unusable row is never written", k, got)
+		if got := s.Visit(k, 0); got != 0 {
+			t.Errorf("Visit(%d, 0) = %d, want 0: an unusable row is never written", k, got)
 		}
 	}
 	src.rows = append(src.rows, row("9", 500))
@@ -158,8 +158,8 @@ func TestBootstrap_counts_deleted_item_rows_apart_from_unmatched(t *testing.T) {
 	if v := s.View(); v.Deleted != 4 || v.Unmatched != 0 {
 		t.Errorf("View() Deleted, Unmatched = %d, %d, want 4, 0; reads started at %v", v.Deleted, v.Unmatched, src.since)
 	}
-	if got := s.LastPlayed(6); got != 1200 {
-		t.Errorf("LastPlayed(6) = %d, want 1200", got)
+	if got := s.Visit(6, 0); got != 1200 {
+		t.Errorf("Visit(6, 0) = %d, want 1200", got)
 	}
 }
 
@@ -232,8 +232,8 @@ func TestBootstrap_failure_discards_the_map(t *testing.T) {
 		t.Fatalf("Bootstrap() = %q, want failed", st)
 	}
 	v := s.View()
-	if v.Current || s.LastPlayed(1) != 0 {
-		t.Errorf("after a failed bootstrap Current=%v LastPlayed(1)=%d, want false and 0", v.Current, s.LastPlayed(1))
+	if v.Current || s.Visit(1, 0) != 0 {
+		t.Errorf("after a failed bootstrap Current=%v Visit(1, 0)=%d, want false and 0", v.Current, s.Visit(1, 0))
 	}
 	if v.Gen <= before {
 		t.Errorf("Gen = %d after a failed bootstrap, want past %d", v.Gen, before)
@@ -249,8 +249,8 @@ func TestBootstrap_over_the_page_limit(t *testing.T) {
 	if st := s.Bootstrap(t.Context()); st != StatusOverLimit {
 		t.Fatalf("Bootstrap() = %q, want over_limit", st)
 	}
-	if s.LastPlayed(1) != 0 {
-		t.Errorf("LastPlayed(1) = %d, want 0: an over-limit read is discarded", s.LastPlayed(1))
+	if s.Visit(1, 0) != 0 {
+		t.Errorf("Visit(1, 0) = %d, want 0: an over-limit read is discarded", s.Visit(1, 0))
 	}
 }
 
@@ -262,8 +262,8 @@ func TestIncremental_failure_keeps_state_and_cursor(t *testing.T) {
 	if err := s.Incremental(t.Context()); err == nil {
 		t.Fatal("Incremental() error = nil, want the page error")
 	}
-	if s.LastPlayed(1) != 1000 || s.View().Status != StatusComplete {
-		t.Errorf("after a failed increment LastPlayed(1)=%d Status=%q, want 1000 and complete", s.LastPlayed(1), s.View().Status)
+	if s.Visit(1, 0) != 1000 || s.View().Status != StatusComplete {
+		t.Errorf("after a failed increment Visit(1, 0)=%d Status=%q, want 1000 and complete", s.Visit(1, 0), s.View().Status)
 	}
 	src.failPage = -1
 	src.rows = append(src.rows, row("2", 1200))
@@ -273,8 +273,8 @@ func TestIncremental_failure_keeps_state_and_cursor(t *testing.T) {
 	if got := src.since[len(src.since)-1]; got != 1000-incrementalOverlap {
 		t.Errorf("increment read from %d, want %d (cursor minus the overlap)", got, 1000-incrementalOverlap)
 	}
-	if s.LastPlayed(2) != 1200 {
-		t.Errorf("LastPlayed(2) = %d, want 1200", s.LastPlayed(2))
+	if s.Visit(2, 0) != 1200 {
+		t.Errorf("Visit(2, 0) = %d, want 1200", s.Visit(2, 0))
 	}
 }
 
@@ -294,8 +294,8 @@ func TestIncremental_cap_moves_past_unmatched_rows(t *testing.T) {
 			t.Fatalf("Incremental() #%d error = %v", i+1, err)
 		}
 	}
-	if got := s.LastPlayed(9); got != 2000+MaxIncrementalPages*PageSize {
-		t.Errorf("LastPlayed(9) after two capped increments = %d, want %d; reads started at %v",
+	if got := s.Visit(9, 0); got != 2000+MaxIncrementalPages*PageSize {
+		t.Errorf("Visit(9, 0) after two capped increments = %d, want %d; reads started at %v",
 			got, 2000+MaxIncrementalPages*PageSize, src.since)
 	}
 }
@@ -318,8 +318,8 @@ func TestIncremental_capped_read_inside_one_second_reaches_the_rows_after_it(t *
 			t.Fatalf("Incremental() #%d error = %v", i+1, err)
 		}
 	}
-	if got8, got9 := s.LastPlayed(8), s.LastPlayed(9); got8 != 2000 || got9 != 2001 {
-		t.Errorf("LastPlayed(8), LastPlayed(9) after two capped increments = %d, %d, want 2000, 2001; reads started at since %v, offset %v",
+	if got8, got9 := s.Visit(8, 0), s.Visit(9, 0); got8 != 2000 || got9 != 2001 {
+		t.Errorf("Visit(8, 0), Visit(9, 0) after two capped increments = %d, %d, want 2000, 2001; reads started at since %v, offset %v",
 			got8, got9, src.since, src.starts)
 	}
 }
@@ -339,8 +339,8 @@ func TestIncremental_drain_spans_several_capped_reads(t *testing.T) {
 			t.Fatalf("Incremental() #%d error = %v", i+1, err)
 		}
 	}
-	if got := s.LastPlayed(9); got != 2000 {
-		t.Errorf("LastPlayed(9) after three increments = %d, want 2000; reads started at offset %v", got, src.starts)
+	if got := s.Visit(9, 0); got != 2000 {
+		t.Errorf("Visit(9, 0) after three increments = %d, want 2000; reads started at offset %v", got, src.starts)
 	}
 }
 
@@ -387,8 +387,8 @@ func TestIncremental_failure_while_draining_keeps_the_offset(t *testing.T) {
 	if err := s.Incremental(t.Context()); err != nil {
 		t.Fatalf("Incremental() #3 error = %v", err)
 	}
-	if got := s.LastPlayed(9); got != 2000 {
-		t.Errorf("LastPlayed(9) = %d, want 2000; reads started at since %v, offset %v", got, src.since, src.starts)
+	if got := s.Visit(9, 0); got != 2000 {
+		t.Errorf("Visit(9, 0) = %d, want 2000; reads started at since %v, offset %v", got, src.since, src.starts)
 	}
 	if got := src.starts[len(src.starts)-1]; got != MaxIncrementalPages*PageSize {
 		t.Errorf("retry read from offset %d, want %d", got, MaxIncrementalPages*PageSize)
@@ -434,8 +434,8 @@ func TestBootstrap_cursor_covers_trailing_unmatched_rows(t *testing.T) {
 	if err := s.Incremental(t.Context()); err != nil {
 		t.Fatalf("Incremental() error = %v", err)
 	}
-	if got := s.LastPlayed(9); got != 2000+MaxIncrementalPages*PageSize {
-		t.Errorf("LastPlayed(9) after one increment = %d, want %d; reads started at %v",
+	if got := s.Visit(9, 0); got != 2000+MaxIncrementalPages*PageSize {
+		t.Errorf("Visit(9, 0) after one increment = %d, want %d; reads started at %v",
 			got, 2000+MaxIncrementalPages*PageSize, src.since)
 	}
 }
@@ -478,16 +478,16 @@ func TestCatchup_merges_a_late_play(t *testing.T) {
 	if err := s.Incremental(t.Context()); err != nil {
 		t.Fatalf("Incremental() error = %v", err)
 	}
-	if s.LastPlayed(2) != 0 {
-		t.Fatalf("LastPlayed(2) = %d after the increment, want 0: the play is behind the cursor", s.LastPlayed(2))
+	if s.Visit(2, 0) != 0 {
+		t.Fatalf("Visit(2, 0) = %d after the increment, want 0: the play is behind the cursor", s.Visit(2, 0))
 	}
 	for range 2 {
 		if err := s.Catchup(t.Context()); err != nil {
 			t.Fatalf("Catchup() error = %v", err)
 		}
 	}
-	if s.LastPlayed(2) != late {
-		t.Errorf("LastPlayed(2) = %d, want %d", s.LastPlayed(2), late)
+	if s.Visit(2, 0) != late {
+		t.Errorf("Visit(2, 0) = %d, want %d", s.Visit(2, 0), late)
 	}
 }
 
@@ -499,9 +499,9 @@ func TestPrune_removes_only_unvisited_keys_older_than_the_cutoff(t *testing.T) {
 		t.Fatalf("Visit(2) = %d, want 10", got)
 	}
 	n := s.Prune(7, 50, gen)
-	if n != 1 || s.LastPlayed(1) != 0 || s.LastPlayed(2) != 10 || s.LastPlayed(3) != 99 {
-		t.Errorf("Prune removed %d; LastPlayed = %d, %d, %d, want 1 removed and 0, 10, 99",
-			n, s.LastPlayed(1), s.LastPlayed(2), s.LastPlayed(3))
+	if n != 1 || s.Visit(1, 0) != 0 || s.Visit(2, 0) != 10 || s.Visit(3, 0) != 99 {
+		t.Errorf("Prune removed %d; Visit = %d, %d, %d, want 1 removed and 0, 10, 99",
+			n, s.Visit(1, 0), s.Visit(2, 0), s.Visit(3, 0))
 	}
 }
 
@@ -512,8 +512,8 @@ func TestPrune_skipped_after_a_rebuild(t *testing.T) {
 	mustBootstrap(t.Context(), t, s)
 	gen := s.View().Gen
 	mustBootstrap(t.Context(), t, s)
-	if n := s.Prune(7, 50, gen); n != 0 || s.LastPlayed(1) != 10 {
-		t.Errorf("Prune after a rebuild removed %d, LastPlayed(1) = %d, want 0 removed and 10", n, s.LastPlayed(1))
+	if n := s.Prune(7, 50, gen); n != 0 || s.Visit(1, 0) != 10 {
+		t.Errorf("Prune after a rebuild removed %d, Visit(1, 0) = %d, want 0 removed and 10", n, s.Visit(1, 0))
 	}
 }
 

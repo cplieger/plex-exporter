@@ -112,8 +112,8 @@ func TestBootstrap_short_pages_stay_under_two_requests_a_second(t *testing.T) {
 		if st := srv.History.Bootstrap(t.Context()); st != history.StatusComplete {
 			t.Fatalf("Bootstrap() over five %d-row pages = %q, want complete", shortPage, st)
 		}
-		if got, want := srv.History.LastPlayed(10), int64(1700000000+5*shortPage-1); got != want {
-			t.Errorf("LastPlayed(10) = %d, want %d from the last page", got, want)
+		if got, want := srv.History.Visit(10, 0), int64(1700000000+5*shortPage-1); got != want {
+			t.Errorf("Visit(10, 0) = %d, want %d from the last page", got, want)
 		}
 		at := tr.requests()
 		if len(at) != 5 {

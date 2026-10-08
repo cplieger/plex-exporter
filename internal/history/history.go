@@ -133,15 +133,8 @@ func (s *Store) View() View {
 	}
 }
 
-// LastPlayed returns the newest recorded play of key, or 0.
-func (s *Store) LastPlayed(key uint64) int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return int64(s.watched[key].at)
-}
-
-// Visit is LastPlayed that also records that walk pass saw key in the
-// catalog; pass 0 records nothing.
+// Visit returns the newest recorded play of key, or 0, and records that walk
+// pass saw key in the catalog; pass 0 records nothing.
 func (s *Store) Visit(key uint64, pass uint32) int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
