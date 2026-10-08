@@ -11,8 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cplieger/plex-exporter/internal/history"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
+	"github.com/cplieger/plex-exporter/internal/pacer"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/cplieger/plexapi/v2"
@@ -27,51 +29,75 @@ type Server struct {
 	ErrorCounts          map[string]float64
 	Client               *plex.Client
 	Sessions             *sessions.Tracker
-	ID                   string
-	Name                 string
-	Version              string
-	Platform             string
-	PlatformVersion      string
-	Libraries            []library.Library
-	HostCPU              float64
-	HostMem              float64
-	TransmitBytes        float64
-	LastBandwidthAt      int
-	ActiveTranscodes     int
-	mu                   sync.Mutex
-	refreshing           atomic.Bool
-	HTTPReachable        bool
-	SessionsReachable    bool
-	PlexPass             bool
-	ResourcesRead        bool
-	BandwidthRead        bool
+	// History and Pace may be nil, which turns off watch figures and pacing.
+	History           *history.Store
+	Pace              *pacer.Pacer
+	walkSignal        chan struct{}
+	PlatformVersion   string
+	ID                string
+	Name              string
+	Version           string
+	Platform          string
+	walks             walkState
+	Libraries         []library.Library
+	background        backgroundState
+	HostMem           float64
+	HostCPU           float64
+	TransmitBytes     float64
+	LastBandwidthAt   int
+	ActiveTranscodes  int
+	mu                sync.Mutex
+	refreshing        atomic.Bool
+	HTTPReachable     bool
+	SessionsReachable bool
+	PlexPass          bool
+	ResourcesRead     bool
+	BandwidthRead     bool
 }
 
 // New returns an initialised Server for the given Plex HTTP client.
 // LastBandwidthAt is seeded to "now" so the first bandwidth refresh only
 // picks up samples produced after startup, matching legacy behaviour.
 func New(client *plex.Client) *Server {
+	pace := pacer.New(pacer.DefaultInterval)
 	return &Server{
 		Client:          client,
 		LastBandwidthAt: int(time.Now().Unix()),
 		Sessions:        sessions.NewTracker(),
 		ErrorCounts:     make(map[string]float64, len(metrics.ErrorTypes)),
+		Pace:            pace,
+		History:         history.New(client, pace),
+		walkSignal:      make(chan struct{}, 1),
 	}
+}
+
+// RunHistoryLoop reads watch history until ctx ends, signalling the walk
+// loop after each full rebuild. It returns at once when History is nil.
+func (s *Server) RunHistoryLoop(ctx context.Context) {
+	if s.History == nil {
+		return
+	}
+	s.History.Run(ctx, s.SignalWalk, func() { s.RecordError("history_fetch") })
 }
 
 // RecordError increments the error counter for the given type. The type
 // must be a member of metrics.ErrorTypes; unknown types are silently
 // dropped to preserve the Prometheus cardinality bound.
 func (s *Server) RecordError(typ string) {
+	s.mu.Lock()
+	s.recordErrorLocked(typ)
+	s.mu.Unlock()
+}
+
+// recordErrorLocked is RecordError for a caller already holding s.mu.
+func (s *Server) recordErrorLocked(typ string) {
 	if !slices.Contains(metrics.ErrorTypes, typ) {
 		return
 	}
-	s.mu.Lock()
 	if s.ErrorCounts == nil {
 		s.ErrorCounts = make(map[string]float64, len(metrics.ErrorTypes))
 	}
 	s.ErrorCounts[typ]++
-	s.mu.Unlock()
 }
 
 // providersRefreshInterval is the /media/providers fetch cadence. That
@@ -141,6 +167,7 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 	// Resources + bandwidth are Plex Pass features and may 404.
 	s.refreshResources(ctx)
 	s.refreshBandwidth(ctx)
+	s.refreshBackground(ctx)
 	return nil
 }
 
@@ -207,6 +234,8 @@ func (s *Server) SnapshotLibraries() []library.Library {
 // Collect's lock scope to a single block. PlexPass is a string so the
 // caller can emit it directly as a Prometheus label value.
 type Snapshot struct {
+	walks             map[string]libWalk
+	activities        map[activityKey]float64
 	ErrorCounts       map[string]float64
 	PlatformVersion   string
 	Name              string
@@ -215,6 +244,10 @@ type Snapshot struct {
 	Platform          string
 	PlexPass          string
 	Libraries         []library.Library
+	sections          []section
+	update            updateState
+	history           history.View
+	passDuration      time.Duration
 	HostCPU           float64
 	HostMem           float64
 	TransmitBytes     float64
@@ -224,6 +257,8 @@ type Snapshot struct {
 	Retries           float64
 	ResourcesRead     bool
 	BandwidthRead     bool
+	passDone          bool
+	historyEnabled    bool
 }
 
 // Snapshot returns a consistent point-in-time copy of the server's
@@ -249,6 +284,20 @@ func (s *Server) Snapshot() Snapshot {
 	}
 	copy(snap.Libraries, s.Libraries)
 	maps.Copy(snap.ErrorCounts, s.ErrorCounts)
+	snap.walks = make(map[string]libWalk, len(s.walks.libs))
+	for id, w := range s.walks.libs {
+		snap.walks[id] = *w
+	}
+	snap.passDuration, snap.passDone = s.walks.passDuration, s.walks.passDone
+	snap.sections = s.background.sections
+	if time.Since(s.background.activitiesAt) <= activitiesStaleAfter {
+		snap.activities = s.background.activities
+	}
+	snap.update = s.background.update
+	if s.History != nil {
+		snap.historyEnabled = true
+		snap.history = s.History.View()
+	}
 	if s.PlexPass {
 		snap.PlexPass = "true"
 	}
@@ -560,19 +609,28 @@ func (s *Server) applySessionUpdate(w *sessionWork, media *plexapi.Item, libs []
 	s.classifyTranscode(w.sess)
 }
 
-// classifyTranscode derives transcode kind and subtitle action from the
-// session's embedded TranscodeSession and writes them to the tracked
-// session. No-op when the session carries no TranscodeSession.
+// classifyTranscode derives transcode kind, subtitle action and the video
+// pipeline from the session's embedded TranscodeSession and writes them to
+// the tracked session. Without a TranscodeSession only the video pipeline
+// is cleared, so a session that stopped transcoding leaves that series.
 func (s *Server) classifyTranscode(sess *plexapi.Item) {
 	ts := sess.TranscodeSession
 	if ts == nil {
+		s.Sessions.UpdateLibraryLabels(sess.SessionKey, func(ss *sessions.Session) {
+			ss.VideoTranscoding = false
+		})
 		return
 	}
 	kind := sessions.TranscodeKind(ts)
 	subtitle := sessions.SubtitleAction(ts)
+	decode, encode, video := sessions.VideoPipeline(ts)
 	s.Sessions.UpdateLibraryLabels(sess.SessionKey, func(ss *sessions.Session) {
 		ss.TranscodeType = kind
 		ss.SubtitleAction = subtitle
+		ss.VideoTranscoding = video
+		ss.VideoDecode, ss.VideoEncode = decode, encode
+		ss.SourceVideoCodec = metrics.NormalizeCodec(ts.SourceVideoCodec)
+		ss.TargetVideoCodec = metrics.NormalizeCodec(ts.VideoCodec)
 	})
 }
 

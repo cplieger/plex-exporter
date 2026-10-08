@@ -1,8 +1,6 @@
-// Package main is the composition root for plex-exporter. Wiring
-// only: env parsing, concrete-type construction from internal/*
-// packages, HTTP listener, and goroutine launch. All business logic
-// lives in internal/{plex,plexapi,metrics,library,sessions,server};
-// see those packages for behaviour.
+// Package main is the composition root for plex-exporter: env parsing,
+// construction, the HTTP listener and goroutine launch. Business logic
+// lives under internal/.
 package main
 
 import (
@@ -141,6 +139,8 @@ func run() int {
 
 	go ps.Sessions.RunPruneLoop(ctx)
 	go ps.RunSessionPollLoop(ctx)
+	go ps.RunHistoryLoop(ctx)
+	go ps.RunLibraryWalkLoop(ctx)
 
 	slog.Info("starting metrics server", "addr", listener.Addr().String())
 	// WithPreDrain flips the health marker to unhealthy strictly BEFORE

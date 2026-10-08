@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/metrics"
@@ -141,4 +142,77 @@ func TestSubtitleAction_returns_known_label(t *testing.T) {
 			rt.Errorf("SubtitleAction returned %q, not a canonical subtitle_action label", got)
 		}
 	})
+}
+
+func TestVideoPipeline_reads_hardware_fields(t *testing.T) {
+	tests := []struct {
+		name               string
+		json               string
+		wantDec, wantEnc   string
+		wantVideoTranscode bool
+	}{
+		{
+			"hardware decode and encode",
+			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"vaapi","transcodeHwEncoding":"vaapi","transcodeHwFullPipeline":true}`,
+			PipelineHardware, PipelineHardware, true,
+		},
+		{
+			"hardware requested, software decode",
+			`{"videoDecision":"transcode","transcodeHwRequested":"1","transcodeHwEncoding":"qsv"}`,
+			PipelineSoftware, PipelineHardware, true,
+		},
+		{
+			"hardware not requested",
+			`{"videoDecision":"transcode","transcodeHwRequested":false}`,
+			PipelineSoftware, PipelineSoftware, true,
+		},
+		{
+			"no hardware fields",
+			`{"videoDecision":"transcode"}`,
+			metrics.ValUnknown, metrics.ValUnknown, true,
+		},
+		{
+			"unreadable hardware flag",
+			`{"videoDecision":"transcode","transcodeHwRequested":"maybe"}`,
+			metrics.ValUnknown, metrics.ValUnknown, true,
+		},
+		{
+			"audio-only transcode",
+			`{"videoDecision":"copy","audioDecision":"transcode","transcodeHwRequested":true}`,
+			"", "", false,
+		},
+		{
+			"mixed GPUs, no full pipeline",
+			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"nvdec","transcodeHwEncoding":"vaapi","transcodeHwFullPipeline":false}`,
+			PipelineHardware, PipelineHardware, true,
+		},
+		{
+			"encoder title without an encoder",
+			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"vaapi","transcodeHwDecodingTitle":"Amd (VA API)","transcodeHwEncodingTitle":"Amd ()","transcodeHwFullPipeline":false}`,
+			PipelineHardware, PipelineSoftware, true,
+		},
+		{
+			"stale full pipeline after a software restart",
+			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwFullPipeline":true}`,
+			PipelineSoftware, PipelineSoftware, true,
+		},
+		{
+			"Windows Intel",
+			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"d3d11va","transcodeHwEncoding":"qsv","transcodeHwFullPipeline":true}`,
+			PipelineHardware, PipelineHardware, true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ts plexapi.TranscodeSession
+			if err := json.Unmarshal([]byte(tt.json), &ts); err != nil {
+				t.Fatalf("Setup: decode %s: %v", tt.json, err)
+			}
+			dec, enc, ok := VideoPipeline(&ts)
+			if dec != tt.wantDec || enc != tt.wantEnc || ok != tt.wantVideoTranscode {
+				t.Errorf("VideoPipeline(%s) = (%q, %q, %v), want (%q, %q, %v)",
+					tt.json, dec, enc, ok, tt.wantDec, tt.wantEnc, tt.wantVideoTranscode)
+			}
+		})
+	}
 }

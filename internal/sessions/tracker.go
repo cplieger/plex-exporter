@@ -74,11 +74,18 @@ type Session struct {
 	LibID          string
 	LibType        string
 	// MediaKey is the rating key MediaMeta was fetched for; see MediaResolved.
-	MediaKey       string
-	State          State
-	Meta           plexapi.Item
-	MediaMeta      plexapi.Item
-	PrevPlayedTime time.Duration
+	MediaKey string
+	// VideoDecode, VideoEncode and the two codecs are set while the session
+	// transcodes video (VideoTranscoding); see VideoPipeline.
+	VideoDecode      string
+	VideoEncode      string
+	SourceVideoCodec string
+	TargetVideoCodec string
+	State            State
+	Meta             plexapi.Item
+	MediaMeta        plexapi.Item
+	PrevPlayedTime   time.Duration
+	VideoTranscoding bool
 }
 
 // Tracker is the in-memory active-session map. All lock-protected

@@ -20,7 +20,7 @@ These four carry no server labels and appear from the first scrape.
 | `plex_http_reachable` | Gauge | _none_ | `1` when the last refresh of the Plex API succeeded, `0` when it failed |
 | `plex_session_poll_reachable` | Gauge | _none_ | `1` when the last `/status/sessions` poll succeeded, `0` when it failed |
 | `plex_http_retries_total` | Counter | _none_ | HTTP retries the exporter's Plex client made, across all requests |
-| `plex_exporter_errors_total` | Counter | `type` | Exporter errors by type: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server` or `library_items` |
+| `plex_exporter_errors_total` | Counter | `type` | Exporter errors by type: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`, `library_walk`, `history_fetch`, `activities_fetch`, `sections_fetch` or `updater_fetch` |
 
 ## Server metrics
 
@@ -31,6 +31,9 @@ These four carry no server labels and appear from the first scrape.
 | `plex_host_memory_utilization_ratio` | Gauge | `server`, `server_id` | Host memory use from 0.0 to 1.0. Needs Plex Pass |
 | `plex_transmit_bytes_total` | Counter | `server`, `server_id` | Bytes sent, from the Plex bandwidth API. Needs Plex Pass. Starts again from zero when the container restarts, so treat it as indicative |
 | `plex_active_transcode_sessions` | Gauge | `server`, `server_id` | Active video transcodes, from the root endpoint. Works without Plex Pass |
+| `plex_server_activity_progress_ratio` | Gauge | `server`, `server_id`, `activity_type`, `library_type`, `library_id` | Progress of a Plex background task from 0 to 1, or `-1` with no estimate. `activity_type` is `scan`, `analysis`, `metadata`, `maintenance`, `streaming` or `other`. `library_id` is empty for a server-wide task. The series disappear once the task list has not been read for 90 seconds |
+| `plex_server_update_available` | Gauge | `server`, `server_id`, `state` | `1` when Plex lists a release other than the running version, `0` when it is up to date. `state` is the deciding release state. Absent until Plex has checked without an error |
+| `plex_server_update_checked_timestamp_seconds` | Gauge | `server`, `server_id` | When Plex last checked for an update, as a Unix time |
 
 ## Library metrics
 
@@ -40,6 +43,68 @@ These four carry no server labels and appear from the first scrape.
 | `plex_library_storage_bytes` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Disk space the library uses, in bytes |
 | `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Items in the library, read every 15 minutes. `content_type` is `movies`, `episodes`, `tracks`, `photos` or `items` |
 
+## Library content metrics
+
+The exporter reads every movie, show and home-video library item by item once an hour, up to 32 libraries. These series appear after a library's first complete read. Music and photo libraries are not read this way. The base labels are `server`, `server_id`, `library_type` and `library_id`. They carry no `library` name, so join it from `plex_library_storage_bytes` on `server`, `server_id` and `library_id`.
+
+| Metric | Type | Extra labels | Description |
+| --- | --- | --- | --- |
+| `plex_library_top_item_bytes` | Gauge | `rating_key`, `title`, `year` | Size of one of the 10 largest items in the library. A show is the sum of its episodes. An item or show with any unknown size is not ranked |
+| `plex_library_top_item_last_played_timestamp_seconds` | Gauge | `rating_key`, `title`, `year` | When any account last played that item, as a Unix time, `0` for no recorded play. Present only while the watch figures are ready |
+| `plex_library_recent_item_added_timestamp_seconds` | Gauge | `rating_key`, `title`, `year`, `episode` | When one of the 10 newest items on the server was added. A show is listed once, with its newest episode as `SxxEyy` in `episode` |
+| `plex_library_watch_age_bytes` | Gauge | `last_watched` | Bytes of sized items by newest play by any account, `never`, `over_1y`, `90d_1y` or `under_90d`. Present only while the watch figures are ready |
+| `plex_library_watch_age_items` | Gauge | `last_watched` | Items by the same buckets, sized or not. Present only while the watch figures are ready |
+| `plex_library_resolution_bytes` | Gauge | `video_resolution` | Bytes of sized items by resolution: `sd`, `480`, `576`, `720`, `1080`, `2160`, `other` or `unknown` |
+| `plex_library_codec_bytes` | Gauge | `video_codec` | Bytes of sized items by codec: `h264`, `hevc`, `av1`, `vp9`, `mpeg2video`, `mpeg4`, `vc1`, `other` or `unknown` |
+| `plex_library_multi_version_items` | Gauge | _none_ | Items with more than one version |
+| `plex_library_extra_version_bytes` | Gauge | _none_ | Bytes of every version of an item except its largest |
+| `plex_library_newest_item_added_timestamp_seconds` | Gauge | _none_ | When the newest item was added. Absent when no item has a known added time |
+| `plex_library_added_items` | Gauge | `window` | Items added in the last `24h` or `7d` |
+| `plex_library_unsized_items` | Gauge | _none_ | Items whose file size Plex did not report for every version. They are left out of every byte figure |
+| `plex_library_walkable` | Gauge, always 1 | _none_ | One series for each library the exporter reads item by item |
+| `plex_library_walk_last_success_timestamp_seconds` | Gauge | _none_ | When the last complete read of the library finished |
+| `plex_library_walk_duration_seconds` | Gauge | _none_ | How long that read took |
+| `plex_library_last_scan_timestamp_seconds` | Gauge | _none_ | When Plex last scanned the library, for every library type. Absent when Plex reports no scan time |
+
+Server-level read state:
+
+| Metric | Type | Labels | Description |
+| --- | --- | --- | --- |
+| `plex_library_walk_pass_duration_seconds` | Gauge | `server`, `server_id` | How long the last pass over every read library took |
+| `plex_library_walk_skipped_libraries` | Gauge | `server`, `server_id` | Video libraries past the limit of 32 |
+| `plex_library_walk_complete` | Gauge | `server`, `server_id` | `1` when the last pass read every library and none was skipped |
+| `plex_library_watch_age_complete` | Gauge | `server`, `server_id` | `1` when the watch figures of every read library come from current watch history with no unmatched rows |
+| `plex_history_read_status` | Gauge | `server`, `server_id`, `status` | `1` for the outcome of the last full watch-history read: `complete`, `over_limit` or `failed` |
+| `plex_history_last_success_timestamp_seconds` | Gauge | `server`, `server_id` | When a watch-history read last succeeded |
+| `plex_history_unmatched_rows` | Gauge | `server`, `server_id` | History rows with a non-numeric item key, or an item key but no play time, since the last full read, counted up to 250,000 |
+| `plex_history_deleted_item_rows` | Gauge | `server`, `server_id` | History rows for items no longer in Plex since the last full read, counted up to 250,000 |
+
+### Watch figures
+
+"No recorded play" means no account on the server has a play of the item in Plex's watch history, and the token owner has not marked it watched with a play count. History deleted in Plex still counts as no recorded play, and so does an item another account marked as watched without playing it.
+
+The watch figures are the `last_watched` families and the last-played times. A library publishes them only when its last read ran while watch history was complete and current, and history has not been rebuilt since. After a rebuild, the exporter reads the affected libraries again at once. While any history row has a non-numeric item key, or an item key but no play time, the watch figures are hidden. `plex_library_watch_age_complete` then reads `0`, because a watched item could otherwise read as never played.
+
+Plex keeps the plays of items you delete and sends them without an item. Those rows are counted in `plex_history_deleted_item_rows` and never hide the watch figures. A play of a deleted item does not count for a copy you add again later, because Plex gives that copy a new item.
+
+The exporter reads the whole history when it starts, then the plays since its last read every 5 minutes, and the last 30 days once a day for plays a client reported late. A failed read keeps the figures for up to an hour. A failed full read is retried after 5 minutes, doubling to 6 hours.
+
+### Fixed limits
+
+| Limit | Value |
+| --- | --- |
+| Largest items per library, newest items per server | 10 |
+| Libraries read item by item | 32 |
+| Items per library read | 500,000, in pages of 500 |
+| Time for one library read | 10 minutes |
+| Watch-history rows read at start | 250,000, in pages of 500, within 20 minutes. Past either limit the status is `over_limit`, retried once a day |
+| Watch-history rows per 5-minute read, per daily read | 10,000 and 100,000. A 5-minute read that reaches its limit carries on from the next row at the following read |
+| Unmatched and deleted-item watch-history rows counted | 250,000 each, as many as a full read holds. Later reads stop counting at that number |
+| Background requests to Plex | 2 per second at most, counting every page request, shared by the library reads, the history reads and the reads below |
+| Title labels | 128 bytes, one line, control and direction-changing characters removed |
+
+Item titles stay in Prometheus for as long as it keeps data, including titles that later leave the top 10. At most about 3,800 series exist at once on a server at the limits, and about 340 on a typical server.
+
 ## Session metrics
 
 | Metric | Type | Labels | Description |
@@ -48,6 +113,7 @@ These four carry no server labels and appear from the first scrape.
 | `plex_play_seconds_total` | Counter | the same as `plex_plays_active` | Time played in the session, in seconds |
 | `plex_session_bandwidth_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Bandwidth of the session from the Plex sessions API, in kbps |
 | `plex_session_bitrate_kbps` | Gauge | `server`, `server_id`, `session`, `user`, `location` | Live bitrate of the stream, in kbps |
+| `plex_session_video_transcode` | Gauge, 1 or 0 | `server`, `server_id`, `session`, `decode`, `encode`, `source_codec`, `target_codec` | One series for each session transcoding video. It reads 1 while the stream plays or pauses, and 0 after it ends until it is pruned. `decode` and `encode` are `hardware`, `software` or `unknown`, and the codecs use the `plex_library_codec_bytes` values. Join on `server_id` and `session`, because Plex numbers sessions per server |
 
 The play labels are `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `grandchild_index`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location` and `local`.
 
@@ -66,13 +132,22 @@ For an episode, `title` is the show, `child_title` the season, `grandchild_title
 
 A value outside the sets above becomes `other`. A missing `stream_type` or `location` becomes `unknown`, and a missing `media_type` becomes `other`. The two resolution labels take `sd`, `480`, `576`, `720`, `1080`, `4k` or `2160`, stay empty when Plex reports none, and become `other` for any other value. An empty `subtitleDecision` from Plex is reported as `subtitle_action="none"`.
 
+On `plex_session_video_transcode`, a half of the transcode is `hardware` when Plex names the hardware API it uses for that half, such as `vaapi`, `nvenc` or `qsv`. Plex's own dashboard marks a stream `(hw)` by the same rule. A half is `software` when Plex says whether hardware was requested but names no API for that half. It is `unknown` when Plex sends no hardware fields or an unreadable one. A paused stream still reads 1, because Plex keeps its transcoder running.
+
+Both labels report what Plex says about the session. Plex can keep reporting hardware for a session it has restarted on the CPU, so a `hardware` label beside high CPU load points at Plex.
+
 ## Dashboard
 
-[`grafana-dashboard.json`](../grafana-dashboard.json) needs Grafana 13.2 or newer. It has three tabs:
+[`grafana-dashboard.json`](../grafana-dashboard.json) needs Grafana 13.2 or newer. It has six tabs:
 
-- Overview shows whether the exporter reaches Plex, the library totals, the active streams with their bandwidth and bitrate, and, for a server with Plex Pass, the host's CPU and memory.
-- Libraries shows each library's size and change per day, the average length and size per item, the items by content type, and the storage each library gained in the selected range.
-- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched titles. It also shows the streams over time by delivery method and by home or remote network, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
+- Overview shows whether the exporter reaches Plex and whether a Plex update is out. It shows the active streams with how each video transcode runs, what Plex is scanning, and how long ago each library gained an item. A server with Plex Pass also gets the host's CPU and memory.
+- Libraries shows the library totals, each library's size, averages and recent activity, storage and item count over time, storage by resolution and codec, and the 10 newest items.
+- Storage cleanup shows the space held by items nobody has played, items not played in a year and extra versions. It also shows storage by last play, and the 10 largest items in each library with when anyone last played them.
+- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched titles. It also shows the hours watched per day by delivery method and by home or remote network, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
+- Transcoding shows the transcode time per day by where Plex decoded and encoded the video, the share encoded on hardware, and the transcode time by player, codec and resolution.
+- Exporter health shows the watch-history state, each library's last read and the failed reads by type, so you can see what plex-exporter could read.
+
+The Library variable filters the Libraries and Storage cleanup tabs by library. Plex numbers libraries per server, so with several servers selected one choice shows that library number on each of them. With several servers selected, every per-library row and bar names its server before the library. Two libraries with the same name on one server show their library number after the name, such as `Movies (id 2)`. Two servers that report the same name are selected together by the Server variable, and each shows the first eight characters of its server ID after the name, such as `home (id 3f2a9c1e)`.
 
 The dashboard is versioned with the app. The `grafana-dashboard.json` of release `<tag>` matches the metrics that image serves. The file sets `metadata.name` to `plex-exporter`, which Grafana uses as the dashboard UID. Because the name stays the same from release to release, a re-import over the existing one, or a file provider reading the newer file, updates it in place. Pin it the way you pin the image, with the tag of the image you run.
 
@@ -89,7 +164,7 @@ The tiles that show the current state ask for an instant value rather than a ran
 
 ## Alerting
 
-plex-exporter serves Prometheus metrics on `/metrics` and writes its own diagnostics to its container log. The six PromQL rules in [`alerts/promql.yaml`](../alerts/promql.yaml) go to Prometheus or the Mimir ruler, and the three LogQL rules in [`alerts/logql.yaml`](../alerts/logql.yaml) go to Loki's ruler. [Loading metric alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-metric-alert-rules) and [Loading an app's alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-an-apps-alert-rules) show how. They cover:
+plex-exporter serves Prometheus metrics on `/metrics` and writes its own diagnostics to its container log. The seven PromQL rules in [`alerts/promql.yaml`](../alerts/promql.yaml) go to Prometheus or the Mimir ruler, and the three LogQL rules in [`alerts/logql.yaml`](../alerts/logql.yaml) go to Loki's ruler. [Loading metric alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-metric-alert-rules) and [Loading an app's alert rules](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#loading-an-apps-alert-rules) show how. They cover:
 
 | Alert | Fires when | Severity |
 | --- | --- | --- |
@@ -99,6 +174,7 @@ plex-exporter serves Prometheus metrics on `/metrics` and writes its own diagnos
 | `PlexSessionPollFailing` | `plex_session_poll_reachable=0` for 10m while the rest of the Plex API answers, so every session metric is absent or stale | warning |
 | `PlexExporterCollectionErrors` | the `plex_exporter_errors_total` counter keeps rising for some `type` over 30m | warning |
 | `PlexLibraryItemsCollapsed` | a library's item count falls more than 50% below its level 1 to 2 hours earlier for 30m, a fall to zero included | warning |
+| `PlexLibraryWalkStale` | a library has not been read item by item for 4h plus twice the last pass time, or never since the exporter started 6h ago | warning |
 | `PlexExporterFatalError` | the exporter logs an `ERROR`, such as a rejected config or token, a bind failure, a metrics-server failure or a recovered panic | warning |
 | `PlexExporterSessionMapFull` | the session tracker is at its cap of 256 and drops new Plex sessions, so the session metrics undercount | warning |
 | `PlexExporterRefreshIncomplete` | refresh cycles run out of time before the Plex Pass gauges are read, so they keep serving values from an earlier cycle | warning |
@@ -119,6 +195,7 @@ The metric rules need nothing beyond the scrape. The four exporter series are pu
 - `PlexExporterSessionMapFull`. Nothing in `/metrics` reports this. The dropped session is missing, every other series stays healthy and no error counter moves. Expect either a genuinely large number of concurrent streams or a Plex server minting session keys faster than the tracker reclaims them. A stopped session is reclaimed after 60s, an idle one after 5m. The log line carries the `tracked` and `cap` attributes.
 - `PlexExporterRefreshIncomplete`. The stale gauges are `plex_host_cpu_utilization_ratio`, `plex_host_memory_utilization_ratio` and `plex_transmit_bytes_total`. They keep the values from an earlier cycle rather than going absent. This path records no error and leaves `plex_http_reachable` at 1, because the fetches earlier in the same cycle succeeded. The threshold of 3 lines in 15m ignores a single slow cycle. More than that means Plex has been answering slowly for minutes.
 - `PlexSessionPollFailing`. The session metrics it leaves absent or stale are `plex_plays_active`, `plex_play_seconds_total` and the bandwidth and bitrate gauges. A poll that fails only while something is playing points at the session payload itself.
+- `PlexLibraryWalkStale`. The threshold grows with `plex_library_walk_pass_duration_seconds`, so a large server whose pass takes hours is not paged for its size. The rule needs `process_start_time_seconds`, which the exporter serves from its Go runtime, and it stays quiet for 6h after a restart. The log line `library walk failed` names the library and the error.
 - `PlexLibraryItemsCollapsed`. A fall to zero is covered too. The exporter publishes `plex_library_items=0` once it reads a library as empty, so the drop is a full 100%. A library whose count cannot be read is a different condition and does not fire here. The series holds its last value and the failed fetch raises `plex_exporter_errors_total{type="library_items"}`, which `PlexExporterCollectionErrors` alerts on.
 
 Thresholds, the `for:` windows and the `severity` labels are starting points. If you run more than one instance, add your scrape `job` label to the metric selectors. Change the `container` selector to the label your log collector sets, and route by whatever labels your Alertmanager uses.
