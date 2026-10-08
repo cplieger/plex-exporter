@@ -3,14 +3,13 @@
 # cplieger/ci/.github/workflows/release.yaml; this file only calls it. The
 # central pipeline selects the channel from the branch it runs on (main is the
 # stable channel), computes the version, detects the repo type and the changed
-# paths, and publishes. This file triggers on main only until the pinned
-# pipeline is one that publishes a dev channel from a dev push. Per-repo
+# paths, and publishes; a push to dev publishes the dev channel. Per-repo
 # behaviour is the "Resolve repo policy" step there; no override surface here.
 name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
     inputs:
       # Read by the v2 pipeline's no-change gate through github.event.inputs
@@ -20,6 +19,14 @@ on:
         description: "Skip publishing when the rebuilt image is package-identical to :latest (used by the scheduled staleness rebuild)."
         type: boolean
         default: false
+      # Read by the two-branch pipeline through github.event.inputs, never
+      # `with:`, which a v2 pin does not declare. A stable run's dev barrier
+      # dispatches `renumber` on dev; a person never needs to.
+      mode:
+        description: "'renumber' re-tags dev's newest builds under fresh pre-release versions; 'normal' otherwise."
+        type: choice
+        options: [normal, renumber]
+        default: normal
 
 # Serialize release runs per repo. Two merges seconds apart otherwise race:
 # the losing run can 403 even on the git-refs tag create and strand a
@@ -44,13 +51,15 @@ permissions:
 jobs:
   release:
     permissions:
+      # The two-branch dev barrier dispatches dev release runs.
+      actions: write
       contents: write
       statuses: write
       packages: write
       id-token: write
       attestations: write
       security-events: write
-    uses: cplieger/ci/.github/workflows/release.yaml@c9c218d713f221dabb8504141b1ab4501d5ba7af # v2
+    uses: cplieger/ci/.github/workflows/release.yaml@3ec077ed6f632b1a1276ed92269c0fb391c753aa # v3
     # Forward only the two Docker Hub publish credentials the reusable pipeline
     # actually declares and consumes, rather than `secrets: inherit` (which
     # exposes every repo secret to the reusable-workflow trust boundary). Both
