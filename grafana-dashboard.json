@@ -85,7 +85,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -562,7 +562,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -1267,7 +1267,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -1598,7 +1598,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -1690,7 +1690,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -1769,7 +1769,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -1848,7 +1848,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -2078,7 +2078,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -3209,7 +3209,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -3309,7 +3309,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -3388,7 +3388,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -3467,7 +3467,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -3546,7 +3546,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -4775,7 +4775,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -4805,7 +4805,7 @@
         "kind": "Panel",
         "spec": {
           "id": 111,
-          "title": "Not played in a year",
+          "title": "No play in a year",
           "description": "Disk space held by items no account has played in the last year: items never played plus items whose newest play is older than a year. No recorded play shows the never-played part on its own. These are good candidates to delete or move to cheaper storage. The figure stays hidden until every library has been read, every item has a size and watch history is complete.",
           "links": [],
           "data": {
@@ -4853,7 +4853,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -4931,7 +4931,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -5009,7 +5009,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -6799,7 +6799,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -6904,7 +6904,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -6991,7 +6991,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -7086,7 +7086,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -7315,7 +7315,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -7603,7 +7603,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -7682,7 +7682,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -7765,7 +7765,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -7848,7 +7848,7 @@
                 },
                 "text": {
                   "titleSize": 14,
-                  "valueSize": 24
+                  "valueSize": 28
                 }
               },
               "fieldConfig": {
@@ -8158,7 +8158,7 @@
                                 "spec": {
                                   "x": 10,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 6,
                                   "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
@@ -8169,9 +8169,9 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 15,
+                                  "x": 16,
                                   "y": 0,
-                                  "width": 9,
+                                  "width": 8,
                                   "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
@@ -8381,7 +8381,7 @@
                                 }
                               }
                             ],
-                            "columnWidth": 172
+                            "columnWidth": 180
                           }
                         }
                       }
@@ -8792,7 +8792,7 @@
                                 }
                               }
                             ],
-                            "columnWidth": 172
+                            "columnWidth": 180
                           }
                         }
                       }

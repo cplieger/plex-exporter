@@ -470,7 +470,7 @@ func panelByTitle(t *testing.T, panels map[string]dashPanel, title string) dashP
 // in never or over_1y; reading over_1y alone leaves out every unplayed item.
 func TestDashboard_year_without_a_play_counts_the_never_played(t *testing.T) {
 	_, panels := loadDashboard(t)
-	p := panelByTitle(t, panels, "Not played in a year")
+	p := panelByTitle(t, panels, "No play in a year")
 	for _, e := range exprs(&p) {
 		if !strings.Contains(e, `last_watched=~"never|over_1y"`) || strings.Contains(e, `last_watched="over_1y"`) {
 			t.Errorf("%q reads %s, want every leg on last_watched=~\"never|over_1y\"", p.Spec.Title, e)
