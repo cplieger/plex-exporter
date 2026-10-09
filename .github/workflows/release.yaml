@@ -12,15 +12,8 @@ on:
     branches: [main, dev]
   workflow_dispatch:
     inputs:
-      # Read by the v2 pipeline's no-change gate through github.event.inputs
-      # (deliberately not forwarded via `with:`); the scheduled staleness
-      # rebuild dispatches with it while a repo's default branch is main.
-      skip_if_unchanged:
-        description: "Skip publishing when the rebuilt image is package-identical to :latest (used by the scheduled staleness rebuild)."
-        type: boolean
-        default: false
-      # Read by the two-branch pipeline through github.event.inputs, never
-      # `with:`, which a v2 pin does not declare. A stable run's dev barrier
+      # Read by the release pipeline through github.event.inputs, so this
+      # caller forwards nothing through `with:`. A stable run's dev barrier
       # dispatches `renumber` on dev; a person never needs to.
       mode:
         description: "'renumber' re-tags dev's newest builds under fresh pre-release versions; 'normal' otherwise."
@@ -59,7 +52,7 @@ jobs:
       id-token: write
       attestations: write
       security-events: write
-    uses: cplieger/ci/.github/workflows/release.yaml@f0229da815e0820c85a679dea8158cf2bd414925 # v3
+    uses: cplieger/ci/.github/workflows/release.yaml@c5c2a1ca2199a2eb407227df3b56a837b99cc736 # v3
     # Forward only the two Docker Hub publish credentials the reusable pipeline
     # actually declares and consumes, rather than `secrets: inherit` (which
     # exposes every repo secret to the reusable-workflow trust boundary). Both
