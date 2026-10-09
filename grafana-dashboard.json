@@ -30,14 +30,14 @@
       }
     ],
     "cursorSync": "Crosshair",
-    "description": "Shows whether plex-exporter can reach your Plex Media Server, who is streaming and how, and what Plex is working on. The Libraries, Storage cleanup, Streaming history and Transcoding tabs go deeper, and Exporter health shows what plex-exporter could read.",
+    "description": "What plex-exporter reads from your Plex Media Server: whether Plex is reachable, who is streaming and how, and what Plex is working on. The Libraries, Storage cleanup, Streaming history and Transcoding tabs go deeper, and Exporter health shows what plex-exporter could read.",
     "editable": true,
     "elements": {
       "panel-1": {
         "kind": "Panel",
         "spec": {
           "id": 1,
-          "title": "Server status",
+          "title": "Plex server",
           "description": "Shows whether plex-exporter reached your Plex server on its last check, a few seconds ago. Online is normal. Unreachable means Plex is down, restarting or rejecting the token, and the other panels stop updating. Exporter not scraped means no metrics arrive at all, so check the exporter container and your scrape job.",
           "links": [],
           "data": {
@@ -82,6 +82,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -374,7 +378,11 @@
                     "desc": true,
                     "displayName": "Storage"
                   }
-                ]
+                ],
+                "cellHeight": "sm",
+                "frozenColumns": {
+                  "left": 1
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -483,6 +491,18 @@
                         "value": "decbytes"
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Library"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
+                      }
+                    ]
                   }
                 ]
               }
@@ -495,7 +515,7 @@
         "spec": {
           "id": 2,
           "title": "Session poll",
-          "description": "Shows whether the last read of current playback worked. plex-exporter reads it every 5 seconds. Reachable is normal. Unreachable while Server status reads Online means only that request fails, so Active sessions and the stream counts are out of date.",
+          "description": "Shows whether the last read of current playback worked. plex-exporter reads it every 5 seconds. Reachable is normal. Unreachable while Plex server reads Online means only that request fails, so Active sessions and the stream counts are out of date.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -539,6 +559,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -738,7 +762,11 @@
                     "desc": true,
                     "displayName": "Play time"
                   }
-                ]
+                ],
+                "cellHeight": "sm",
+                "frozenColumns": {
+                  "left": 1
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -775,7 +803,11 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 88
+                        "value": 152
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
                       }
                     ]
                   },
@@ -787,7 +819,7 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 130
+                        "value": 152
                       }
                     ]
                   },
@@ -800,6 +832,10 @@
                       {
                         "id": "custom.minWidth",
                         "value": 150
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
                       }
                     ]
                   },
@@ -811,7 +847,7 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 112
+                        "value": 96
                       }
                     ]
                   },
@@ -1073,8 +1109,8 @@
         "kind": "Panel",
         "spec": {
           "id": 21,
-          "title": "Session bandwidth",
-          "description": "Network bandwidth Plex reports for all streams together, per server. Compare it with your upload speed when remote streams buffer. It reads 0 when nobody is streaming, and a gap means plex-exporter was not scraped.",
+          "title": "Session bandwidth and bitrate",
+          "description": "Network bandwidth Plex reports for all streams together, per server, as a solid line, with the bitrate of the media they play as a dashed line. Bandwidth well above the bitrate is players buffering ahead, and a high bitrate points to large files such as 4K remuxes. When remote streams buffer, Bandwidth by network on Streaming history splits the bandwidth into home and remote to compare with your upload speed. Both lines read 0 when nobody is streaming, and a gap means plex-exporter was not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1092,62 +1128,13 @@
                       },
                       "spec": {
                         "expr": "label_replace(label_join((sum by (server, server_id) (plex_session_bandwidth_kbps{server=~\"$server\"}) or (0 * group by (server, server_id) (plex_server_info{server=~\"$server\"}))) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id) label_replace((sum by (server, server_id) (plex_session_bandwidth_kbps{server=~\"$server\"}) or (0 * group by (server, server_id) (plex_server_info{server=~\"$server\"}))), \"name\", \"$1\", \"server\", \"(.*)\")",
-                        "legendFormat": "{{name}}"
+                        "legendFormat": "{{name}} bandwidth"
                       }
                     },
                     "refId": "A",
                     "hidden": false
                   }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "options": {
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom"
                 },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "Kbits",
-                  "min": 0,
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "fillOpacity": 20,
-                    "lineWidth": 2
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-22": {
-        "kind": "Panel",
-        "spec": {
-          "id": 22,
-          "title": "Session bitrate",
-          "description": "The bitrate of the media being streamed, added up across all streams, per server. A high value points to large files, such as 4K remuxes, that strain your upload or your players. It reads 0 when nobody is streaming, and a gap means plex-exporter was not scraped.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
                 {
                   "kind": "PanelQuery",
                   "spec": {
@@ -1160,10 +1147,10 @@
                       },
                       "spec": {
                         "expr": "label_replace(label_join((sum by (server, server_id) (plex_session_bitrate_kbps{server=~\"$server\"}) or (0 * group by (server, server_id) (plex_server_info{server=~\"$server\"}))) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id) label_replace((sum by (server, server_id) (plex_session_bitrate_kbps{server=~\"$server\"}) or (0 * group by (server, server_id) (plex_server_info{server=~\"$server\"}))), \"name\", \"$1\", \"server\", \"(.*)\")",
-                        "legendFormat": "{{name}}"
+                        "legendFormat": "{{name}} media bitrate"
                       }
                     },
-                    "refId": "A",
+                    "refId": "B",
                     "hidden": false
                   }
                 }
@@ -1199,7 +1186,30 @@
                     "lineWidth": 2
                   }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".* media bitrate"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.lineStyle",
+                        "value": {
+                          "fill": "dash",
+                          "dash": [
+                            10,
+                            10
+                          ]
+                        }
+                      },
+                      {
+                        "id": "custom.fillOpacity",
+                        "value": 0
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1209,7 +1219,7 @@
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Active transcodes",
+          "title": "Transcodes",
           "description": "Streams Plex is converting right now on the selected servers, because the player cannot play the file as it is. Transcoding uses the most CPU, so a high count explains a slow server. The tile turns yellow at 1 transcode and orange at 3, and zero is normal when your players support your files. Unknown means plex-exporter has not identified the server yet.",
           "links": [],
           "data": {
@@ -1254,6 +1264,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -1488,7 +1502,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "plex_server_info{server=~\"$server\"}",
+                        "expr": "label_replace(plex_server_info{server=~\"$server\"}, \"version\", \"$1\", \"version\", \"([^-]+)-.*\")",
                         "instant": true,
                         "legendFormat": "{{ version }}",
                         "range": false
@@ -1516,7 +1530,11 @@
                     "lastNotNull"
                   ]
                 },
-                "textMode": "name"
+                "textMode": "name",
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -1532,7 +1550,7 @@
         "kind": "Panel",
         "spec": {
           "id": 40,
-          "title": "Active streams",
+          "title": "Streams",
           "description": "Streams playing or paused right now on the selected servers, with the trend over the time range. A stream drops out about a minute after it stops. The colour turns yellow at 1 stream, orange at 3 and red at 5, because each stream uses upload bandwidth and server time. Unknown means plex-exporter has not identified the server yet.",
           "links": [],
           "data": {
@@ -1560,7 +1578,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 11000
+              }
             }
           },
           "vizConfig": {
@@ -1575,6 +1595,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -1619,7 +1643,7 @@
         "spec": {
           "id": 42,
           "title": "Total items",
-          "description": "Movies, episodes, tracks and photos across the selected libraries, added together. plex-exporter counts them every 15 minutes, so the number can lag after a large scan. Not counted yet means the first count since plex-exporter started has not finished.",
+          "description": "Movies, episodes, tracks and photos across the selected libraries, added together. plex-exporter counts them every 15 minutes, so the number can lag after a large scan. Not counted yet means the first count since plex-exporter started has not finished, or plex-exporter is not being scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1637,7 +1661,9 @@
                       },
                       "spec": {
                         "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\"})",
-                        "legendFormat": ""
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -1661,6 +1687,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -1710,7 +1740,9 @@
                       },
                       "spec": {
                         "expr": "sum(plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"})",
-                        "legendFormat": ""
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -1734,6 +1766,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -1783,7 +1819,9 @@
                       },
                       "spec": {
                         "expr": "sum(plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"})",
-                        "legendFormat": ""
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -1807,6 +1845,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -1865,9 +1907,7 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {
-                "interval": "1d"
-              }
+              "queryOptions": {}
             }
           },
           "vizConfig": {
@@ -2035,348 +2075,30 @@
                   ],
                   "fields": "",
                   "values": false
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
                 "defaults": {
                   "unit": "short",
-                  "decimals": 0,
                   "noValue": "No libraries yet",
                   "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
+                    "mode": "thresholds"
                   },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "value": null,
-                        "color": "blue"
+                        "color": "purple"
                       }
                     ]
                   }
                 },
                 "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-61": {
-        "kind": "Panel",
-        "spec": {
-          "id": 61,
-          "title": "Average length per item",
-          "description": "Total running time of each library divided by its item count, so a show library gives the average episode length. A photo library has no running time and reads 0. A library with no items is left out.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "(label_join(label_replace(label_join((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0)) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0)), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_duration_milliseconds{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0), \"name\", \"$1\", \"library\", \"(.*)\")",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false,
-                        "format": "table"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [
-                {
-                  "kind": "Transformation",
-                  "group": "organize",
-                  "spec": {
-                    "options": {
-                      "excludeByName": {
-                        "__name__": true,
-                        "__tenant_id__": true,
-                        "instance": true,
-                        "job": true,
-                        "hostname": true,
-                        "Time": true,
-                        "Time 1": true,
-                        "Time 2": true,
-                        "Time #A": true,
-                        "Time #B": true,
-                        "Time #C": true,
-                        "Time #D": true,
-                        "Time #E": true,
-                        "Time #F": true,
-                        "Time #G": true,
-                        "Time #H": true,
-                        "Time #I": true,
-                        "Time #J": true,
-                        "Time #K": true,
-                        "Time #L": true,
-                        "Time #N": true,
-                        "server": true,
-                        "server_id": true,
-                        "library_id": true,
-                        "library": true,
-                        "library_type": true,
-                        "activity_type": true,
-                        "user": true
-                      },
-                      "indexByName": {
-                        "name": 0,
-                        "Value": 1
-                      },
-                      "renameByName": {
-                        "name": "Library",
-                        "Value": "Average length"
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "sortBy": [
-                  {
-                    "displayName": "Average length",
-                    "desc": true
-                  }
-                ]
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "ms",
-                  "noValue": "No libraries yet",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "blue"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  },
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
-                    }
-                  },
-                  "min": 0
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Average length"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "gauge",
-                          "mode": "basic",
-                          "valueDisplayMode": "text"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": ".*"
-                    },
-                    "properties": [
-                      {
-                        "id": "noValue",
-                        "value": "-"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "panel-62": {
-        "kind": "Panel",
-        "spec": {
-          "id": 62,
-          "title": "Average size per item",
-          "description": "Disk space of each library divided by its item count. A high average in a movie library usually means many 4K or remux files. A library with no items is left out.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "(label_join(label_replace(label_join((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0)) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0)), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) / (sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) > 0), \"name\", \"$1\", \"library\", \"(.*)\")",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false,
-                        "format": "table"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [
-                {
-                  "kind": "Transformation",
-                  "group": "organize",
-                  "spec": {
-                    "options": {
-                      "excludeByName": {
-                        "__name__": true,
-                        "__tenant_id__": true,
-                        "instance": true,
-                        "job": true,
-                        "hostname": true,
-                        "Time": true,
-                        "Time 1": true,
-                        "Time 2": true,
-                        "Time #A": true,
-                        "Time #B": true,
-                        "Time #C": true,
-                        "Time #D": true,
-                        "Time #E": true,
-                        "Time #F": true,
-                        "Time #G": true,
-                        "Time #H": true,
-                        "Time #I": true,
-                        "Time #J": true,
-                        "Time #K": true,
-                        "Time #L": true,
-                        "Time #N": true,
-                        "server": true,
-                        "server_id": true,
-                        "library_id": true,
-                        "library": true,
-                        "library_type": true,
-                        "activity_type": true,
-                        "user": true
-                      },
-                      "indexByName": {
-                        "name": 0,
-                        "Value": 1
-                      },
-                      "renameByName": {
-                        "name": "Library",
-                        "Value": "Average size"
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "sortBy": [
-                  {
-                    "displayName": "Average size",
-                    "desc": true
-                  }
-                ]
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "decbytes",
-                  "noValue": "No libraries yet",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "blue"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  },
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
-                    }
-                  },
-                  "min": 0
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Average size"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "gauge",
-                          "mode": "basic",
-                          "valueDisplayMode": "text"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": ".*"
-                    },
-                    "properties": [
-                      {
-                        "id": "noValue",
-                        "value": "-"
-                      }
-                    ]
-                  }
-                ]
               }
             }
           }
@@ -2467,8 +2189,8 @@
         "kind": "Panel",
         "spec": {
           "id": 70,
-          "title": "Watch time by delivery per day",
-          "description": "Hours watched each day, stacked by how Plex delivered the stream. Direct play sends the file as it is, direct stream repackages it, and transcode re-encodes it on the server. A growing orange transcode band means a device or a file format forces conversions, so check the Active sessions table for which ones. Times are estimates from the 5-second session check, and a missing bar means nothing played or plex-exporter was not scraped.",
+          "title": "Watch time by delivery",
+          "description": "Hours watched, stacked by delivery: direct play sends the file as it is, direct stream repackages it, and transcode re-encodes it. A growing orange transcode band means a device or a file format forces conversions, so check the Transcoding tab for which players. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. The legend total adds up the bars, which start at the first whole slice inside the range, and a missing bar means nothing played or plex-exporter was not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2485,7 +2207,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Direct play"
                       }
                     },
@@ -2504,7 +2226,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Direct stream"
                       }
                     },
@@ -2523,7 +2245,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Transcode"
                       }
                     },
@@ -2542,7 +2264,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Unknown"
                       }
                     },
@@ -2553,7 +2275,8 @@
               ],
               "transformations": [],
               "queryOptions": {
-                "interval": "1d"
+                "maxDataPoints": 25,
+                "interval": "1h"
               }
             }
           },
@@ -2577,7 +2300,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "suffix:h",
                   "min": 0,
                   "noValue": "No watch time in this range",
                   "color": {
@@ -2592,7 +2315,7 @@
                       "mode": "normal",
                       "group": "A"
                     },
-                    "barAlignment": -1
+                    "barAlignment": 1
                   }
                 },
                 "overrides": [
@@ -2666,8 +2389,8 @@
         "kind": "Panel",
         "spec": {
           "id": 71,
-          "title": "Watch time by network per day",
-          "description": "Hours watched each day, stacked by whether the player was on your home network or remote. Remote watching uses your upload bandwidth, so a growing yellow remote band explains slow remote streams. Unknown covers streams with no network location. Times are estimates from the 5-second session check, and a missing bar means nothing played or plex-exporter was not scraped.",
+          "title": "Watch time by network",
+          "description": "Hours watched, stacked by home network, remote, and Unknown for streams with no network location. Remote watching uses your upload bandwidth, so a growing yellow remote band explains slow remote streams. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. The legend total adds up the bars, which start at the first whole slice inside the range, and a missing bar means nothing played or plex-exporter was not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2684,7 +2407,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Home network"
                       }
                     },
@@ -2703,7 +2426,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Remote"
                       }
                     },
@@ -2722,7 +2445,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval]))",
+                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Unknown"
                       }
                     },
@@ -2733,7 +2456,8 @@
               ],
               "transformations": [],
               "queryOptions": {
-                "interval": "1d"
+                "maxDataPoints": 25,
+                "interval": "1h"
               }
             }
           },
@@ -2757,7 +2481,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "suffix:h",
                   "min": 0,
                   "noValue": "No watch time in this range",
                   "color": {
@@ -2772,7 +2496,7 @@
                       "mode": "normal",
                       "group": "A"
                     },
-                    "barAlignment": -1
+                    "barAlignment": 1
                   }
                 },
                 "overrides": [
@@ -2849,7 +2573,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sort_desc(sum by (user) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])))",
+                        "expr": "sort_desc((sum by (user) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range]))) / 3600)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false,
@@ -2929,7 +2653,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "suffix:h",
                   "min": 0,
                   "noValue": "No watch time in this range",
                   "thresholds": {
@@ -3009,7 +2733,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sort_desc((label_join(label_replace(label_join((label_replace(label_join(label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\") and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\")) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\") and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\")), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\") and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\"), \"name\", \"$1\", \"library\", \"(.*)\"))",
+                        "expr": "sort_desc(((label_join(label_replace(label_join((label_replace(label_join(label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\") and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\")) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\") and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\")), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\") and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) label_replace(sum by (server, server_id, library_id, library) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])), \"library\", \"Unknown library\", \"library\", \"unknown\"), \"name\", \"$1\", \"library\", \"(.*)\")) / 3600)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false,
@@ -3089,7 +2813,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "suffix:h",
                   "min": 0,
                   "noValue": "No watch time in this range",
                   "thresholds": {
@@ -3152,7 +2876,7 @@
         "spec": {
           "id": 74,
           "title": "Most watched titles",
-          "description": "The 20 titles played longest in the selected range, with the show, season and episode for TV and the artist, album and track for music. Times are estimates from plex-exporter's 5-second session check, and history reaches back only as far as your Prometheus keeps metrics. Each stream can lose up to one scrape interval, so short streams count low or are missed. No plays in this range means nothing played, or plex-exporter was not scraped.",
+          "description": "The 20 shows, films and music tracks played longest in the selected range, each show counted whole, its watch time the sum of its episodes. A music row names the artist as its title, with the album and track beside it. Times are estimates from plex-exporter's 5-second session check that reach back only as far as your Prometheus keeps metrics, so short streams count low or are missed. No plays in this range means nothing played, or plex-exporter was not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3169,7 +2893,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "topk(20, sum by (title, child_title, grandchild_title) (increase(plex_play_seconds_total{server=~\"$server\"}[$__range])))",
+                        "expr": "(topk(20, (sum by (media_type, title) (increase(plex_play_seconds_total{server=~\"$server\", media_type=\"episode\"}[$__range])) or sum by (media_type, title, child_title, grandchild_title) (increase(plex_play_seconds_total{server=~\"$server\", media_type!=\"episode\"}[$__range]))) > 0)) / 3600",
                         "legendFormat": "",
                         "format": "table",
                         "instant": true,
@@ -3192,15 +2916,17 @@
                       },
                       "indexByName": {
                         "title": 0,
-                        "child_title": 1,
-                        "grandchild_title": 2,
-                        "Value": 3
+                        "media_type": 1,
+                        "child_title": 2,
+                        "grandchild_title": 3,
+                        "Value": 4
                       },
                       "renameByName": {
                         "title": "Title",
-                        "child_title": "Season or album",
-                        "grandchild_title": "Episode or track",
-                        "Value": "Watch time"
+                        "media_type": "Type",
+                        "child_title": "Album",
+                        "grandchild_title": "Track",
+                        "Value": "Watched"
                       }
                     }
                   }
@@ -3219,9 +2945,10 @@
                 "sortBy": [
                   {
                     "desc": true,
-                    "displayName": "Watch time"
+                    "displayName": "Watched"
                   }
-                ]
+                ],
+                "cellHeight": "sm"
               },
               "fieldConfig": {
                 "defaults": {
@@ -3239,20 +2966,20 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Watch time"
+                      "options": "Watched"
                     },
                     "properties": [
-                      {
-                        "id": "unit",
-                        "value": "s"
-                      },
                       {
                         "id": "min",
                         "value": 0
                       },
                       {
                         "id": "custom.width",
-                        "value": 136
+                        "value": 112
+                      },
+                      {
+                        "id": "unit",
+                        "value": "suffix:h"
                       }
                     ]
                   },
@@ -3265,6 +2992,52 @@
                       {
                         "id": "noValue",
                         "value": "-"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Type"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 88
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "episode": {
+                                "index": 0,
+                                "text": "Show"
+                              },
+                              "movie": {
+                                "index": 1,
+                                "text": "Film"
+                              },
+                              "track": {
+                                "index": 2,
+                                "text": "Track"
+                              },
+                              "clip": {
+                                "index": 3,
+                                "text": "Clip"
+                              },
+                              "photo": {
+                                "index": 4,
+                                "text": "Photo"
+                              },
+                              "other": {
+                                "index": 5,
+                                "text": "Other"
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   }
@@ -3433,6 +3206,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -3484,7 +3261,7 @@
         "kind": "Panel",
         "spec": {
           "id": 101,
-          "title": "Libraries busy",
+          "title": "Libraries",
           "description": "Libraries where Plex is scanning, analysing media or refreshing metadata right now, each counted once however many tasks it runs. A library that stays in this count for hours points at a stuck scan, so check Current library work below. Zero is the normal idle state, and the tile also reads zero when plex-exporter cannot read the task list, see Exporter health. Unknown means plex-exporter has not reached Plex.",
           "links": [],
           "data": {
@@ -3529,11 +3306,15 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
+                  "unit": "suffix: busy",
                   "noValue": "Unknown",
                   "thresholds": {
                     "mode": "absolute",
@@ -3559,7 +3340,7 @@
         "kind": "Panel",
         "spec": {
           "id": 102,
-          "title": "Server tasks",
+          "title": "Plex tasks",
           "description": "Background tasks Plex runs for the whole server rather than one library, such as database maintenance. Plex schedules these in its maintenance window, so a task that runs all day is worth a look. Zero is the normal idle state, and the tile also reads zero when plex-exporter cannot read the task list, see Exporter health. Unknown means plex-exporter has not reached Plex.",
           "links": [],
           "data": {
@@ -3604,6 +3385,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -3634,7 +3419,7 @@
         "kind": "Panel",
         "spec": {
           "id": 103,
-          "title": "Oldest library scan",
+          "title": "Oldest scan",
           "description": "How long ago Plex last scanned the library that has gone longest without a scan. A library that stops scanning usually means its media folder went missing, so check the mount. No value means Plex reports no scan time for any library.",
           "links": [],
           "data": {
@@ -3679,6 +3464,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -3709,7 +3498,7 @@
         "kind": "Panel",
         "spec": {
           "id": 104,
-          "title": "Added in 24 hours",
+          "title": "New in 24 h",
           "description": "Movies and episodes added to the selected servers in the last 24 hours, read each hour, with the weekly figure per library on the Libraries tab. Zero for a week on a server that usually grows means your downloads or imports have stopped. No value means plex-exporter has not finished reading the libraries yet.",
           "links": [],
           "data": {
@@ -3754,6 +3543,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -4024,167 +3817,6 @@
           }
         }
       },
-      "panel-106": {
-        "kind": "Panel",
-        "spec": {
-          "id": 106,
-          "title": "Newest item per library",
-          "description": "How long ago each library last gained an item, oldest first, read each hour. A library that usually grows and has gained nothing for weeks means its downloads or imports have stopped. A library with no known added time is left out.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sort_desc((label_join(label_replace(label_join((label_replace(label_join(time() - max by (server, server_id, library_id, library) (plex_library_newest_item_added_timestamp_seconds{server=~\"$server\"} * on (server, server_id, library_id) group_left (library) (0 * max by (server, server_id, library_id, library) (plex_library_storage_bytes) + 1)) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) time() - max by (server, server_id, library_id, library) (plex_library_newest_item_added_timestamp_seconds{server=~\"$server\"} * on (server, server_id, library_id) group_left (library) (0 * max by (server, server_id, library_id, library) (plex_library_storage_bytes) + 1))) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(time() - max by (server, server_id, library_id, library) (plex_library_newest_item_added_timestamp_seconds{server=~\"$server\"} * on (server, server_id, library_id) group_left (library) (0 * max by (server, server_id, library_id, library) (plex_library_storage_bytes) + 1)) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) time() - max by (server, server_id, library_id, library) (plex_library_newest_item_added_timestamp_seconds{server=~\"$server\"} * on (server, server_id, library_id) group_left (library) (0 * max by (server, server_id, library_id, library) (plex_library_storage_bytes) + 1))), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(time() - max by (server, server_id, library_id, library) (plex_library_newest_item_added_timestamp_seconds{server=~\"$server\"} * on (server, server_id, library_id) group_left (library) (0 * max by (server, server_id, library_id, library) (plex_library_storage_bytes) + 1)) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) time() - max by (server, server_id, library_id, library) (plex_library_newest_item_added_timestamp_seconds{server=~\"$server\"} * on (server, server_id, library_id) group_left (library) (0 * max by (server, server_id, library_id, library) (plex_library_storage_bytes) + 1)), \"name\", \"$1\", \"library\", \"(.*)\"))",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false,
-                        "format": "table"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [
-                {
-                  "kind": "Transformation",
-                  "group": "organize",
-                  "spec": {
-                    "options": {
-                      "excludeByName": {
-                        "__name__": true,
-                        "__tenant_id__": true,
-                        "instance": true,
-                        "job": true,
-                        "hostname": true,
-                        "Time": true,
-                        "Time 1": true,
-                        "Time 2": true,
-                        "Time #A": true,
-                        "Time #B": true,
-                        "Time #C": true,
-                        "Time #D": true,
-                        "Time #E": true,
-                        "Time #F": true,
-                        "Time #G": true,
-                        "Time #H": true,
-                        "Time #I": true,
-                        "Time #J": true,
-                        "Time #K": true,
-                        "Time #L": true,
-                        "Time #N": true,
-                        "server": true,
-                        "server_id": true,
-                        "library_id": true,
-                        "library": true,
-                        "library_type": true,
-                        "activity_type": true,
-                        "user": true
-                      },
-                      "indexByName": {
-                        "name": 0,
-                        "Value": 1
-                      },
-                      "renameByName": {
-                        "name": "Library",
-                        "Value": "Newest item"
-                      }
-                    }
-                  }
-                }
-              ],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "",
-            "spec": {
-              "options": {
-                "showHeader": true,
-                "cellHeight": "sm",
-                "sortBy": [
-                  {
-                    "displayName": "Newest item",
-                    "desc": true
-                  }
-                ]
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "noValue": "Not read yet",
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "blue"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  },
-                  "decimals": 0,
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
-                    }
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Newest item"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "gauge",
-                          "mode": "basic",
-                          "valueDisplayMode": "text"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": ".*"
-                    },
-                    "properties": [
-                      {
-                        "id": "noValue",
-                        "value": "-"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
       "panel-117": {
         "kind": "Panel",
         "spec": {
@@ -4401,7 +4033,10 @@
                     "desc": true
                   }
                 ],
-                "cellHeight": "sm"
+                "cellHeight": "sm",
+                "frozenColumns": {
+                  "left": 1
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -4499,6 +4134,18 @@
                         "value": "-"
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Library"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
+                      }
+                    ]
                   }
                 ]
               }
@@ -4580,6 +4227,45 @@
                         "sd": "SD",
                         "other": "Other",
                         "unknown": "Unknown"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "calculateField",
+                  "spec": {
+                    "options": {
+                      "mode": "reduceRow",
+                      "reduce": {
+                        "reducer": "sum"
+                      },
+                      "alias": "Total",
+                      "replaceFields": false
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "sortBy",
+                  "spec": {
+                    "options": {
+                      "sort": [
+                        {
+                          "field": "Total",
+                          "desc": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Total": true
                       }
                     }
                   }
@@ -4707,6 +4393,45 @@
                         "vc1": "VC-1",
                         "other": "Other",
                         "unknown": "Unknown"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "calculateField",
+                  "spec": {
+                    "options": {
+                      "mode": "reduceRow",
+                      "reduce": {
+                        "reducer": "sum"
+                      },
+                      "alias": "Total",
+                      "replaceFields": false
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "sortBy",
+                  "spec": {
+                    "options": {
+                      "sort": [
+                        {
+                          "field": "Total",
+                          "desc": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Total": true
                       }
                     }
                   }
@@ -4862,7 +4587,10 @@
                     "desc": true
                   }
                 ],
-                "cellHeight": "sm"
+                "cellHeight": "sm",
+                "frozenColumns": {
+                  "left": 1
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -4893,7 +4621,11 @@
                       },
                       {
                         "id": "custom.minWidth",
-                        "value": 100
+                        "value": 150
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
                       }
                     ]
                   },
@@ -5040,6 +4772,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -5070,7 +4806,7 @@
         "spec": {
           "id": 111,
           "title": "Not played in a year",
-          "description": "Disk space held by items whose newest play by any account is more than a year old. These are good candidates to delete or move to cheaper storage. The figure stays hidden until every library has been read, every item has a size and watch history is complete.",
+          "description": "Disk space held by items no account has played in the last year: items never played plus items whose newest play is older than a year. No recorded play shows the never-played part on its own. These are good candidates to delete or move to cheaper storage. The figure stays hidden until every library has been read, every item has a size and watch history is complete.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -5087,7 +4823,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "label_replace(label_join((sum by (server, server_id) (plex_library_watch_age_bytes{server=~\"$server\", library_id=~\"$library_id\", last_watched=\"over_1y\"}) and on (server, server_id) (plex_library_walk_complete == 1) and on (server, server_id) (sum by (server, server_id) (plex_library_unsized_items) == 0) and on (server, server_id) (plex_library_watch_age_complete == 1)) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id) label_replace((sum by (server, server_id) (plex_library_watch_age_bytes{server=~\"$server\", library_id=~\"$library_id\", last_watched=\"over_1y\"}) and on (server, server_id) (plex_library_walk_complete == 1) and on (server, server_id) (sum by (server, server_id) (plex_library_unsized_items) == 0) and on (server, server_id) (plex_library_watch_age_complete == 1)), \"name\", \"$1\", \"server\", \"(.*)\")",
+                        "expr": "label_replace(label_join((sum by (server, server_id) (plex_library_watch_age_bytes{server=~\"$server\", library_id=~\"$library_id\", last_watched=~\"never|over_1y\"}) and on (server, server_id) (plex_library_walk_complete == 1) and on (server, server_id) (sum by (server, server_id) (plex_library_unsized_items) == 0) and on (server, server_id) (plex_library_watch_age_complete == 1)) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id) label_replace((sum by (server, server_id) (plex_library_watch_age_bytes{server=~\"$server\", library_id=~\"$library_id\", last_watched=~\"never|over_1y\"}) and on (server, server_id) (plex_library_walk_complete == 1) and on (server, server_id) (sum by (server, server_id) (plex_library_unsized_items) == 0) and on (server, server_id) (plex_library_watch_age_complete == 1)), \"name\", \"$1\", \"server\", \"(.*)\")",
                         "legendFormat": "{{name}}",
                         "instant": true,
                         "range": false
@@ -5114,6 +4850,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -5188,6 +4928,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -5262,6 +5006,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -5362,6 +5110,45 @@
                         "over_1y": "Over a year ago",
                         "90d_1y": "90 days to a year ago",
                         "under_90d": "Within 90 days"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "calculateField",
+                  "spec": {
+                    "options": {
+                      "mode": "reduceRow",
+                      "reduce": {
+                        "reducer": "sum"
+                      },
+                      "alias": "Total",
+                      "replaceFields": false
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "sortBy",
+                  "spec": {
+                    "options": {
+                      "sort": [
+                        {
+                          "field": "Total",
+                          "desc": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Total": true
                       }
                     }
                   }
@@ -5771,7 +5558,10 @@
                     "desc": true
                   }
                 ],
-                "cellHeight": "sm"
+                "cellHeight": "sm",
+                "frozenColumns": {
+                  "left": 1
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -5802,7 +5592,11 @@
                       },
                       {
                         "id": "custom.minWidth",
-                        "value": 100
+                        "value": 150
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
                       }
                     ]
                   },
@@ -5930,8 +5724,8 @@
         "kind": "Panel",
         "spec": {
           "id": 120,
-          "title": "Transcode time per day",
-          "description": "Minutes of video transcoding each day, paused streams included, stacked by where Plex decoded and encoded the video. Green full-hardware time is cheap for the server. A growing orange Software band on a server set up for hardware transcoding means streams are running on the CPU instead, so check the per-player chart below. Plex reports the pipeline per session, and history reaches back as far as your Prometheus keeps metrics.",
+          "title": "Transcode time",
+          "description": "Hours of video transcoding, paused streams included, stacked by where Plex decoded and encoded the video. Green full-hardware time is cheap, and a growing orange Software band on a server set up for hardware transcoding means streams run on the CPU, so check the per-player table below. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. The legend total adds up the bars, which start at the first whole slice inside the range, and a missing bar means no video transcode ran in that slice.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -5948,7 +5742,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(sum_over_time(plex_session_video_transcode{server=~\"$server\", decode=\"hardware\", encode=\"hardware\"}[$__interval:1m]))",
+                        "expr": "sum(sum_over_time((plex_session_video_transcode{server=~\"$server\", decode=\"hardware\", encode=\"hardware\"} and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) / 60 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Hardware decode and encode"
                       }
                     },
@@ -5967,7 +5761,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(sum_over_time(plex_session_video_transcode{server=~\"$server\", decode=\"software\", encode=\"hardware\"}[$__interval:1m]))",
+                        "expr": "sum(sum_over_time((plex_session_video_transcode{server=~\"$server\", decode=\"software\", encode=\"hardware\"} and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) / 60 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Hardware encode only"
                       }
                     },
@@ -5986,7 +5780,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(sum_over_time(plex_session_video_transcode{server=~\"$server\", decode=\"hardware\", encode=\"software\"}[$__interval:1m]))",
+                        "expr": "sum(sum_over_time((plex_session_video_transcode{server=~\"$server\", decode=\"hardware\", encode=\"software\"} and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) / 60 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Hardware decode only"
                       }
                     },
@@ -6005,7 +5799,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(sum_over_time(plex_session_video_transcode{server=~\"$server\", decode=\"software\", encode=\"software\"}[$__interval:1m]))",
+                        "expr": "sum(sum_over_time((plex_session_video_transcode{server=~\"$server\", decode=\"software\", encode=\"software\"} and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) / 60 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Software"
                       }
                     },
@@ -6024,7 +5818,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(sum_over_time((plex_session_video_transcode{server=~\"$server\", decode=\"unknown\"} or plex_session_video_transcode{server=~\"$server\", encode=\"unknown\"})[$__interval:1m]))",
+                        "expr": "sum(sum_over_time(((plex_session_video_transcode{server=~\"$server\", decode=\"unknown\"} or plex_session_video_transcode{server=~\"$server\", encode=\"unknown\"}) and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) / 60 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Unknown"
                       }
                     },
@@ -6035,7 +5829,8 @@
               ],
               "transformations": [],
               "queryOptions": {
-                "interval": "1d"
+                "maxDataPoints": 25,
+                "interval": "1h"
               }
             }
           },
@@ -6050,7 +5845,8 @@
                     "sum"
                   ],
                   "displayMode": "table",
-                  "placement": "right"
+                  "placement": "right",
+                  "width": 300
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -6059,7 +5855,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "m",
+                  "unit": "suffix:h",
                   "min": 0,
                   "noValue": "No video transcode in this range",
                   "color": {
@@ -6074,7 +5870,7 @@
                       "mode": "normal",
                       "group": "A"
                     },
-                    "barAlignment": -1
+                    "barAlignment": 1
                   }
                 },
                 "overrides": [
@@ -6163,8 +5959,8 @@
         "kind": "Panel",
         "spec": {
           "id": 121,
-          "title": "Hardware encode share per day",
-          "description": "The share of each day's video transcode time, paused streams included, that Plex encoded on the GPU. A drop on a server with hardware transcoding turned on usually follows a driver, image or Plex update. A missing bar means no video transcode ran that day.",
+          "title": "Hardware encode share",
+          "description": "The share of video transcode time, paused streams included, that Plex encoded on the GPU. A drop on a server with hardware transcoding turned on usually follows a driver, image or Plex update. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. A missing bar means no video transcode ran in that slice.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -6181,7 +5977,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(sum_over_time(plex_session_video_transcode{server=~\"$server\", encode=\"hardware\"}[$__interval:1m])) / (sum(sum_over_time(plex_session_video_transcode{server=~\"$server\"}[$__interval:1m])) > 0)",
+                        "expr": "sum(sum_over_time((plex_session_video_transcode{server=~\"$server\", encode=\"hardware\"} and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) / (sum(sum_over_time((plex_session_video_transcode{server=~\"$server\"} and on () (vector(time()) <= $__to / 1000))[$__interval:1m] offset -$__interval)) > 0) and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Encoded on hardware"
                       }
                     },
@@ -6192,7 +5988,8 @@
               ],
               "transformations": [],
               "queryOptions": {
-                "interval": "1d"
+                "maxDataPoints": 25,
+                "interval": "1h"
               }
             }
           },
@@ -6207,7 +6004,8 @@
                     "mean"
                   ],
                   "displayMode": "table",
-                  "placement": "right"
+                  "placement": "right",
+                  "width": 300
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -6231,7 +6029,7 @@
                       "mode": "none",
                       "group": "A"
                     },
-                    "barAlignment": -1
+                    "barAlignment": 1
                   },
                   "max": 1
                 },
@@ -6262,7 +6060,7 @@
         "spec": {
           "id": 122,
           "title": "Transcode time by player",
-          "description": "Video transcoding time in the selected range, paused streams included, for the 8 player and encoder pairs with the most, split by whether Plex encoded on hardware or software. A player that transcodes a lot is often fixed with a client setting, such as raising its streaming quality on your network. Software time on a server with a GPU means Plex could not use the GPU for those streams. Check the hardware acceleration settings in Plex, the GPU's limit on simultaneous encodes and the Plex log.",
+          "description": "Video transcoding time in the selected range, paused streams included, for the 8 player and encoder pairs with the most, with Encoder saying whether Plex encoded on hardware or software. A player that transcodes a lot is often fixed with a client setting, such as raising its streaming quality on your network. Software time on a server with a GPU means Plex could not use the GPU for those streams. Check the hardware acceleration settings in Plex, the GPU's limit on simultaneous encodes and the Plex log.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -6279,10 +6077,11 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sort_desc(topk(8, sum by (device_type, encode) (sum_over_time((plex_session_video_transcode{server=~\"$server\"} * on (server, server_id, session) group_left (device_type) topk by (server, server_id, session) (1, max by (server, server_id, session, device_type) (plex_plays_active{server=~\"$server\"})))[$__range:1m]))))",
-                        "legendFormat": "{{device_type}}, {{encode}}",
+                        "expr": "sort_desc((topk(8, sum by (device_type, encode) (sum_over_time((plex_session_video_transcode{server=~\"$server\"} * on (server, server_id, session) group_left (device_type) topk by (server, server_id, session) (1, max by (server, server_id, session, device_type) (plex_plays_active{server=~\"$server\"})))[$__range:1m])))) / 60)",
+                        "legendFormat": "",
                         "instant": true,
-                        "range": false
+                        "range": false,
+                        "format": "table"
                       }
                     },
                     "refId": "A",
@@ -6290,39 +6089,52 @@
                   }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true
+                      },
+                      "indexByName": {
+                        "device_type": 0,
+                        "encode": 1,
+                        "Value": 2
+                      },
+                      "renameByName": {
+                        "device_type": "Player",
+                        "encode": "Encoder",
+                        "Value": "Time"
+                      }
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "bargauge",
+            "group": "table",
             "version": "",
             "spec": {
               "options": {
-                "displayMode": "basic",
-                "orientation": "horizontal",
-                "showUnfilled": true,
-                "valueMode": "color",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "namePlacement": "left",
-                "sizing": "manual",
-                "minVizHeight": 36,
-                "maxVizHeight": 36,
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 14
-                }
+                "showHeader": true,
+                "cellHeight": "sm",
+                "sortBy": [
+                  {
+                    "displayName": "Time",
+                    "desc": true
+                  }
+                ]
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "m",
-                  "noValue": "No video transcode in this range",
+                  "unit": "suffix:h",
                   "min": 0,
+                  "noValue": "No video transcode in this range",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -6336,9 +6148,97 @@
                     "mode": "fixed",
                     "fixedColor": "blue"
                   },
-                  "decimals": 1
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    }
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Player"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.minWidth",
+                        "value": 100
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Encoder"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 112
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "hardware": {
+                                "index": 0,
+                                "text": "Hardware"
+                              },
+                              "software": {
+                                "index": 1,
+                                "text": "Software"
+                              },
+                              "unknown": {
+                                "index": 2,
+                                "text": "Unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Time"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.minWidth",
+                        "value": 88
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "gauge",
+                          "mode": "basic",
+                          "valueDisplayMode": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -6349,7 +6249,7 @@
         "spec": {
           "id": 123,
           "title": "Transcode time by codec",
-          "description": "Video transcoding time in the selected range, paused streams included, by the codec of the file Plex converted, top 8, split by hardware or software encoding. H.265 or AV1 files that transcode often are the ones to keep a compatible copy of. Unknown codec means Plex reported no source codec.",
+          "description": "Video transcoding time in the selected range, paused streams included, by the codec of the file Plex converted, top 8, with Encoder saying whether Plex encoded on hardware or software. H.265 or AV1 files that transcode often are the ones to keep a compatible copy of. Unknown codec means Plex reported no source codec.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -6366,10 +6266,11 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sort_desc(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(topk(8, sum by (source_codec, encode) (sum_over_time(plex_session_video_transcode{server=~\"$server\"}[$__range:1m]))), \"source_codec\", \"H.265\", \"source_codec\", \"hevc\"), \"source_codec\", \"H.264\", \"source_codec\", \"h264\"), \"source_codec\", \"H.262\", \"source_codec\", \"mpeg2video\"), \"source_codec\", \"DivX or Xvid\", \"source_codec\", \"mpeg4\"), \"source_codec\", \"AV1\", \"source_codec\", \"av1\"), \"source_codec\", \"VP9\", \"source_codec\", \"vp9\"), \"source_codec\", \"VC-1\", \"source_codec\", \"vc1\"), \"source_codec\", \"Unknown codec\", \"source_codec\", \"unknown\"), \"source_codec\", \"Other codec\", \"source_codec\", \"other\"))",
-                        "legendFormat": "{{source_codec}}, {{encode}}",
+                        "expr": "sort_desc((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(topk(8, sum by (source_codec, encode) (sum_over_time(plex_session_video_transcode{server=~\"$server\"}[$__range:1m]))), \"source_codec\", \"H.265\", \"source_codec\", \"hevc\"), \"source_codec\", \"H.264\", \"source_codec\", \"h264\"), \"source_codec\", \"H.262\", \"source_codec\", \"mpeg2video\"), \"source_codec\", \"DivX or Xvid\", \"source_codec\", \"mpeg4\"), \"source_codec\", \"AV1\", \"source_codec\", \"av1\"), \"source_codec\", \"VP9\", \"source_codec\", \"vp9\"), \"source_codec\", \"VC-1\", \"source_codec\", \"vc1\"), \"source_codec\", \"Unknown codec\", \"source_codec\", \"unknown\"), \"source_codec\", \"Other codec\", \"source_codec\", \"other\")) / 60)",
+                        "legendFormat": "",
                         "instant": true,
-                        "range": false
+                        "range": false,
+                        "format": "table"
                       }
                     },
                     "refId": "A",
@@ -6377,39 +6278,52 @@
                   }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true
+                      },
+                      "indexByName": {
+                        "source_codec": 0,
+                        "encode": 1,
+                        "Value": 2
+                      },
+                      "renameByName": {
+                        "source_codec": "Codec",
+                        "encode": "Encoder",
+                        "Value": "Time"
+                      }
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "bargauge",
+            "group": "table",
             "version": "",
             "spec": {
               "options": {
-                "displayMode": "basic",
-                "orientation": "horizontal",
-                "showUnfilled": true,
-                "valueMode": "color",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "namePlacement": "left",
-                "sizing": "manual",
-                "minVizHeight": 36,
-                "maxVizHeight": 36,
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 14
-                }
+                "showHeader": true,
+                "cellHeight": "sm",
+                "sortBy": [
+                  {
+                    "displayName": "Time",
+                    "desc": true
+                  }
+                ]
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "m",
-                  "noValue": "No video transcode in this range",
+                  "unit": "suffix:h",
                   "min": 0,
+                  "noValue": "No video transcode in this range",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -6423,9 +6337,97 @@
                     "mode": "fixed",
                     "fixedColor": "blue"
                   },
-                  "decimals": 1
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    }
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Codec"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.minWidth",
+                        "value": 100
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Encoder"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 112
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "hardware": {
+                                "index": 0,
+                                "text": "Hardware"
+                              },
+                              "software": {
+                                "index": 1,
+                                "text": "Software"
+                              },
+                              "unknown": {
+                                "index": 2,
+                                "text": "Unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Time"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.minWidth",
+                        "value": 88
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "gauge",
+                          "mode": "basic",
+                          "valueDisplayMode": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -6436,7 +6438,7 @@
         "spec": {
           "id": 124,
           "title": "Transcode time by resolution",
-          "description": "Video transcoding time in the selected range, paused streams included, by the resolution of the file Plex converted, top 8, split by hardware or software encoding. Software transcoding of 4K files is the heaviest load a Plex server takes. Unknown resolution means Plex reported none for the file.",
+          "description": "Video transcoding time in the selected range, paused streams included, by the resolution of the file Plex converted, top 8, with Encoder saying whether Plex encoded on hardware or software. Software transcoding of 4K files is the heaviest load a Plex server takes. Unknown resolution means Plex reported none for the file.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -6453,10 +6455,11 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sort_desc(topk(8, sum by (stream_file_resolution, encode) (label_replace(label_replace(label_replace(label_replace(label_replace(sum_over_time((plex_session_video_transcode{server=~\"$server\"} * on (server, server_id, session) group_left (stream_file_resolution) topk by (server, server_id, session) (1, max by (server, server_id, session, stream_file_resolution) (label_replace(plex_plays_active{server=~\"$server\"}, \"stream_file_resolution\", \"2160\", \"stream_file_resolution\", \"(?i)4k\"))))[$__range:1m]), \"stream_file_resolution\", \"4K\", \"stream_file_resolution\", \"2160\"), \"stream_file_resolution\", \"${1}p\", \"stream_file_resolution\", \"(480|576|720|1080)\"), \"stream_file_resolution\", \"SD\", \"stream_file_resolution\", \"(?i)sd\"), \"stream_file_resolution\", \"Other resolution\", \"stream_file_resolution\", \"other\"), \"stream_file_resolution\", \"Unknown resolution\", \"stream_file_resolution\", \"\"))))",
-                        "legendFormat": "{{stream_file_resolution}}, {{encode}}",
+                        "expr": "sort_desc((topk(8, sum by (stream_file_resolution, encode) (label_replace(label_replace(label_replace(label_replace(label_replace(sum_over_time((plex_session_video_transcode{server=~\"$server\"} * on (server, server_id, session) group_left (stream_file_resolution) topk by (server, server_id, session) (1, max by (server, server_id, session, stream_file_resolution) (label_replace(plex_plays_active{server=~\"$server\"}, \"stream_file_resolution\", \"2160\", \"stream_file_resolution\", \"(?i)4k\"))))[$__range:1m]), \"stream_file_resolution\", \"4K\", \"stream_file_resolution\", \"2160\"), \"stream_file_resolution\", \"${1}p\", \"stream_file_resolution\", \"(480|576|720|1080)\"), \"stream_file_resolution\", \"SD\", \"stream_file_resolution\", \"(?i)sd\"), \"stream_file_resolution\", \"Other resolution\", \"stream_file_resolution\", \"other\"), \"stream_file_resolution\", \"Unknown resolution\", \"stream_file_resolution\", \"\")))) / 60)",
+                        "legendFormat": "",
                         "instant": true,
-                        "range": false
+                        "range": false,
+                        "format": "table"
                       }
                     },
                     "refId": "A",
@@ -6464,39 +6467,52 @@
                   }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true
+                      },
+                      "indexByName": {
+                        "stream_file_resolution": 0,
+                        "encode": 1,
+                        "Value": 2
+                      },
+                      "renameByName": {
+                        "stream_file_resolution": "Resolution",
+                        "encode": "Encoder",
+                        "Value": "Time"
+                      }
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "bargauge",
+            "group": "table",
             "version": "",
             "spec": {
               "options": {
-                "displayMode": "basic",
-                "orientation": "horizontal",
-                "showUnfilled": true,
-                "valueMode": "color",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "namePlacement": "left",
-                "sizing": "manual",
-                "minVizHeight": 36,
-                "maxVizHeight": 36,
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 14
-                }
+                "showHeader": true,
+                "cellHeight": "sm",
+                "sortBy": [
+                  {
+                    "displayName": "Time",
+                    "desc": true
+                  }
+                ]
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "m",
-                  "noValue": "No video transcode in this range",
+                  "unit": "suffix:h",
                   "min": 0,
+                  "noValue": "No video transcode in this range",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -6510,9 +6526,97 @@
                     "mode": "fixed",
                     "fixedColor": "blue"
                   },
-                  "decimals": 1
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    }
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Resolution"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.minWidth",
+                        "value": 100
+                      },
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Encoder"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 112
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "hardware": {
+                                "index": 0,
+                                "text": "Hardware"
+                              },
+                              "software": {
+                                "index": 1,
+                                "text": "Software"
+                              },
+                              "unknown": {
+                                "index": 2,
+                                "text": "Unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Time"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.minWidth",
+                        "value": 88
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "gauge",
+                          "mode": "basic",
+                          "valueDisplayMode": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -6523,7 +6627,7 @@
         "spec": {
           "id": 130,
           "title": "Failed reads by type",
-          "description": "Failed Plex reads in the selected range, by what plex-exporter was reading. A steady count on one type means that part of the dashboard is stale, and the exporter log names the cause. The bar is green at 0 and yellow from 1.",
+          "description": "Failed Plex reads in the selected range, by what plex-exporter was reading, listing only the reads that failed. A steady count on one type means that part of the dashboard is stale, and the exporter log names the cause. No failed reads in this range means every read succeeded, or plex-exporter was not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -6540,10 +6644,11 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sort_desc(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (type) (increase(plex_exporter_errors_total[$__range])), \"type\", \"Server refresh\", \"type\", \"refresh\"), \"type\", \"Sessions\", \"type\", \"sessions_fetch\"), \"type\", \"Item details\", \"type\", \"metadata_fetch\"), \"type\", \"Invalid item key\", \"type\", \"invalid_rating_key\"), \"type\", \"Metrics server\", \"type\", \"metrics_server\"), \"type\", \"Item counts\", \"type\", \"library_items\"), \"type\", \"Catalog read\", \"type\", \"library_walk\"), \"type\", \"Watch history\", \"type\", \"history_fetch\"), \"type\", \"Background tasks\", \"type\", \"activities_fetch\"), \"type\", \"Library list\", \"type\", \"sections_fetch\"), \"type\", \"Update check\", \"type\", \"updater_fetch\"))",
-                        "legendFormat": "{{type}}",
+                        "expr": "sort_desc(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((sum by (type) (increase(plex_exporter_errors_total[$__range])) > 0), \"type\", \"Server refresh\", \"type\", \"refresh\"), \"type\", \"Sessions\", \"type\", \"sessions_fetch\"), \"type\", \"Item details\", \"type\", \"metadata_fetch\"), \"type\", \"Invalid item key\", \"type\", \"invalid_rating_key\"), \"type\", \"Metrics server\", \"type\", \"metrics_server\"), \"type\", \"Item counts\", \"type\", \"library_items\"), \"type\", \"Catalog read\", \"type\", \"library_walk\"), \"type\", \"Watch history\", \"type\", \"history_fetch\"), \"type\", \"Background tasks\", \"type\", \"activities_fetch\"), \"type\", \"Library list\", \"type\", \"sections_fetch\"), \"type\", \"Update check\", \"type\", \"updater_fetch\"))",
+                        "legendFormat": "",
                         "instant": true,
-                        "range": false
+                        "range": false,
+                        "format": "table"
                       }
                     },
                     "refId": "A",
@@ -6551,58 +6656,92 @@
                   }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true
+                      },
+                      "indexByName": {
+                        "type": 0,
+                        "Value": 1
+                      },
+                      "renameByName": {
+                        "type": "Read",
+                        "Value": "Failed reads"
+                      }
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "bargauge",
+            "group": "table",
             "version": "",
             "spec": {
               "options": {
-                "displayMode": "basic",
-                "orientation": "horizontal",
-                "showUnfilled": true,
-                "valueMode": "color",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "namePlacement": "left",
-                "sizing": "manual",
-                "minVizHeight": 36,
-                "maxVizHeight": 36,
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 14
-                }
+                "showHeader": true,
+                "cellHeight": "sm",
+                "sortBy": [
+                  {
+                    "displayName": "Failed reads",
+                    "desc": true
+                  }
+                ]
               },
               "fieldConfig": {
                 "defaults": {
                   "unit": "short",
-                  "noValue": "Not scraped",
+                  "decimals": 0,
                   "min": 0,
+                  "noValue": "No failed reads in this range",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "value": null,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
                         "color": "yellow"
                       }
                     ]
                   },
                   "color": {
                     "mode": "thresholds"
-                  },
-                  "decimals": 0
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Failed reads"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -6657,6 +6796,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -6758,6 +6901,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -6841,6 +6988,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -6932,6 +7083,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -7027,7 +7182,7 @@
                       },
                       "renameByName": {
                         "name": "Library",
-                        "Value": "Items without a size"
+                        "Value": "Unsized items"
                       }
                     }
                   }
@@ -7045,7 +7200,7 @@
                 "showHeader": true,
                 "sortBy": [
                   {
-                    "displayName": "Items without a size",
+                    "displayName": "Unsized items",
                     "desc": true
                   }
                 ],
@@ -7075,7 +7230,7 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Items without a size"
+                      "options": "Unsized items"
                     },
                     "properties": [
                       {
@@ -7157,6 +7312,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -7320,7 +7479,10 @@
                     "desc": true
                   }
                 ],
-                "cellHeight": "sm"
+                "cellHeight": "sm",
+                "frozenColumns": {
+                  "left": 1
+                }
               },
               "fieldConfig": {
                 "defaults": {
@@ -7368,6 +7530,18 @@
                       {
                         "id": "noValue",
                         "value": "-"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Library"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.wrapText",
+                        "value": true
                       }
                     ]
                   }
@@ -7426,6 +7600,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -7501,6 +7679,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -7580,6 +7762,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -7659,6 +7845,10 @@
                   "calcs": [
                     "lastNotNull"
                   ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 24
                 }
               },
               "fieldConfig": {
@@ -7707,7 +7897,7 @@
                           "kind": "AutoGridLayout",
                           "spec": {
                             "maxColumnCount": 5,
-                            "columnWidthMode": "narrow",
+                            "columnWidthMode": "custom",
                             "rowHeightMode": "custom",
                             "rowHeight": 106,
                             "fillScreen": false,
@@ -7802,7 +7992,8 @@
                                   }
                                 }
                               }
-                            ]
+                            ],
+                            "columnWidth": 172
                           }
                         }
                       }
@@ -7822,7 +8013,7 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 24,
-                                  "height": 9,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-20"
@@ -7833,25 +8024,12 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 9,
-                                  "width": 12,
+                                  "y": 8,
+                                  "width": 24,
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-21"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 9,
-                                  "width": 12,
-                                  "height": 8,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-22"
                                   }
                                 }
                               }
@@ -7874,24 +8052,11 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 0,
-                                  "width": 12,
-                                  "height": 10,
+                                  "width": 24,
+                                  "height": 5,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-105"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 10,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-106"
                                   }
                                 }
                               }
@@ -7967,8 +8132,8 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 0,
-                                  "width": 8,
-                                  "height": 4,
+                                  "width": 5,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-42"
@@ -7978,10 +8143,10 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 8,
+                                  "x": 5,
                                   "y": 0,
-                                  "width": 8,
-                                  "height": 4,
+                                  "width": 5,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-43"
@@ -7991,10 +8156,10 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 16,
+                                  "x": 10,
                                   "y": 0,
-                                  "width": 8,
-                                  "height": 4,
+                                  "width": 5,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-44"
@@ -8004,10 +8169,10 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 0,
-                                  "y": 4,
-                                  "width": 24,
-                                  "height": 4,
+                                  "x": 15,
+                                  "y": 0,
+                                  "width": 9,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-60"
@@ -8047,50 +8212,10 @@
                                   "x": 0,
                                   "y": 10,
                                   "width": 24,
-                                  "height": 8,
+                                  "height": 10,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-117"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Per item",
-                        "collapse": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 10,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-61"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 10,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-62"
                                   }
                                 }
                               }
@@ -8114,7 +8239,7 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 24,
-                                  "height": 10,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-63"
@@ -8125,9 +8250,9 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 10,
+                                  "y": 8,
                                   "width": 24,
-                                  "height": 10,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-50"
@@ -8138,7 +8263,7 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 20,
+                                  "y": 16,
                                   "width": 12,
                                   "height": 10,
                                   "element": {
@@ -8151,7 +8276,7 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 12,
-                                  "y": 20,
+                                  "y": 16,
                                   "width": 12,
                                   "height": 10,
                                   "element": {
@@ -8214,7 +8339,7 @@
                           "kind": "AutoGridLayout",
                           "spec": {
                             "maxColumnCount": 4,
-                            "columnWidthMode": "narrow",
+                            "columnWidthMode": "custom",
                             "rowHeightMode": "custom",
                             "rowHeight": 106,
                             "fillScreen": false,
@@ -8255,7 +8380,8 @@
                                   }
                                 }
                               }
-                            ]
+                            ],
+                            "columnWidth": 172
                           }
                         }
                       }
@@ -8384,7 +8510,7 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 12,
+                                  "y": 15,
                                   "width": 24,
                                   "height": 22,
                                   "element": {
@@ -8413,7 +8539,7 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 12,
-                                  "height": 9,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-70"
@@ -8426,7 +8552,7 @@
                                   "x": 12,
                                   "y": 0,
                                   "width": 12,
-                                  "height": 9,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-71"
@@ -8437,7 +8563,7 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 9,
+                                  "y": 8,
                                   "width": 24,
                                   "height": 8,
                                   "element": {
@@ -8479,7 +8605,7 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 24,
-                                  "height": 9,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-120"
@@ -8490,7 +8616,7 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 9,
+                                  "y": 8,
                                   "width": 24,
                                   "height": 8,
                                   "element": {
@@ -8519,7 +8645,7 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 24,
-                                  "height": 12,
+                                  "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-122"
@@ -8530,9 +8656,9 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 12,
+                                  "y": 7,
                                   "width": 12,
-                                  "height": 12,
+                                  "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-123"
@@ -8543,9 +8669,9 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 12,
-                                  "y": 12,
+                                  "y": 7,
                                   "width": 12,
-                                  "height": 12,
+                                  "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-124"
@@ -8578,8 +8704,8 @@
                         "layout": {
                           "kind": "AutoGridLayout",
                           "spec": {
-                            "maxColumnCount": 5,
-                            "columnWidthMode": "narrow",
+                            "maxColumnCount": 3,
+                            "columnWidthMode": "custom",
                             "rowHeightMode": "custom",
                             "rowHeight": 106,
                             "fillScreen": false,
@@ -8665,7 +8791,8 @@
                                   }
                                 }
                               }
-                            ]
+                            ],
+                            "columnWidth": 172
                           }
                         }
                       }
@@ -8685,7 +8812,7 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 12,
-                                  "height": 16,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-130"
@@ -8698,7 +8825,7 @@
                                   "x": 12,
                                   "y": 0,
                                   "width": 12,
-                                  "height": 16,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-135"
@@ -8709,9 +8836,9 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 16,
+                                  "y": 8,
                                   "width": 24,
-                                  "height": 10,
+                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-137"
@@ -8760,7 +8887,7 @@
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
-    "title": "Plex Media Server",
+    "title": "Plex Exporter",
     "variables": [
       {
         "kind": "DatasourceVariable",

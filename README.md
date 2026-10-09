@@ -73,7 +73,7 @@ On Unraid, open the **Apps** tab, search for plex-exporter and click **Install**
 
 ## Adding the Grafana dashboard
 
-The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), a dashboard built on these metrics. It needs Grafana 13.2 or newer.
+The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), the Plex Exporter dashboard built on these metrics. It needs Grafana 13.2 or newer.
 
 Load the copy from the release that matches your image tag into Grafana 13.2 or newer, as [Importing an app's dashboard](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#importing-an-apps-dashboard) shows, because each release's dashboard matches the metrics that image serves. Every release names the dashboard `plex-exporter`, so importing a newer copy and choosing **Import (Overwrite)** updates it in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
 

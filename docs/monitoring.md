@@ -138,14 +138,14 @@ Both labels report what Plex says about the session. Plex can keep reporting har
 
 ## Dashboard
 
-[`grafana-dashboard.json`](../grafana-dashboard.json) needs Grafana 13.2 or newer. It has six tabs:
+[`grafana-dashboard.json`](../grafana-dashboard.json) imports as the Plex Exporter dashboard and needs Grafana 13.2 or newer. It has six tabs:
 
-- Overview shows whether the exporter reaches Plex and whether a Plex update is out. It shows the active streams with how each video transcode runs, what Plex is scanning, and how long ago each library gained an item. A server with Plex Pass also gets the host's CPU and memory.
+- Overview shows whether the exporter reaches Plex and whether a Plex update is out. It shows the active streams with how each video transcode runs, their bandwidth beside the bitrate of the media they play, and what Plex is scanning. A server with Plex Pass also gets the host's CPU and memory.
 - Libraries shows the library totals, each library's size, averages and recent activity, storage and item count over time, storage by resolution and codec, and the 10 newest items.
-- Storage cleanup shows the space held by items nobody has played, items not played in a year and extra versions. It also shows storage by last play, and the 10 largest items in each library with when anyone last played them.
-- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched titles. It also shows the hours watched per day by delivery method and by home or remote network, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
-- Transcoding shows the transcode time per day by where Plex decoded and encoded the video, the share encoded on hardware, and the transcode time by player, codec and resolution.
-- Exporter health shows the watch-history state, each library's last read and the failed reads by type, so you can see what plex-exporter could read.
+- Storage cleanup shows the space held by items nobody has played, items nobody has played in a year, never-played ones included, and extra versions. It also shows storage by last play, and the 10 largest items in each library with when anyone last played them.
+- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched shows, films and tracks, each show counted whole. It also shows the hours watched by delivery method and by home or remote network, in bars an hour long at 24 hours and a day long at 30 days, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
+- Transcoding shows the hours of video transcoding over the range by where Plex decoded and encoded the video, the share encoded on hardware, and the transcode hours by player, codec and resolution.
+- Exporter health shows the watch-history state, each library's last read and any failed reads by type, so you can see what plex-exporter could read.
 
 The Library variable filters the Libraries and Storage cleanup tabs by library. Plex numbers libraries per server, so with several servers selected one choice shows that library number on each of them. With several servers selected, every per-library row and bar names its server before the library. Two libraries with the same name on one server show their library number after the name, such as `Movies (id 2)`. Two servers that report the same name are selected together by the Server variable, and each shows the first eight characters of its server ID after the name, such as `home (id 3f2a9c1e)`.
 

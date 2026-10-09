@@ -22,7 +22,8 @@ type dashPanel struct {
 					Spec struct {
 						Query struct {
 							Spec struct {
-								Expr string `json:"expr"`
+								Expr    string `json:"expr"`
+								Instant bool   `json:"instant"`
 							} `json:"spec"`
 						} `json:"query"`
 					} `json:"spec"`
@@ -35,6 +36,10 @@ type dashPanel struct {
 						} `json:"options"`
 					} `json:"spec"`
 				} `json:"transformations"`
+				QueryOptions struct {
+					Interval      string `json:"interval"`
+					MaxDataPoints int    `json:"maxDataPoints"`
+				} `json:"queryOptions"`
 			} `json:"spec"`
 		} `json:"data"`
 		VizConfig struct {
@@ -47,6 +52,8 @@ type dashPanel struct {
 							CellOptions struct {
 								Type string `json:"type"`
 							} `json:"cellOptions"`
+							DrawStyle    string `json:"drawStyle"`
+							BarAlignment int    `json:"barAlignment"`
 						} `json:"custom"`
 						NoValue string `json:"noValue"`
 					} `json:"defaults"`
@@ -289,31 +296,91 @@ func TestDashboard_server_groupings_keep_the_server_id(t *testing.T) {
 	}
 }
 
-// A bar gauge draws every row at a fixed 36 px, so it only fits a list of
-// known length: a topk bound or the closed error-type set. An open-ended
-// list per library, user or task is a table, which scrolls under its header.
-func TestDashboard_bar_gauges_list_a_bounded_set(t *testing.T) {
+// Grafana aligns a range query's start and end down to the step, so a bar
+// counting the bucket before its timestamp never draws the bucket still
+// filling up, and the first point counts a bucket from before the range.
+// Each bar therefore counts the bucket after its timestamp and drops a
+// bucket that starts before the range.
+func TestDashboard_bars_draw_the_newest_bucket_and_none_before_the_range(t *testing.T) {
+	const inRange = ` and on () (vector(time()) >= $__from / 1000)`
 	_, panels := loadDashboard(t)
-	gauges := 0
+	bars := 0
 	for name, p := range panels {
-		if p.Spec.VizConfig.Group != "bargauge" {
+		custom := p.Spec.VizConfig.Spec.FieldConfig.Defaults.Custom
+		if p.Spec.VizConfig.Group != "timeseries" || custom.DrawStyle != "bars" {
 			continue
 		}
-		gauges++
+		bars++
+		if custom.BarAlignment != 1 {
+			t.Errorf("%s %q draws its bars with barAlignment %d, want 1 (the bucket after the timestamp)", name, p.Spec.Title, custom.BarAlignment)
+		}
 		for _, e := range exprs(&p) {
-			if strings.Contains(e, "topk(") {
-				continue
-			}
-			for _, m := range byClause.FindAllStringSubmatch(e, -1) {
-				if labels := labelSet(m[1]); !slices.Equal(labels, []string{"type"}) {
-					t.Errorf("%s %q is a bar gauge over a list grouped by %v; an open-ended list is a table with a gauge cell", name, p.Spec.Title, labels)
-					break
-				}
+			if !strings.Contains(e, "offset -$__interval") || !strings.HasSuffix(e, inRange) {
+				t.Errorf("%s %q = %s, want every bucket read with offset -$__interval and the expression ending %q", name, p.Spec.Title, e, inRange)
 			}
 		}
 	}
-	if gauges == 0 {
-		t.Error("no bar gauge found; the pattern no longer reads the dashboard")
+	if bars == 0 {
+		t.Error("no bar time series found; the pattern no longer reads the dashboard")
+	}
+}
+
+// A subquery step after the range end still finds a live series through the
+// 5-minute lookback, so a bucket reading forward from now counted minutes that
+// had not happened yet. Each such subquery drops the steps past the range end.
+func TestDashboard_bar_subqueries_count_no_step_after_the_range(t *testing.T) {
+	const forward = `[$__interval:1m] offset -$__interval)`
+	const clamp = ` and on () (vector(time()) <= $__to / 1000))` + forward
+	_, panels := loadDashboard(t)
+	subqueries := 0
+	for name, p := range panels {
+		if p.Spec.VizConfig.Spec.FieldConfig.Defaults.Custom.DrawStyle != "bars" {
+			continue
+		}
+		for _, e := range exprs(&p) {
+			n := strings.Count(e, forward)
+			subqueries += n
+			if got := strings.Count(e, clamp); got != n {
+				t.Errorf("%s %q = %s: %d of %d forward subqueries end their steps at $__to, want all", name, p.Spec.Title, e, got, n)
+			}
+		}
+	}
+	if subqueries == 0 {
+		t.Error("no forward subquery found in a bar chart; the pattern no longer reads the dashboard")
+	}
+}
+
+// A stat reads its value off the last point of a range query, and Grafana
+// aligns that point down to the step, which at the default 7 days is 30
+// minutes unless the panel asks for more points; a minute keeps it current.
+func TestDashboard_range_stats_show_a_current_value(t *testing.T) {
+	const minutesIn7Days = 7 * 24 * 60
+	_, panels := loadDashboard(t)
+	ranged := 0
+	for name, p := range panels {
+		if p.Spec.VizConfig.Group != "stat" || p.Spec.Data.Spec.Queries[0].Spec.Query.Spec.Instant {
+			continue
+		}
+		ranged++
+		if got := p.Spec.Data.Spec.QueryOptions.MaxDataPoints; got < minutesIn7Days {
+			t.Errorf("%s %q asks for %d points, want at least %d so its value is under a minute old at 7 days", name, p.Spec.Title, got, minutesIn7Days)
+		}
+	}
+	if ranged == 0 {
+		t.Error("no stat on a range query found; the pattern no longer reads the dashboard")
+	}
+}
+
+// A fixed interval steps a line to the last whole interval, so a gauge
+// history stepped by a day ended at midnight; only bar charts, whose bucket
+// is the interval, set one.
+func TestDashboard_only_bar_charts_fix_their_interval(t *testing.T) {
+	_, panels := loadDashboard(t)
+	for name, p := range panels {
+		interval := p.Spec.Data.Spec.QueryOptions.Interval
+		if interval != "" && p.Spec.VizConfig.Spec.FieldConfig.Defaults.Custom.DrawStyle != "bars" {
+			t.Errorf("%s %q (%s) sets interval %q; a line follows the range's own step", name, p.Spec.Title, p.Spec.VizConfig.Group, interval)
+		}
 	}
 }
 
@@ -385,6 +452,41 @@ func TestDashboard_busy_libraries_count_each_library_once(t *testing.T) {
 	e := exprs(&p)[0]
 	if !strings.Contains(e, "count(count by (server, server_id, library_id) (") || !strings.Contains(e, `library_id!=""`) {
 		t.Errorf("%q = %s, want a count of count by (server, server_id, library_id) over library_id!=\"\"", p.Spec.Title, e)
+	}
+}
+
+func panelByTitle(t *testing.T, panels map[string]dashPanel, title string) dashPanel {
+	t.Helper()
+	for _, p := range panels {
+		if p.Spec.Title == title {
+			return p
+		}
+	}
+	t.Fatalf("Setup: no panel titled %q", title)
+	return dashPanel{}
+}
+
+// The last_watched buckets are disjoint, so an item with no play in a year is
+// in never or over_1y; reading over_1y alone leaves out every unplayed item.
+func TestDashboard_year_without_a_play_counts_the_never_played(t *testing.T) {
+	_, panels := loadDashboard(t)
+	p := panelByTitle(t, panels, "Not played in a year")
+	for _, e := range exprs(&p) {
+		if !strings.Contains(e, `last_watched=~"never|over_1y"`) || strings.Contains(e, `last_watched="over_1y"`) {
+			t.Errorf("%q reads %s, want every leg on last_watched=~\"never|over_1y\"", p.Spec.Title, e)
+		}
+	}
+}
+
+// An episode series carries its show in title, so the episode leg sums by
+// title alone and every row is a whole show.
+func TestDashboard_most_watched_sums_episodes_per_show(t *testing.T) {
+	_, panels := loadDashboard(t)
+	p := panelByTitle(t, panels, "Most watched titles")
+	e := exprs(&p)[0]
+	const showLeg = `sum by (media_type, title) (increase(plex_play_seconds_total{server=~"$server", media_type="episode"}`
+	if !strings.Contains(e, showLeg) || !strings.Contains(e, `media_type!="episode"`) {
+		t.Errorf("%q = %s, want an episode leg %s… beside a media_type!=\"episode\" leg", p.Spec.Title, e, showLeg)
 	}
 }
 
