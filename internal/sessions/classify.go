@@ -69,8 +69,8 @@ func SubtitleAction(ts *plexapi.TranscodeSession) string {
 
 // Where Plex runs one half of a video transcode.
 const (
-	PipelineHardware = "hardware"
-	PipelineSoftware = "software"
+	pipelineHardware = "hardware"
+	pipelineSoftware = "software"
 )
 
 // VideoPipeline reports where Plex decodes and encodes a video transcode,
@@ -89,9 +89,9 @@ func VideoPipeline(ts *plexapi.TranscodeSession) (decode, encode string, ok bool
 func pipelineHalf(hw string, requested *plexapi.FlexBool) string {
 	switch {
 	case strings.TrimSpace(hw) != "":
-		return PipelineHardware
+		return pipelineHardware
 	case requested != nil && requested.Valid():
-		return PipelineSoftware
+		return pipelineSoftware
 	default:
 		return metrics.ValUnknown
 	}

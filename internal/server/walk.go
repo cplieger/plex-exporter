@@ -18,10 +18,10 @@ import (
 
 // Bounds of the catalog walk.
 const (
-	MaxWalkedLibraries = 32
-	MaxWalkPages       = 1000
-	WalkPageSize       = 500
-	WalkDeadline       = 10 * time.Minute
+	maxWalkedLibraries = 32
+	maxWalkPages       = 1000
+	walkPageSize       = 500
+	walkDeadline       = 10 * time.Minute
 	walkInterval       = time.Hour
 	walkTypeMovie      = 1
 )
@@ -48,7 +48,7 @@ type walkState struct {
 }
 
 // walkableLibraries returns the video libraries the walk reads, in section
-// id order, and how many past MaxWalkedLibraries it skips.
+// id order, and how many past maxWalkedLibraries it skips.
 func walkableLibraries(libs []library.Library) (walk []library.Library, skipped int) {
 	for _, l := range libs {
 		switch l.Type {
@@ -61,32 +61,32 @@ func walkableLibraries(libs []library.Library) (walk []library.Library, skipped 
 		y, _ := strconv.ParseUint(b.ID, 10, 64)
 		return cmp.Compare(x, y)
 	})
-	if len(walk) > MaxWalkedLibraries {
-		return walk[:MaxWalkedLibraries], len(walk) - MaxWalkedLibraries
+	if len(walk) > maxWalkedLibraries {
+		return walk[:maxWalkedLibraries], len(walk) - maxWalkedLibraries
 	}
 	return walk, 0
 }
 
 // RunLibraryWalkLoop walks every walkable library once the section list has
 // been read, then again an hour after each pass started, or at once when
-// the previous pass ran longer. A completed history rebuild (SignalWalk)
-// re-walks the libraries whose figures predate it.
+// the previous pass ran longer. A completed history rebuild triggers a
+// pass over the libraries whose figures predate it.
 func (s *Server) RunLibraryWalkLoop(ctx context.Context) {
 	if !s.waitForSections(ctx) {
 		return
 	}
 	for {
 		start := time.Now()
-		s.WalkPass(ctx, false)
+		s.walkPass(ctx, false)
 		if !s.waitNextPass(ctx, start.Add(walkInterval)) {
 			return
 		}
 	}
 }
 
-// SignalWalk asks the walk loop to re-walk libraries built from an older
+// signalWalk asks the walk loop to re-walk libraries built from an older
 // history generation; repeated signals before it runs coalesce.
-func (s *Server) SignalWalk() {
+func (s *Server) signalWalk() {
 	select {
 	case s.walkSignal <- struct{}{}:
 	default:
@@ -94,7 +94,7 @@ func (s *Server) SignalWalk() {
 }
 
 func (s *Server) waitForSections(ctx context.Context) bool {
-	t := time.NewTicker(SessionPollInterval)
+	t := time.NewTicker(sessionPollInterval)
 	defer t.Stop()
 	for {
 		s.mu.Lock()
@@ -122,17 +122,17 @@ func (s *Server) waitNextPass(ctx context.Context, at time.Time) bool {
 			return true
 		case <-s.walkSignal:
 			t.Stop()
-			s.WalkPass(ctx, true)
+			s.walkPass(ctx, true)
 		}
 	}
 }
 
-// WalkPass walks the walkable libraries in order; staleOnly limits it to
+// walkPass walks the walkable libraries in order; staleOnly limits it to
 // those whose watch figures are not from the current history generation.
 // A full pass in which every library walked prunes the watched map of
 // items no longer in any library, played before the pass started.
-func (s *Server) WalkPass(ctx context.Context, staleOnly bool) {
-	libs, skipped := walkableLibraries(s.SnapshotLibraries())
+func (s *Server) walkPass(ctx context.Context, staleOnly bool) {
+	libs, skipped := walkableLibraries(s.snapshotLibraries())
 	start := time.Now()
 	gen := s.historyView().Gen
 	pass := uint32(0)
@@ -179,7 +179,7 @@ func (s *Server) WalkPass(ctx context.Context, staleOnly bool) {
 func (s *Server) walkLibrary(ctx context.Context, lib *library.Library, pass uint32) bool {
 	gen0 := s.stampableGen()
 	start := time.Now()
-	wctx, cancel := context.WithTimeout(ctx, WalkDeadline)
+	wctx, cancel := context.WithTimeout(ctx, walkDeadline)
 	defer cancel()
 	played := func(key uint64) int64 {
 		if s.History == nil {
@@ -290,7 +290,7 @@ func walkType(libType string) int {
 
 // pagedItems walks one library under the shared pace and the item budget.
 func (s *Server) pagedItems(ctx context.Context, lib *library.Library) iter.Seq2[plexapi.Item, error] {
-	seq := s.Client.WalkSectionItems(ctx, plexapi.RatingKey(lib.ID), walkType(lib.Type), plexapi.Page{Size: WalkPageSize}, s.wait)
+	seq := s.Client.WalkSectionItems(ctx, plexapi.RatingKey(lib.ID), walkType(lib.Type), plexapi.Page{Size: walkPageSize}, s.wait)
 	return func(yield func(plexapi.Item, error) bool) {
 		n := 0
 		for it, err := range seq {
@@ -298,7 +298,7 @@ func (s *Server) pagedItems(ctx context.Context, lib *library.Library) iter.Seq2
 			case err != nil:
 				yield(plexapi.Item{}, err)
 				return
-			case n == MaxWalkPages*WalkPageSize:
+			case n == maxWalkPages*walkPageSize:
 				yield(plexapi.Item{}, errWalkLimit)
 				return
 			case !yield(it, nil):

@@ -237,7 +237,7 @@ func buildNMovieSections(t *testing.T, n int) plexapi.MediaProviders {
 		dirs = append(dirs, fmt.Sprintf(`{"title":"lib%d","id":"%d","type":"movie"}`, i, i))
 	}
 	js := fmt.Sprintf(`{"MediaProvider":[{"identifier":%q,"Feature":[{"type":%q,"Directory":[%s]}]}]}`,
-		PluginIdentifier, FeatureContent, strings.Join(dirs, ","))
+		pluginIdentifier, featureContent, strings.Join(dirs, ","))
 	var providers plexapi.MediaProviders
 	if err := json.Unmarshal([]byte(js), &providers); err != nil {
 		t.Fatalf("buildNMovieSections: %v", err)

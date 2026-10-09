@@ -35,7 +35,7 @@ func TestTrackerPrune(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	tracker.Prune()
+	tracker.prune()
 
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
@@ -76,7 +76,7 @@ func TestTrackerPrune_stale_boundary(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	tracker.Prune()
+	tracker.prune()
 
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
@@ -107,7 +107,7 @@ func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	tracker.Prune()
+	tracker.prune()
 
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
@@ -120,8 +120,6 @@ func TestSessionTrackerPrune_exact_timeout_boundary(t *testing.T) {
 	}
 }
 
-// TestTrackerPrune_no_removals_emits_no_summary verifies that when nothing is
-// reclaimed, Prune does NOT emit the "pruned expired sessions" debug summary.
 func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 	logs := capture.Default(t)
 
@@ -134,10 +132,10 @@ func TestTrackerPrune_no_removals_emits_no_summary(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	tracker.Prune()
+	tracker.prune()
 
 	if logs.Contains(prunedSummaryMsg) {
-		t.Errorf("Prune() with no removals emitted %q summary, want none", prunedSummaryMsg)
+		t.Errorf("prune() with no removals emitted %q summary, want none", prunedSummaryMsg)
 	}
 }
 
@@ -154,10 +152,10 @@ func TestTrackerPrune_stopped_removal_logs_stopped_count(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	tracker.Prune()
+	tracker.prune()
 
 	if !logs.Contains(prunedSummaryMsg) {
-		t.Fatalf("Prune() removing 1 stopped session emitted no %q summary, want one", prunedSummaryMsg)
+		t.Fatalf("prune() removing 1 stopped session emitted no %q summary, want one", prunedSummaryMsg)
 	}
 	if got, ok := logs.AttrValue(prunedSummaryMsg, "stopped"); !ok || got != "1" {
 		t.Errorf("summary stopped count = %q (found=%v), want 1", got, ok)
@@ -181,10 +179,10 @@ func TestTrackerPrune_stale_removal_logs_stale_count(t *testing.T) {
 	}
 	tracker.mu.Unlock()
 
-	tracker.Prune()
+	tracker.prune()
 
 	if !logs.Contains(prunedSummaryMsg) {
-		t.Fatalf("Prune() removing 1 stale session emitted no %q summary, want one", prunedSummaryMsg)
+		t.Fatalf("prune() removing 1 stale session emitted no %q summary, want one", prunedSummaryMsg)
 	}
 	if got, ok := logs.AttrValue(prunedSummaryMsg, "stale"); !ok || got != "1" {
 		t.Errorf("summary stale count = %q (found=%v), want 1", got, ok)

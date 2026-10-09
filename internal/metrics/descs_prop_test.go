@@ -11,13 +11,17 @@ import (
 // Plex server, Normalize must return an allowlisted value or the Fallback,
 // and the mapping must be idempotent.
 func TestNormalize_bounded_to_allowlist(t *testing.T) {
-	lists := []*metrics.LabelAllowlist{
-		metrics.StreamTypeAllowlist,
-		metrics.MediaTypeAllowlist,
-		metrics.ResolutionAllowlist,
+	lists := []struct {
+		list *metrics.LabelAllowlist
+		name string
+	}{
+		{metrics.StreamTypeAllowlist, "stream_type"},
+		{metrics.MediaTypeAllowlist, "media_type"},
+		{metrics.ResolutionAllowlist, "resolution"},
 	}
-	for _, list := range lists {
-		t.Run(list.Name, func(t *testing.T) {
+	for _, tt := range lists {
+		list := tt.list
+		t.Run(tt.name, func(t *testing.T) {
 			rapid.Check(t, func(t *rapid.T) {
 				v := rapid.String().Draw(t, "v")
 				got := list.Normalize(v)

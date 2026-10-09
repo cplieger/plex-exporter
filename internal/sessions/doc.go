@@ -4,11 +4,4 @@
 // unexported) so package server can orchestrate lock scope without a wall
 // of getter methods; SnapshotSessions and UpdateLibraryLabels are the
 // snapshot/apply helpers callers use for lock-safe access.
-//
-// Exported symbols: State with ParseState and the StatePlaying /
-// StateStopped / StatePaused / StateOther constants; the MaxSessionKeyLen /
-// MaxTrackedSessions bounds; the Session DTO; the transcode classifiers
-// TranscodeKind and SubtitleAction; and Tracker with NewTracker, Update,
-// UpdateLibraryLabels, MarkAbsentStopped, SnapshotSessions, MediaResolved,
-// Prune, and RunPruneLoop.
 package sessions

@@ -26,11 +26,9 @@ func (s *Server) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// Collect implements prometheus.Collector. It snapshots server state
-// under s.mu (via Snapshot) and then emits metrics outside the lock so
-// the collector never holds s.mu across a channel send.
+// Collect implements prometheus.Collector.
 func (s *Server) Collect(ch chan<- prometheus.Metric) {
-	snap := s.Snapshot()
+	snap := s.snapshot()
 
 	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPReachable, prometheus.GaugeValue, snap.HTTPReachable)
 	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable)
@@ -72,7 +70,7 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 	s.collectSessions(ch, snap.Name, snap.ID, snap.Libraries)
-	s.collectCatalog(ch, &snap)
+	collectCatalog(ch, &snap)
 }
 
 // collectSessions emits per-session Prometheus metrics, from a
@@ -207,7 +205,7 @@ func resolveLibrary(sess *sessions.Session, libByID map[string]library.Library) 
 }
 
 // sessionLabelValues builds the Prometheus label value slice for a
-// session. The slice order matches metrics.PlayLabels exactly.
+// session. The slice order matches the playback descriptors' label order exactly.
 func sessionLabelValues(
 	srvName, srvID string,
 	sess *sessions.Session, sessID string,

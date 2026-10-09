@@ -9,7 +9,6 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 )
 
 // sessionsFixture is a /status/sessions answer: a hardware transcode, a
@@ -46,10 +45,10 @@ func TestCollect_video_transcode_series_per_transcoding_session(t *testing.T) {
 		}
 	}))
 	defer ts.Close()
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	srv.Name, srv.ID = "srv", "mid"
 	srv.Libraries = []library.Library{{ID: "1", Name: "Movies", Type: library.TypeMovie}}
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	got := map[string]string{}
 	for _, s := range series(t, srv, metrics.DescSessionVideoTranscode) {
@@ -62,7 +61,7 @@ func TestCollect_video_transcode_series_per_transcoding_session(t *testing.T) {
 
 	// The hardware session drops to direct play and the software one ends.
 	gone.Store(true)
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	for _, s := range series(t, srv, metrics.DescSessionVideoTranscode) {
 		if s.labels["session"] == "hw" {
 			t.Errorf("session hw still has a video transcode series after it stopped transcoding: %v", s.labels)

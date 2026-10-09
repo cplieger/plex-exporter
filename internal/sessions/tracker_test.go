@@ -172,16 +172,16 @@ func TestSessionTrackerMediaMetaUpdate(t *testing.T) {
 
 func TestSessionTrackerUpdate_truncates_long_session_key(t *testing.T) {
 	tracker := NewTracker()
-	longKey := strings.Repeat("x", MaxSessionKeyLen+20)
+	longKey := strings.Repeat("x", maxSessionKeyLen+20)
 	meta := &plexapi.Item{Title: "Long Key"}
 	tracker.Update(longKey, StatePlaying, meta, nil)
 
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
 
-	truncated := longKey[:MaxSessionKeyLen]
+	truncated := longKey[:maxSessionKeyLen]
 	if _, ok := tracker.Sessions[truncated]; !ok {
-		t.Errorf("session should be stored under truncated key (len=%d)", MaxSessionKeyLen)
+		t.Errorf("session should be stored under truncated key (len=%d)", maxSessionKeyLen)
 	}
 	if _, ok := tracker.Sessions[longKey]; ok {
 		t.Error("session should NOT be stored under the full-length key")
@@ -191,7 +191,7 @@ func TestSessionTrackerUpdate_truncates_long_session_key(t *testing.T) {
 func TestSessionTrackerUpdate_rejects_new_when_full(t *testing.T) {
 	tracker := NewTracker()
 
-	for i := range MaxTrackedSessions {
+	for i := range maxTrackedSessions {
 		tracker.Update(fmt.Sprintf("s%d", i), StatePlaying, nil, nil)
 	}
 
@@ -199,8 +199,8 @@ func TestSessionTrackerUpdate_rejects_new_when_full(t *testing.T) {
 	count := len(tracker.Sessions)
 	tracker.mu.Unlock()
 
-	if count != MaxTrackedSessions {
-		t.Fatalf("sessions count = %d, want %d", count, MaxTrackedSessions)
+	if count != maxTrackedSessions {
+		t.Fatalf("sessions count = %d, want %d", count, maxTrackedSessions)
 	}
 
 	// New session should be rejected
@@ -214,15 +214,15 @@ func TestSessionTrackerUpdate_rejects_new_when_full(t *testing.T) {
 	if exists {
 		t.Error("new session should be rejected when tracker is full")
 	}
-	if afterCount != MaxTrackedSessions {
-		t.Errorf("sessions count = %d, want %d (unchanged)", afterCount, MaxTrackedSessions)
+	if afterCount != maxTrackedSessions {
+		t.Errorf("sessions count = %d, want %d (unchanged)", afterCount, maxTrackedSessions)
 	}
 }
 
 func TestSessionTrackerUpdate_existing_session_updates_when_full(t *testing.T) {
 	tracker := NewTracker()
 
-	for i := range MaxTrackedSessions {
+	for i := range maxTrackedSessions {
 		tracker.Update(fmt.Sprintf("s%d", i), StatePlaying, nil, nil)
 	}
 
@@ -242,11 +242,11 @@ func TestUpdateLibraryLabels_normalizes_long_key(t *testing.T) {
 	// a session stored via Update with a >64-byte key is found by
 	// UpdateLibraryLabels using the original long key.
 	tracker := NewTracker()
-	longKey := strings.Repeat("a", MaxSessionKeyLen+30)
+	longKey := strings.Repeat("a", maxSessionKeyLen+30)
 
 	tracker.Update(longKey, StatePlaying, &plexapi.Item{Title: "LongKey"}, nil)
 
-	truncated := longKey[:MaxSessionKeyLen]
+	truncated := longKey[:maxSessionKeyLen]
 	tracker.mu.Lock()
 	if _, ok := tracker.Sessions[truncated]; !ok {
 		t.Fatal("session not found under truncated key after Update")
@@ -298,17 +298,17 @@ func TestUpdateLibraryLabels_short_key_unchanged(t *testing.T) {
 func TestNormalizeKey(t *testing.T) {
 	// Three regions matter: below the cap (unchanged), exactly at the cap
 	// (unchanged — the limit is inclusive), and above the cap (truncated to
-	// exactly MaxSessionKeyLen bytes).
+	// exactly maxSessionKeyLen bytes).
 	cases := []struct {
 		name string
 		in   string
 		want string
 	}{
 		{"short key unchanged", "abc123", "abc123"},
-		{"below cap unchanged", strings.Repeat("a", MaxSessionKeyLen-1), strings.Repeat("a", MaxSessionKeyLen-1)},
-		{"at cap unchanged", strings.Repeat("b", MaxSessionKeyLen), strings.Repeat("b", MaxSessionKeyLen)},
-		{"one past cap truncated", strings.Repeat("c", MaxSessionKeyLen+1), strings.Repeat("c", MaxSessionKeyLen)},
-		{"well past cap truncated", strings.Repeat("y", MaxSessionKeyLen+50), strings.Repeat("y", MaxSessionKeyLen)},
+		{"below cap unchanged", strings.Repeat("a", maxSessionKeyLen-1), strings.Repeat("a", maxSessionKeyLen-1)},
+		{"at cap unchanged", strings.Repeat("b", maxSessionKeyLen), strings.Repeat("b", maxSessionKeyLen)},
+		{"one past cap truncated", strings.Repeat("c", maxSessionKeyLen+1), strings.Repeat("c", maxSessionKeyLen)},
+		{"well past cap truncated", strings.Repeat("y", maxSessionKeyLen+50), strings.Repeat("y", maxSessionKeyLen)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -329,9 +329,9 @@ func TestParseState(t *testing.T) {
 		{"playing", "playing", StatePlaying},
 		{"stopped", "stopped", StateStopped},
 		{"paused", "paused", StatePaused},
-		{"unknown maps to other", "buffering", StateOther},
-		{"empty maps to other", "", StateOther},
-		{"case-sensitive Playing is not playing", "Playing", StateOther},
+		{"unknown maps to other", "buffering", stateOther},
+		{"empty maps to other", "", stateOther},
+		{"case-sensitive Playing is not playing", "Playing", stateOther},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -484,13 +484,13 @@ func TestMarkAbsentStopped_already_stopped_not_rebanked(t *testing.T) {
 		t.Errorf("PrevPlayedTime = %v, want 5s unchanged (already-stopped session must not re-bank)", s.PrevPlayedTime)
 	}
 	if !s.LastUpdate.Equal(stoppedAt) {
-		t.Errorf("LastUpdate = %v, want unchanged %v (early continue must skip the LastUpdate bump so Prune can still reclaim)", s.LastUpdate, stoppedAt)
+		t.Errorf("LastUpdate = %v, want unchanged %v (early continue must skip the LastUpdate bump so prune can still reclaim)", s.LastUpdate, stoppedAt)
 	}
 }
 
 func TestMarkAbsentStopped_normalizes_present_keys(t *testing.T) {
 	tracker := NewTracker()
-	longKey := strings.Repeat("k", MaxSessionKeyLen+30)
+	longKey := strings.Repeat("k", maxSessionKeyLen+30)
 	tracker.Update(longKey, StatePlaying, &plexapi.Item{Title: "long"}, nil)
 
 	// Reporting the same long key as present must normalize to the stored
@@ -506,11 +506,11 @@ func TestMarkAbsentStopped_normalizes_present_keys(t *testing.T) {
 }
 
 func TestNormalizeKey_continuation_bytes_walk_to_zero(t *testing.T) {
-	// A session key longer than MaxSessionKeyLen made entirely of UTF-8
+	// A session key longer than maxSessionKeyLen made entirely of UTF-8
 	// continuation bytes (0x80) has no rune-start byte, so the boundary walk
-	// decrements i from MaxSessionKeyLen down to 0. The guard must stop at zero
+	// decrements i from maxSessionKeyLen down to 0. The guard must stop at zero
 	// (i > 0): a >= guard would index id[0], step to -1, and panic on id[:-1].
-	input := strings.Repeat("\x80", MaxSessionKeyLen+1)
+	input := strings.Repeat("\x80", maxSessionKeyLen+1)
 
 	got := normalizeKey(input)
 
@@ -518,8 +518,8 @@ func TestNormalizeKey_continuation_bytes_walk_to_zero(t *testing.T) {
 		t.Errorf("normalizeKey(all-continuation-bytes len=%d) = %q (len=%d), want %q",
 			len(input), got, len(got), "")
 	}
-	if len(got) > MaxSessionKeyLen {
-		t.Errorf("normalizeKey result len %d exceeds MaxSessionKeyLen %d", len(got), MaxSessionKeyLen)
+	if len(got) > maxSessionKeyLen {
+		t.Errorf("normalizeKey result len %d exceeds maxSessionKeyLen %d", len(got), maxSessionKeyLen)
 	}
 }
 

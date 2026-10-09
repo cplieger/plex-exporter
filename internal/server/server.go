@@ -77,7 +77,7 @@ func (s *Server) RunHistoryLoop(ctx context.Context) {
 	if s.History == nil {
 		return
 	}
-	s.History.Run(ctx, s.SignalWalk, func() { s.RecordError("history_fetch") })
+	s.History.Run(ctx, s.signalWalk, func() { s.RecordError("history_fetch") })
 }
 
 // RecordError increments the error counter for the given type. The type
@@ -221,8 +221,7 @@ func (s *Server) SetSessionsReachable(v bool) {
 	s.mu.Unlock()
 }
 
-// SnapshotLibraries returns a copy of the current library list.
-func (s *Server) SnapshotLibraries() []library.Library {
+func (s *Server) snapshotLibraries() []library.Library {
 	s.mu.Lock()
 	libs := make([]library.Library, len(s.Libraries))
 	copy(libs, s.Libraries)
@@ -230,10 +229,9 @@ func (s *Server) SnapshotLibraries() []library.Library {
 	return libs
 }
 
-// Snapshot is an immutable view of Server for metric emission, keeping
-// Collect's lock scope to a single block. PlexPass is a string so the
-// caller can emit it directly as a Prometheus label value.
-type Snapshot struct {
+// snapshot is the metric-visible state of Server at one instant. PlexPass
+// is a string so it is emitted directly as a Prometheus label value.
+type snapshot struct {
 	walks             map[string]libWalk
 	activities        map[activityKey]float64
 	ErrorCounts       map[string]float64
@@ -261,12 +259,12 @@ type Snapshot struct {
 	historyEnabled    bool
 }
 
-// Snapshot returns a consistent point-in-time copy of the server's
+// snapshot returns a consistent point-in-time copy of the server's
 // metric-visible state, so Collect never holds s.mu across a channel send.
-func (s *Server) Snapshot() Snapshot {
+func (s *Server) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	snap := Snapshot{
+	snap := snapshot{
 		Name:             truncLabel(s.Name),
 		ID:               truncLabel(s.ID),
 		Version:          truncLabel(s.Version),
@@ -469,21 +467,21 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 	s.LastBandwidthAt = highest
 }
 
-// SessionPollInterval is the interval between /status/sessions polls.
+// sessionPollInterval is the interval between /status/sessions polls.
 // Short enough (~5s) that the 60s tracker retention catches transient
 // sessions between scrapes.
-const SessionPollInterval = 5 * time.Second
+const sessionPollInterval = 5 * time.Second
 
-// RunSessionPollLoop polls /status/sessions on SessionPollInterval, feeding
-// the tracker with session state, transcode classification, and library
+// RunSessionPollLoop polls Plex's active sessions every 5 seconds, feeding
+// the tracker with session state, transcode classification and library
 // labels, until ctx is cancelled.
 func (s *Server) RunSessionPollLoop(ctx context.Context) {
-	ticker := time.NewTicker(SessionPollInterval)
+	ticker := time.NewTicker(sessionPollInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			s.RefreshSessions(ctx)
+			s.refreshSessions(ctx)
 		case <-ctx.Done():
 			return
 		}
@@ -497,11 +495,7 @@ type sessionWork struct {
 	state sessions.State
 }
 
-// RefreshSessions fetches /status/sessions, applies each active session to
-// the tracker, classifies transcode state from the embedded
-// TranscodeSession element, and fills library labels via
-// /library/metadata/<ratingKey>.
-func (s *Server) RefreshSessions(ctx context.Context) {
+func (s *Server) refreshSessions(ctx context.Context) {
 	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -535,7 +529,7 @@ func (s *Server) RefreshSessions(ctx context.Context) {
 
 	mediaResults := s.fetchSessionMedia(fetchCtx, work)
 
-	libs := s.SnapshotLibraries()
+	libs := s.snapshotLibraries()
 	for i := range work {
 		s.applySessionUpdate(&work[i], mediaResults[i], libs)
 	}

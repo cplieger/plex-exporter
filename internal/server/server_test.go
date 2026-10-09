@@ -14,7 +14,6 @@ import (
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/plex"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
@@ -32,7 +31,7 @@ func TestRefreshResources_updates_host_metrics(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.refreshResources(t.Context())
 
@@ -65,7 +64,7 @@ func TestRefreshResources_empty_stats_no_update(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.HostCPU = 0.99
 	srv.refreshResources(t.Context())
@@ -90,7 +89,7 @@ func TestRefreshResources_404_no_update(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.HostCPU = 0.11
 	srv.HostMem = 0.22
@@ -200,7 +199,7 @@ func TestRefreshBandwidth(t *testing.T) {
 			ts := httptest.NewServer(handler)
 			defer ts.Close()
 
-			client := plextest.NewTestClientFromServer(t, ts)
+			client := newTestClient(t, ts)
 			srv := New(client)
 			srv.LastBandwidthAt = tc.initAt
 			if tc.json == "" {
@@ -261,7 +260,7 @@ func TestRefresh_populates_server_state(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	err := srv.Refresh(t.Context())
@@ -320,7 +319,7 @@ func TestRefresh_preserves_item_counts(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	srv.Libraries = []library.Library{
@@ -379,7 +378,7 @@ func TestRefresh_filters_non_library_providers(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	err := srv.Refresh(t.Context())
@@ -402,7 +401,7 @@ func TestRefresh_provider_error_returns_error(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	err := srv.Refresh(t.Context())
@@ -430,7 +429,7 @@ func TestRefresh_server_info_error_returns_error(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	err := srv.Refresh(t.Context())
@@ -464,10 +463,7 @@ func TestRunRefreshLoop_cancels_cleanly(t *testing.T) {
 		// placeholder that is never dialed -- it only has to satisfy
 		// plexapi's scheme+host check, and a loopback host keeps the
 		// library's plaintext-to-a-remote-host warning out of test output.
-		client, err := plex.NewClientFromHTTP("http://127.0.0.1:32400", "t", ts.Client())
-		if err != nil {
-			t.Fatal(err)
-		}
+		client := newTestClientAt(t, "http://127.0.0.1:32400", ts.Client())
 		srv := New(client)
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -550,7 +546,7 @@ func TestSnapshot_boolean_conversions(t *testing.T) {
 		},
 	}
 
-	snap := srv.Snapshot()
+	snap := srv.snapshot()
 
 	if snap.PlexPass != metrics.ValTrue {
 		t.Errorf("plexPass = %q, want true", snap.PlexPass)
@@ -583,7 +579,7 @@ func TestSnapshot_false_booleans(t *testing.T) {
 		Sessions:          sessions.NewTracker(),
 	}
 
-	snap := srv.Snapshot()
+	snap := srv.snapshot()
 
 	if snap.PlexPass != metrics.ValFalse {
 		t.Errorf("plexPass = %q, want false", snap.PlexPass)
@@ -624,7 +620,7 @@ func TestRefreshBandwidth_accumulates_across_calls(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.LastBandwidthAt = 1000
 
@@ -681,7 +677,7 @@ func TestRefresh_prevItems_preserves_known_counts_only(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	srv.Libraries = []library.Library{
@@ -746,7 +742,7 @@ func TestRefresh_items_refresh_triggered_after_15_minutes(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.LastItemsRefresh = time.Now().Add(-20 * time.Minute)
 
@@ -791,7 +787,7 @@ func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.LastItemsRefresh = time.Now().Add(-5 * time.Minute)
 

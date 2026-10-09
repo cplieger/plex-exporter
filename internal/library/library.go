@@ -13,7 +13,7 @@ const (
 	TypeMovie     = "movie"
 	TypeShow      = "show"
 	TypeArtist    = "artist"
-	TypePhoto     = "photo"
+	typePhoto     = "photo"
 	TypeHomevideo = "homevideo"
 )
 
@@ -25,13 +25,13 @@ const (
 
 // Plex API identifiers and feature types.
 const (
-	PluginIdentifier = "com.plexapp.plugins.library"
-	FeatureContent   = "content"
-	CountLabelItems  = "items"
+	pluginIdentifier = "com.plexapp.plugins.library"
+	featureContent   = "content"
+	countLabelItems  = "items"
 )
 
 // MaxLibraries bounds the number of library sections the exporter tracks and
-// emits metrics for. Like sessions.MaxTrackedSessions, it caps Prometheus label
+// emits metrics for. Like the tracked-session bound, it caps Prometheus label
 // cardinality (one series set per library) against a compromised or buggy Plex
 // server returning an unbounded list of distinct numeric section IDs in
 // /media/providers.
@@ -56,7 +56,7 @@ type Library struct {
 // metrics for.
 func IsType(t string) bool {
 	switch t {
-	case TypeMovie, TypeShow, TypeArtist, TypePhoto, TypeHomevideo:
+	case TypeMovie, TypeShow, TypeArtist, typePhoto, TypeHomevideo:
 		return true
 	}
 	return false
@@ -72,10 +72,10 @@ func ContentTypeLabel(libType string) string {
 		return "episodes"
 	case TypeArtist:
 		return "tracks"
-	case TypePhoto:
+	case typePhoto:
 		return "photos"
 	default:
-		return CountLabelItems
+		return countLabelItems
 	}
 }
 
@@ -99,11 +99,11 @@ func isCountableSection(libType, id string) bool {
 func Build(providers *plexapi.MediaProviders, prevItems map[string]int64) []Library {
 	var libs []Library
 	for _, p := range providers.MediaProviders {
-		if p.Identifier != PluginIdentifier {
+		if p.Identifier != pluginIdentifier {
 			continue
 		}
 		for _, f := range p.Features {
-			if f.Type != FeatureContent {
+			if f.Type != featureContent {
 				continue
 			}
 			for _, d := range f.Directories {

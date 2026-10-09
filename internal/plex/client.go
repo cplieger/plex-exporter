@@ -79,17 +79,6 @@ func NewClient(opts Options) (*Client, error) {
 	return &Client{Client: api, retries: retries}, nil
 }
 
-// NewClientFromHTTP builds a Client over a caller-supplied *http.Client —
-// the test-fixture path (httptest servers). No retry transport or counter
-// is installed; Retries() reports 0.
-func NewClientFromHTTP(serverURL string, token plexapi.Token, hc *http.Client) (*Client, error) {
-	api, err := plexapi.New(serverURL, token, plexapi.WithHTTPClient(hc))
-	if err != nil {
-		return nil, err
-	}
-	return &Client{Client: api, retries: new(atomic.Int64)}, nil
-}
-
 // Retries returns the cumulative number of HTTP retry attempts across all
 // requests on this client (the plex_http_retries_total metric).
 func (c *Client) Retries() int64 {
