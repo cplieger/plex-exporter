@@ -9,11 +9,11 @@ import (
 
 // Order matters for the Prometheus wire contract; do not re-order.
 var (
-	SrvLabels  = []string{LabelServer, LabelServerID}
-	LibLabels  = []string{LabelServer, LabelServerID, LabelLibraryType, "library", LabelLibraryID}
-	PlayLabels = []string{
+	srvLabels  = []string{LabelServer, LabelServerID}
+	libLabels  = []string{LabelServer, LabelServerID, labelLibraryType, "library", labelLibraryID}
+	playLabels = []string{
 		LabelServer, LabelServerID,
-		"library", LabelLibraryID, LabelLibraryType,
+		"library", labelLibraryID, labelLibraryType,
 		"media_type", "title", "child_title", "grandchild_title", "grandchild_index",
 		"stream_type", "stream_resolution", "stream_file_resolution",
 		"device", "device_type", "user", "session",
@@ -38,8 +38,8 @@ const (
 
 	LabelServer      = "server"
 	LabelServerID    = "server_id"
-	LabelLibraryID   = "library_id"
-	LabelLibraryType = "library_type"
+	labelLibraryID   = "library_id"
+	labelLibraryType = "library_type"
 	FallbackOther    = "other"
 )
 
@@ -49,52 +49,52 @@ const (
 var (
 	DescServerInfo = prometheus.NewDesc(
 		"plex_server_info", "Plex server information",
-		append(SrvLabels, "version", "platform", "platform_version", "plex_pass"), nil,
+		append(srvLabels, "version", "platform", "platform_version", "plex_pass"), nil,
 	)
 	DescHostCPU = prometheus.NewDesc(
 		"plex_host_cpu_utilization_ratio", "Host CPU utilization (0-1)",
-		SrvLabels, nil,
+		srvLabels, nil,
 	)
 	DescHostMem = prometheus.NewDesc(
 		"plex_host_memory_utilization_ratio", "Host memory utilization (0-1)",
-		SrvLabels, nil,
+		srvLabels, nil,
 	)
 	DescLibDuration = prometheus.NewDesc(
 		"plex_library_duration_milliseconds", "Total library duration in ms",
-		LibLabels, nil,
+		libLabels, nil,
 	)
 	DescLibStorage = prometheus.NewDesc(
 		"plex_library_storage_bytes", "Total library storage in bytes",
-		LibLabels, nil,
+		libLabels, nil,
 	)
 	DescLibItems = prometheus.NewDesc(
 		"plex_library_items", "Number of items in a library section",
-		append(LibLabels, "content_type"), nil,
+		append(libLabels, "content_type"), nil,
 	)
 	DescTransmitBytes = prometheus.NewDesc(
 		"plex_transmit_bytes_total", "Bytes transmitted (bandwidth API)",
-		SrvLabels, nil,
+		srvLabels, nil,
 	)
 	DescActiveTranscodes = prometheus.NewDesc(
 		"plex_active_transcode_sessions", "Active transcode sessions",
-		SrvLabels, nil,
+		srvLabels, nil,
 	)
 	DescPlayCount = prometheus.NewDesc(
 		"plex_plays_active", "Currently active play sessions (1 per session)",
-		PlayLabels, nil,
+		playLabels, nil,
 	)
 	DescPlaySeconds = prometheus.NewDesc(
 		"plex_play_seconds_total", "Total play time per session",
-		PlayLabels, nil,
+		playLabels, nil,
 	)
 	DescSessionBandwidth = prometheus.NewDesc(
 		"plex_session_bandwidth_kbps", "Session bandwidth in kbps",
-		append(SrvLabels, "session", "user", "location"), nil,
+		append(srvLabels, "session", "user", "location"), nil,
 	)
 	DescSessionBitrate = prometheus.NewDesc(
 		"plex_session_bitrate_kbps",
 		"Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.",
-		append(SrvLabels, "session", "user", "location"), nil,
+		append(srvLabels, "session", "user", "location"), nil,
 	)
 	DescHTTPReachable = prometheus.NewDesc(
 		"plex_http_reachable",
@@ -118,20 +118,20 @@ var (
 	)
 )
 
-// LibIDLabels identify a library without its free-text name, which the
+// libIDLabels identify a library without its free-text name, which the
 // dashboard joins from plex_library_storage_bytes.
-var LibIDLabels = []string{LabelServer, LabelServerID, LabelLibraryType, LabelLibraryID}
+var libIDLabels = []string{LabelServer, LabelServerID, labelLibraryType, labelLibraryID}
 
-// ItemLabels are the identity labels of the top-N item families. Their
+// itemLabels are the identity labels of the top-N item families. Their
 // active population is bounded by libstats.TopN, never by the catalog size.
-var ItemLabels = append(slices.Clone(LibIDLabels), "rating_key", "title", "year")
+var itemLabels = append(slices.Clone(libIDLabels), "rating_key", "title", "year")
 
 func libDesc(name, help string, extra ...string) *prometheus.Desc {
-	return prometheus.NewDesc(name, help, append(slices.Clone(LibIDLabels), extra...), nil)
+	return prometheus.NewDesc(name, help, append(slices.Clone(libIDLabels), extra...), nil)
 }
 
 func srvDesc(name, help string, extra ...string) *prometheus.Desc {
-	return prometheus.NewDesc(name, help, append(slices.Clone(SrvLabels), extra...), nil)
+	return prometheus.NewDesc(name, help, append(slices.Clone(srvLabels), extra...), nil)
 }
 
 // Library-content descriptors, published from the hourly catalog walk.
@@ -139,17 +139,17 @@ var (
 	DescTopItemBytes = prometheus.NewDesc(
 		"plex_library_top_item_bytes",
 		"Size in bytes of one of the 10 largest items in a library (a show counts all its episodes)",
-		ItemLabels, nil,
+		itemLabels, nil,
 	)
 	DescTopItemLastPlayed = prometheus.NewDesc(
 		"plex_library_top_item_last_played_timestamp_seconds",
 		"Last play by any account of one of the 10 largest items, as a Unix time; 0 when no play is recorded",
-		ItemLabels, nil,
+		itemLabels, nil,
 	)
 	DescRecentItemAdded = prometheus.NewDesc(
 		"plex_library_recent_item_added_timestamp_seconds",
 		"When one of the 10 newest items on the server was added, as a Unix time",
-		append(slices.Clone(ItemLabels), "episode"), nil,
+		append(slices.Clone(itemLabels), "episode"), nil,
 	)
 	DescWatchAgeBytes = libDesc("plex_library_watch_age_bytes",
 		"Bytes of sized items by when any account last played them", "last_watched")
@@ -199,7 +199,7 @@ var (
 		"Watch-history rows for items no longer in Plex since the last full read, counted up to 250,000")
 	DescActivityProgress = srvDesc("plex_server_activity_progress_ratio",
 		"Progress of running Plex background work (0-1, -1 when Plex reports no estimate)",
-		"activity_type", LabelLibraryType, LabelLibraryID)
+		"activity_type", labelLibraryType, labelLibraryID)
 	DescUpdateAvailable = srvDesc("plex_server_update_available",
 		"1 when Plex reports a release newer than the running version", "state")
 	DescUpdateChecked = srvDesc("plex_server_update_checked_timestamp_seconds",
@@ -241,7 +241,6 @@ var ErrorTypes = []string{
 // LabelAllowlist defines a bounded set of valid Prometheus label values.
 // Unknown values are normalised to Fallback to prevent cardinality explosion.
 type LabelAllowlist struct {
-	Name     string
 	Allowed  map[string]bool
 	Fallback string
 }
@@ -259,31 +258,26 @@ func (a *LabelAllowlist) Normalize(v string) string {
 // Declarative allowlists for Prometheus label cardinality bounding.
 var (
 	StreamTypeAllowlist = &LabelAllowlist{
-		Name:     "stream_type",
 		Allowed:  map[string]bool{ValCopy: true, ValTranscode: true, "directplay": true, ValUnknown: true},
 		Fallback: FallbackOther,
 	}
 	MediaTypeAllowlist = &LabelAllowlist{
-		Name:     "media_type",
 		Allowed:  map[string]bool{"movie": true, "episode": true, "track": true, "clip": true, "photo": true},
 		Fallback: FallbackOther,
 	}
 	ResolutionAllowlist = &LabelAllowlist{
-		Name:     "resolution",
 		Allowed:  map[string]bool{"": true, "sd": true, "480": true, "576": true, "720": true, "1080": true, "4k": true, "2160": true},
 		Fallback: FallbackOther,
 	}
 	LocationAllowlist = &LabelAllowlist{
-		Name:     "location",
 		Allowed:  map[string]bool{"lan": true, "wan": true, ValUnknown: true},
 		Fallback: FallbackOther,
 	}
 )
 
-// VideoCodecAllowlist bounds video_codec, source_codec and target_codec.
+// videoCodecAllowlist bounds video_codec, source_codec and target_codec.
 // An empty codec is unknown, not other: Plex sent none.
-var VideoCodecAllowlist = &LabelAllowlist{
-	Name: "video_codec",
+var videoCodecAllowlist = &LabelAllowlist{
 	Allowed: map[string]bool{
 		"h264": true, "hevc": true, "av1": true, "vp9": true,
 		"mpeg2video": true, "mpeg4": true, "vc1": true,
@@ -291,12 +285,13 @@ var VideoCodecAllowlist = &LabelAllowlist{
 	Fallback: FallbackOther,
 }
 
-// NormalizeCodec maps a Plex codec name onto VideoCodecAllowlist.
+// NormalizeCodec returns a Plex codec name as a lowercased known video codec,
+// "other" for an unlisted one, or "unknown" when it is empty.
 func NormalizeCodec(v string) string {
 	if strings.TrimSpace(v) == "" {
 		return ValUnknown
 	}
-	return VideoCodecAllowlist.Normalize(strings.TrimSpace(v))
+	return videoCodecAllowlist.Normalize(strings.TrimSpace(v))
 }
 
 // ResolutionBucket maps a Plex videoResolution onto the closed set

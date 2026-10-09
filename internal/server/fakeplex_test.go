@@ -16,7 +16,6 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/history"
 	"github.com/cplieger/plex-exporter/internal/library"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -172,7 +171,7 @@ func newWalkServer(t *testing.T, fp *fakePlex, libs ...library.Library) *Server 
 	t.Helper()
 	ts := httptest.NewServer(fp)
 	t.Cleanup(ts.Close)
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Pace = nil
 	srv.History = history.New(client, noPace{})

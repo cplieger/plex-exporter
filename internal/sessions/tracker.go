@@ -20,12 +20,12 @@ const (
 	StatePlaying State = "playing"
 	StateStopped State = "stopped"
 	StatePaused  State = "paused"
-	StateOther   State = "other"
+	stateOther   State = "other"
 )
 
 // ParseState maps a raw Plex wire-protocol state string to a typed
-// State constant. Unknown values map to StateOther so the state machine
-// handles them intentionally rather than silently.
+// State constant. An unknown value maps to the State "other" so the state
+// machine handles it intentionally rather than silently.
 func ParseState(raw string) State {
 	switch State(raw) {
 	case StatePlaying:
@@ -35,7 +35,7 @@ func ParseState(raw string) State {
 	case StatePaused:
 		return StatePaused
 	default:
-		return StateOther
+		return stateOther
 	}
 }
 
@@ -51,14 +51,14 @@ const staleSessionTimeout = 5 * time.Minute
 // pruneInterval is how often RunPruneLoop sweeps the tracker.
 const pruneInterval = time.Minute
 
-// MaxSessionKeyLen and MaxTrackedSessions bound the session tracker
+// maxSessionKeyLen and maxTrackedSessions bound the session tracker
 // against a compromised or buggy Plex server that streams unbounded
 // distinct sessionKey values. SessionKey is used both as a map key and
 // as a Prometheus label value, so unbounded growth would OOM the
 // exporter and inflate Mimir's active-series count.
 const (
-	MaxSessionKeyLen   = 64
-	MaxTrackedSessions = 256
+	maxSessionKeyLen   = 64
+	maxTrackedSessions = 256
 )
 
 // Session is a single tracked Plex playback session. All fields are
@@ -103,12 +103,12 @@ func NewTracker() *Tracker {
 	}
 }
 
-// normalizeKey truncates a session key to MaxSessionKeyLen so write and
+// normalizeKey truncates a session key to maxSessionKeyLen so write and
 // lookup always use the same map key. The cut must land on a rune boundary:
 // the key is emitted verbatim as the `session` Prometheus label, and an
 // invalid label value panics the collector goroutine.
 func normalizeKey(id string) string {
-	return runesafe.CapBytes(id, MaxSessionKeyLen)
+	return runesafe.CapBytes(id, maxSessionKeyLen)
 }
 
 // UpdateLibraryLabels applies fn to the session identified by id under
@@ -164,9 +164,9 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ite
 
 	// Reject new sessions once the map is full; existing sessions continue
 	// to update. RunPruneLoop handles reclaiming stopped sessions.
-	if _, existing := t.Sessions[id]; !existing && len(t.Sessions) >= MaxTrackedSessions {
+	if _, existing := t.Sessions[id]; !existing && len(t.Sessions) >= maxTrackedSessions {
 		slog.Warn("session map full, dropping new session",
-			"id", id, "tracked", len(t.Sessions), "cap", MaxTrackedSessions)
+			"id", id, "tracked", len(t.Sessions), "cap", maxTrackedSessions)
 		return
 	}
 
@@ -224,10 +224,10 @@ func (t *Tracker) MarkAbsentStopped(presentKeys []string) {
 	}
 }
 
-// Prune reclaims stopped sessions past the session timeout and non-stopped
+// prune reclaims stopped sessions past the session timeout and non-stopped
 // sessions idle past the stale-session timeout. Safe to call concurrently
 // with Update.
-func (t *Tracker) Prune() {
+func (t *Tracker) prune() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	var pruned, stale int
@@ -254,14 +254,15 @@ func (t *Tracker) Prune() {
 	}
 }
 
-// RunPruneLoop invokes Prune every pruneInterval until ctx is cancelled.
+// RunPruneLoop drops, once a minute until ctx is cancelled, stopped sessions
+// idle over a minute and other sessions idle over five minutes.
 func (t *Tracker) RunPruneLoop(ctx context.Context) {
 	ticker := time.NewTicker(pruneInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			t.Prune()
+			t.prune()
 		case <-ctx.Done():
 			return
 		}

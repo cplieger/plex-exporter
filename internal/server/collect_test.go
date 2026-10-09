@@ -13,7 +13,6 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/cplieger/plexapi/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -391,7 +390,6 @@ func TestResolveLibrary(t *testing.T) {
 
 func TestNormalizeLabel(t *testing.T) {
 	allowed := &metrics.LabelAllowlist{
-		Name:     "test",
 		Allowed:  map[string]bool{"movie": true, "episode": true},
 		Fallback: "other",
 	}
@@ -739,7 +737,7 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	if err := srv.Refresh(t.Context()); err == nil {
 		t.Fatal("Refresh() error = nil, want an error from a server answering 500")
 	}
@@ -772,7 +770,6 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 		}
 	}
 
-	// Fails if SrvLabels returns to any of the four exporter descriptors.
 	for _, m := range ms {
 		labels, _ := metricSnapshot(t, m)
 		for _, name := range []string{metrics.LabelServer, metrics.LabelServerID} {
@@ -818,7 +815,7 @@ func TestCollect_plex_pass_gauges_absent_until_read(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	srv.ID = "id1"
 	srv.Name = "Srv"
 
@@ -900,7 +897,7 @@ func TestCollect_identity_persists_across_failed_refresh(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	if err := srv.Refresh(t.Context()); err != nil {
 		t.Fatalf("first Refresh() error = %v, want nil", err)
 	}

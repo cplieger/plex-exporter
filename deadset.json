@@ -1,0 +1,9 @@
+{
+  "target": { "kind": "application" },
+  "analysis": {
+    "configurations": [
+      { "id": "linux-amd64", "os": "linux", "arch": "amd64" },
+      { "id": "linux-amd64-race", "os": "linux", "arch": "amd64", "tags": ["race"] }
+    ]
+  }
+}

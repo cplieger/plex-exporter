@@ -49,7 +49,7 @@ func TestWalkPass_publishes_largest_items_with_last_played(t *testing.T) {
 	fp.history = []historyRow{{RatingKey: "10", ViewedAt: played}}
 	srv := newWalkServer(t, fp, movies)
 	bootstrap(t, srv, history.StatusComplete)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 
 	if v, ok := valueOf(t, srv, metrics.DescTopItemBytes, libMatch("1", "rating_key", "11", "title", "Movie 11", "year", "2001")); !ok || v != 900 {
 		t.Errorf("top item 11 bytes = %v (present %v), want 900", v, ok)
@@ -73,18 +73,18 @@ func TestWalkPass_publishes_largest_items_with_last_played(t *testing.T) {
 func TestWalkPass_failed_library_keeps_its_watched_set(t *testing.T) {
 	fp := newFakePlex()
 	now := time.Now()
-	fp.libs["1"] = manyMovies(100, WalkPageSize+5)
+	fp.libs["1"] = manyMovies(100, walkPageSize+5)
 	fp.libs["2"] = []string{movieRow(900, 10)}
 	// Item 602 sits on the second page, the one that fails below.
 	fp.history = []historyRow{{RatingKey: "602", ViewedAt: now.Add(-48 * time.Hour).Unix()}, {RatingKey: "900", ViewedAt: now.Add(-time.Hour).Unix()}}
 	other := library.Library{ID: "2", Name: "Other", Type: library.TypeMovie}
 	srv := newWalkServer(t, fp, movies, other)
 	bootstrap(t, srv, history.StatusComplete)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	before, _ := neverBytes(t, srv, "1")
 
 	fp.do(func(f *fakePlex) { f.failLib["1"] = true })
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if got, _ := neverBytes(t, srv, "1"); got != before {
 		t.Errorf("never bytes after a failed walk = %v, want the previous %v", got, before)
 	}
@@ -112,7 +112,7 @@ func TestWalkPass_failed_library_keeps_its_watched_set(t *testing.T) {
 			}
 		}
 	})
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if got, _ := neverBytes(t, srv, "1"); got != before {
 		t.Errorf("never bytes after the recovered walk = %v, want %v", got, before)
 	}
@@ -146,14 +146,14 @@ func TestWalkPass_watch_figures_wait_for_a_walk_at_the_current_generation(t *tes
 	t.Run("walked_while_history_failed", func(t *testing.T) {
 		fp, srv := setup(t)
 		bootstrap(t, srv, history.StatusComplete)
-		srv.WalkPass(t.Context(), false)
+		srv.walkPass(t.Context(), false)
 		fp.do(func(f *fakePlex) { f.historyFail = true })
 		bootstrap(t, srv, history.StatusFailed)
-		srv.WalkPass(t.Context(), false)
+		srv.walkPass(t.Context(), false)
 		fp.do(func(f *fakePlex) { f.historyFail = false })
 		bootstrap(t, srv, history.StatusComplete)
 		absent(t, srv, "after recovery, before the re-walk")
-		srv.WalkPass(t.Context(), true)
+		srv.walkPass(t.Context(), true)
 		if _, ok := neverBytes(t, srv, "1"); !ok {
 			t.Error("after the re-walk: watch-age series absent, want present")
 		}
@@ -162,7 +162,7 @@ func TestWalkPass_watch_figures_wait_for_a_walk_at_the_current_generation(t *tes
 	t.Run("old_nonzero_stamp", func(t *testing.T) {
 		fp, srv := setup(t)
 		bootstrap(t, srv, history.StatusComplete)
-		srv.WalkPass(t.Context(), false)
+		srv.walkPass(t.Context(), false)
 		if srv.stampOf("1") == 0 {
 			t.Fatal("Setup: the first walk was not stamped")
 		}
@@ -175,7 +175,7 @@ func TestWalkPass_watch_figures_wait_for_a_walk_at_the_current_generation(t *tes
 
 	t.Run("bootstrap_during_the_walk", func(t *testing.T) {
 		fp, srv := setup(t)
-		fp.libs["1"] = manyMovies(10, WalkPageSize+1)
+		fp.libs["1"] = manyMovies(10, walkPageSize+1)
 		bootstrap(t, srv, history.StatusComplete)
 		fp.do(func(f *fakePlex) {
 			f.onPage = func(_ string, start int) {
@@ -186,7 +186,7 @@ func TestWalkPass_watch_figures_wait_for_a_walk_at_the_current_generation(t *tes
 				}
 			}
 		})
-		srv.WalkPass(t.Context(), false)
+		srv.walkPass(t.Context(), false)
 		if got := srv.stampOf("1"); got != 0 {
 			t.Errorf("stamp = %d for a walk spanning a rebuild, want 0", got)
 		}
@@ -212,7 +212,7 @@ func TestWalkPass_unmatched_history_rows_without_libraries_read_incomplete(t *te
 			fp.history = tc.history
 			srv := newWalkServer(t, fp)
 			bootstrap(t, srv, history.StatusComplete)
-			srv.WalkPass(t.Context(), false)
+			srv.walkPass(t.Context(), false)
 			if v, _ := valueOf(t, srv, metrics.DescWatchAgeComplete, nil); v != tc.want {
 				t.Errorf("watch_age_complete with no libraries = %v, want %v", v, tc.want)
 			}
@@ -226,7 +226,7 @@ func TestWalkPass_unmatched_history_rows_hide_watch_completeness(t *testing.T) {
 	fp.history = []historyRow{{RatingKey: "10", ViewedAt: time.Now().Unix()}, {RatingKey: "-1", ViewedAt: 5}, {RatingKey: "11"}}
 	srv := newWalkServer(t, fp, movies)
 	bootstrap(t, srv, history.StatusComplete)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if v, _ := valueOf(t, srv, metrics.DescHistoryUnmatched, nil); v != 2 {
 		t.Errorf("history_unmatched_rows = %v, want 2", v)
 	}
@@ -257,7 +257,7 @@ func TestWalkPass_deleted_item_history_rows_keep_watch_figures(t *testing.T) {
 	fp.history = loadHistory(t, "history-live-shape.json")
 	srv := newWalkServer(t, fp, movies)
 	bootstrap(t, srv, history.StatusComplete)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if v, _ := valueOf(t, srv, metrics.DescHistoryUnmatched, nil); v != 0 {
 		t.Errorf("history_unmatched_rows = %v, want 0: a row without an item key is a deleted item", v)
 	}
@@ -283,7 +283,7 @@ func TestWalkPass_byte_total_overflow_keeps_the_last_figures(t *testing.T) {
 	fp := newFakePlex()
 	fp.libs["1"] = []string{movieRow(10, 500)}
 	srv := newWalkServer(t, fp, movies)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 
 	half := uint64(1)<<62 + 1
 	fp.do(func(f *fakePlex) {
@@ -292,7 +292,7 @@ func TestWalkPass_byte_total_overflow_keeps_the_last_figures(t *testing.T) {
 			fmt.Sprintf(`{"ratingKey":"21","title":"B","Media":[{"Part":[{"size":%d}]}]}`, half),
 		}
 	})
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if n := srv.ErrorCounts["library_walk"]; n != 1 {
 		t.Errorf("library_walk errors = %v, want 1", n)
 	}
@@ -311,7 +311,7 @@ func TestWalkPass_unsized_item_is_never_ranked(t *testing.T) {
 	fp := newFakePlex()
 	fp.libs["1"] = []string{movieRow(10, 500), `{"ratingKey":"11","title":"No size","Media":[{"Part":[{"id":1}]}]}`}
 	srv := newWalkServer(t, fp, movies)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if _, ok := valueOf(t, srv, metrics.DescTopItemBytes, libMatch("1", "rating_key", "11")); ok {
 		t.Error("unsized item 11 is in the largest items, want it left out")
 	}
@@ -329,7 +329,7 @@ func TestWalkPass_recently_added_lists_ten_per_server(t *testing.T) {
 	fp.libs["1"] = rows
 	fp.libs["2"] = []string{`{"ratingKey":"50","grandparentRatingKey":"40","grandparentTitle":"Show","parentIndex":2,"index":3,"addedAt":1800000000,"Media":[{"Part":[{"size":1}]}]}`}
 	srv := newWalkServer(t, fp, movies, shows)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	got := series(t, srv, metrics.DescRecentItemAdded)
 	if len(got) != 10 {
 		t.Fatalf("recently added series = %d, want 10", len(got))
@@ -349,7 +349,7 @@ func TestWalkPass_listed_shows_carry_the_show_year(t *testing.T) {
 	fp.libs["2"] = []string{`{"ratingKey":"50","grandparentRatingKey":"40","grandparentTitle":"Show","year":2015,"parentIndex":2,"index":3,"addedAt":1800000000,"Media":[{"Part":[{"size":7}]}]}`}
 	fp.showYears["40"] = 2008
 	srv := newWalkServer(t, fp, shows)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if _, ok := valueOf(t, srv, metrics.DescTopItemBytes, libMatch("2", "rating_key", "40", "year", "2008")); !ok {
 		t.Errorf("largest show 40 series = %v, want year 2008", series(t, srv, metrics.DescTopItemBytes))
 	}
@@ -357,7 +357,7 @@ func TestWalkPass_listed_shows_carry_the_show_year(t *testing.T) {
 		t.Errorf("recently added show series = %v, want year 2008", series(t, srv, metrics.DescRecentItemAdded))
 	}
 	fp.do(func(f *fakePlex) { delete(f.showYears, "40"); f.metaReads = 0 })
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if _, ok := valueOf(t, srv, metrics.DescTopItemBytes, libMatch("2", "rating_key", "40", "year", "2008")); !ok {
 		t.Errorf("after a second pass largest show 40 series = %v, want year 2008 kept", series(t, srv, metrics.DescTopItemBytes))
 	}
@@ -374,7 +374,7 @@ func TestWalkPass_failed_show_year_read_is_counted(t *testing.T) {
 	fp := newFakePlex()
 	fp.libs["2"] = []string{`{"ratingKey":"50","grandparentRatingKey":"40","grandparentTitle":"Show","parentIndex":1,"index":1,"addedAt":1800000000,"Media":[{"Part":[{"size":7}]}]}`}
 	srv := newWalkServer(t, fp, shows)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if n := srv.ErrorCounts["metadata_fetch"]; n != 1 {
 		t.Errorf("metadata_fetch errors = %v, want 1 for the one unreadable show", n)
 	}
@@ -391,7 +391,7 @@ func TestWalkPass_title_label_is_bounded(t *testing.T) {
 	}
 	fp.libs["1"] = []string{fmt.Sprintf(`{"ratingKey":"1","title":%s,"Media":[{"Part":[{"size":9}]}]}`, title)}
 	srv := newWalkServer(t, fp, movies)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	got := series(t, srv, metrics.DescTopItemBytes)
 	if len(got) != 1 {
 		t.Fatalf("top item series = %d, want 1", len(got))
@@ -404,18 +404,18 @@ func TestWalkPass_title_label_is_bounded(t *testing.T) {
 func TestWalkPass_skips_libraries_past_the_limit(t *testing.T) {
 	fp := newFakePlex()
 	var libs []library.Library
-	for i := range MaxWalkedLibraries + 2 {
+	for i := range maxWalkedLibraries + 2 {
 		id := fmt.Sprint(i + 1)
 		libs = append(libs, library.Library{ID: id, Type: library.TypeMovie})
 		fp.libs[id] = []string{movieRow(1000+i, 1)}
 	}
 	srv := newWalkServer(t, fp, libs...)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	if v, _ := valueOf(t, srv, metrics.DescWalkSkipped, nil); v != 2 {
 		t.Errorf("walk_skipped_libraries = %v, want 2", v)
 	}
-	if n := len(series(t, srv, metrics.DescWalkable)); n != MaxWalkedLibraries {
-		t.Errorf("walkable series = %d, want %d", n, MaxWalkedLibraries)
+	if n := len(series(t, srv, metrics.DescWalkable)); n != maxWalkedLibraries {
+		t.Errorf("walkable series = %d, want %d", n, maxWalkedLibraries)
 	}
 	if v, _ := valueOf(t, srv, metrics.DescWalkComplete, nil); v != 0 {
 		t.Errorf("walk_complete = %v with skipped libraries, want 0", v)
@@ -435,7 +435,7 @@ func TestCollect_every_emitted_family_is_described(t *testing.T) {
 	srv.Version, srv.ResourcesRead, srv.BandwidthRead = "1", true, true
 	srv.refreshBackground(t.Context())
 	bootstrap(t, srv, history.StatusComplete)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 	meta := testMeta(t, `{"sessionKey":"s1","Session":{"bandwidth":900},"Media":[{"bitrate":800}]}`)
 	srv.Sessions.Update("s1", sessions.StatePlaying, &meta, nil)
 	srv.Sessions.UpdateLibraryLabels("s1", func(ss *sessions.Session) {
@@ -459,14 +459,14 @@ func TestCollect_every_emitted_family_is_described(t *testing.T) {
 // row of the first page is served again; the gather must still succeed.
 func TestWalkPass_row_repeated_across_pages_is_emitted_once(t *testing.T) {
 	fp := newFakePlex()
-	fp.libs["1"] = manyMovies(100, WalkPageSize+5)
+	fp.libs["1"] = manyMovies(100, walkPageSize+5)
 	fp.onPage = func(lib string, start int) {
 		if start == 0 {
 			fp.do(func(f *fakePlex) { f.libs[lib] = append([]string{movieRow(99, 1)}, f.libs[lib]...) })
 		}
 	}
 	srv := newWalkServer(t, fp, movies)
-	srv.WalkPass(t.Context(), false)
+	srv.walkPass(t.Context(), false)
 
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(srv); err != nil {

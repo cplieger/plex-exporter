@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/cplieger/plexapi/v2"
 )
 
@@ -138,7 +137,7 @@ func TestRefresh_survives_a_failing_or_hanging_activities_read(t *testing.T) {
 			}))
 			defer ts.Close()
 			defer close(release)
-			srv := New(plextest.NewTestClientFromServer(t, ts))
+			srv := New(newTestClient(t, ts))
 			srv.Pace = nil
 			if err := srv.Refresh(t.Context()); err != nil {
 				t.Fatalf("Refresh() error = %v, want nil", err)

@@ -20,6 +20,14 @@ import (
 // github.com/cplieger/plexapi/v2 and is tested there; these tests
 // pin only the exporter's adapter layer on top of it.
 
+func newTestClient(serverURL string, token plexapi.Token, hc *http.Client) (*Client, error) {
+	api, err := plexapi.New(serverURL, token, plexapi.WithHTTPClient(hc))
+	if err != nil {
+		return nil, err
+	}
+	return &Client{Client: api}, nil
+}
+
 func TestNewClient_invalid_url_returns_error(t *testing.T) {
 	for _, u := range []string{"ftp://plex:32400", "http://", "://bad"} {
 		if _, err := NewClient(Options{ServerURL: u, Token: "tok"}); err == nil {
@@ -108,7 +116,7 @@ func TestGet_populates_StatusError(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 	defer ts.Close()
-	c, err := NewClientFromHTTP(ts.URL, "tok", ts.Client())
+	c, err := newTestClient(ts.URL, "tok", ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +133,7 @@ func TestGet_populates_StatusError(t *testing.T) {
 func TestGet_not_found_is_ErrNotFound(t *testing.T) {
 	ts := httptest.NewServer(http.NotFoundHandler())
 	defer ts.Close()
-	c, err := NewClientFromHTTP(ts.URL, "tok", ts.Client())
+	c, err := newTestClient(ts.URL, "tok", ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +151,7 @@ func TestCountSectionItems(t *testing.T) {
 		_, _ = w.Write([]byte(`{"MediaContainer":{"totalSize":4360}}`))
 	}))
 	defer ts.Close()
-	c, err := NewClientFromHTTP(ts.URL, "tok", ts.Client())
+	c, err := newTestClient(ts.URL, "tok", ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +166,7 @@ func TestCountSectionItems_propagates_error(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer ts.Close()
-	c, err := NewClientFromHTTP(ts.URL, "tok", ts.Client())
+	c, err := newTestClient(ts.URL, "tok", ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +176,7 @@ func TestCountSectionItems_propagates_error(t *testing.T) {
 }
 
 func TestCountSectionItems_rejects_non_numeric_section(t *testing.T) {
-	c, err := NewClientFromHTTP("http://plex:32400", "tok", nil)
+	c, err := newTestClient("http://plex:32400", "tok", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +192,7 @@ func TestGet_timeout_bounds_stalled_request(t *testing.T) {
 	}))
 	defer ts.Close()
 	defer close(release) // must unblock the handler before ts.Close, which waits on it
-	c, err := NewClientFromHTTP(ts.URL, "tok", ts.Client())
+	c, err := newTestClient(ts.URL, "tok", ts.Client())
 	if err != nil {
 		t.Fatal(err)
 	}

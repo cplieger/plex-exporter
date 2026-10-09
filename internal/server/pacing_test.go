@@ -12,12 +12,10 @@ import (
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/pacer"
-	"github.com/cplieger/plex-exporter/internal/plex"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 )
 
-// shortPage is the row count the fake server answers a WalkPageSize or
-// history.PageSize request with, so every page boundary falls between the
+// shortPage is the row count the fake server answers a walkPageSize or
+// history page-size request with, so every page boundary falls between the
 // readers' own page multiples. Five such pages hold 1500 rows, more than
 // ceil(1500/500)+1 requests: a reader bounded by request count stops short.
 const shortPage = 300
@@ -50,10 +48,7 @@ func (s *stampedTransport) requests() []time.Time {
 func pacedServer(t *testing.T, fp *fakePlex) (*Server, *stampedTransport) {
 	t.Helper()
 	tr := &stampedTransport{fp: fp}
-	client, err := plex.NewClientFromHTTP("http://127.0.0.1:32400", plextest.TestToken, &http.Client{Transport: tr})
-	if err != nil {
-		t.Fatalf("Setup: NewClientFromHTTP: %v", err)
-	}
+	client := newTestClientAt(t, "http://127.0.0.1:32400", &http.Client{Transport: tr})
 	srv := New(client)
 	srv.Pace = pacer.New(pacer.DefaultInterval)
 	srv.History = history.New(client, srv.Pace)
@@ -85,7 +80,7 @@ func TestWalkPass_short_pages_stay_under_two_requests_a_second(t *testing.T) {
 		fp.libs["1"] = manyMovies(1, 5*shortPage)
 		srv, tr := pacedServer(t, fp)
 		srv.History = nil
-		srv.WalkPass(t.Context(), false)
+		srv.walkPass(t.Context(), false)
 
 		// manyMovies sizes rows 1000 to 2499 bytes; their sum is 2624250.
 		if v, ok := valueOf(t, srv, metrics.DescResolutionBytes, libMatch("1", "video_resolution", "1080")); !ok || v != 2624250 {

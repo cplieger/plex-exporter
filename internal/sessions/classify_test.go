@@ -154,17 +154,17 @@ func TestVideoPipeline_reads_hardware_fields(t *testing.T) {
 		{
 			"hardware decode and encode",
 			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"vaapi","transcodeHwEncoding":"vaapi","transcodeHwFullPipeline":true}`,
-			PipelineHardware, PipelineHardware, true,
+			pipelineHardware, pipelineHardware, true,
 		},
 		{
 			"hardware requested, software decode",
 			`{"videoDecision":"transcode","transcodeHwRequested":"1","transcodeHwEncoding":"qsv"}`,
-			PipelineSoftware, PipelineHardware, true,
+			pipelineSoftware, pipelineHardware, true,
 		},
 		{
 			"hardware not requested",
 			`{"videoDecision":"transcode","transcodeHwRequested":false}`,
-			PipelineSoftware, PipelineSoftware, true,
+			pipelineSoftware, pipelineSoftware, true,
 		},
 		{
 			"no hardware fields",
@@ -184,22 +184,22 @@ func TestVideoPipeline_reads_hardware_fields(t *testing.T) {
 		{
 			"mixed GPUs, no full pipeline",
 			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"nvdec","transcodeHwEncoding":"vaapi","transcodeHwFullPipeline":false}`,
-			PipelineHardware, PipelineHardware, true,
+			pipelineHardware, pipelineHardware, true,
 		},
 		{
 			"encoder title without an encoder",
 			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"vaapi","transcodeHwDecodingTitle":"Amd (VA API)","transcodeHwEncodingTitle":"Amd ()","transcodeHwFullPipeline":false}`,
-			PipelineHardware, PipelineSoftware, true,
+			pipelineHardware, pipelineSoftware, true,
 		},
 		{
 			"stale full pipeline after a software restart",
 			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwFullPipeline":true}`,
-			PipelineSoftware, PipelineSoftware, true,
+			pipelineSoftware, pipelineSoftware, true,
 		},
 		{
 			"Windows Intel",
 			`{"videoDecision":"transcode","transcodeHwRequested":true,"transcodeHwDecoding":"d3d11va","transcodeHwEncoding":"qsv","transcodeHwFullPipeline":true}`,
-			PipelineHardware, PipelineHardware, true,
+			pipelineHardware, pipelineHardware, true,
 		},
 	}
 	for _, tt := range tests {

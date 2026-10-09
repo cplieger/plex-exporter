@@ -11,7 +11,6 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 )
 
@@ -47,13 +46,13 @@ func TestRefreshSessions_basic_playing_session(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
@@ -119,13 +118,13 @@ func TestRefreshSessions_with_transcode_session(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
@@ -181,10 +180,10 @@ func TestRefreshSessions_both_transcode(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	s := snap["s3"]
@@ -220,10 +219,10 @@ func TestRefreshSessions_no_transcode_session(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	s := snap["s4"]
@@ -246,10 +245,10 @@ func TestRefreshSessions_empty_response(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 0 {
@@ -279,10 +278,10 @@ func TestRefreshSessions_invalid_rating_key_skipped(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 0 {
@@ -303,11 +302,11 @@ func TestRefreshSessions_fetch_error_records_error(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.SetSessionsReachable(true) // seed true so the error branch's flip to false is observable
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	srv.mu.Lock()
 	errCount := srv.ErrorCounts["sessions_fetch"]
@@ -343,10 +342,10 @@ func TestRefreshSessions_metadata_fetch_failure_still_updates_tracker(t *testing
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 1 {
@@ -398,10 +397,10 @@ func TestRefreshSessions_multiple_sessions(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 
 	snap := srv.Sessions.SnapshotSessions()
 	if len(snap) != 2 {
@@ -426,7 +425,7 @@ func TestRunSessionPollLoop_cancels_cleanly(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -493,24 +492,24 @@ func TestRefreshSessions_vanished_session_marked_stopped(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
 
 	// Poll 1: s1 is actively playing.
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	snap := srv.Sessions.SnapshotSessions()
 	if snap["s1"].State != sessions.StatePlaying {
 		t.Fatalf("after poll 1: s1 state = %q, want playing", snap["s1"].State)
 	}
 
-	// Poll 2: s1 is absent; RefreshSessions must reconcile it to StateStopped
+	// Poll 2: s1 is absent; refreshSessions must reconcile it to StateStopped
 	// (the MarkAbsentStopped path) so it lands on the 60s stopped-prune timer
 	// instead of the 5m stale-orphan path. It stays tracked because
-	// RefreshSessions itself does not prune.
-	srv.RefreshSessions(t.Context())
+	// refreshSessions itself does not prune.
+	srv.refreshSessions(t.Context())
 	snap = srv.Sessions.SnapshotSessions()
 	s, ok := snap["s1"]
 	if !ok {
@@ -571,14 +570,14 @@ func TestRefreshSessions_metadata_cached_per_rating_key(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Shows", Type: library.TypeShow},
 	}
 
 	// Poll 1: first sight of s1/100 fetches metadata.
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	mu.Lock()
 	got := metaHits["100"]
 	mu.Unlock()
@@ -587,7 +586,7 @@ func TestRefreshSessions_metadata_cached_per_rating_key(t *testing.T) {
 	}
 
 	// Poll 2: same session, same rating key -- cached, no refetch.
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	mu.Lock()
 	got = metaHits["100"]
 	mu.Unlock()
@@ -600,7 +599,7 @@ func TestRefreshSessions_metadata_cached_per_rating_key(t *testing.T) {
 	}
 
 	// Poll 3: rating key advances to 101 -- cache invalidated, refetch.
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	mu.Lock()
 	h100, h101 := metaHits["100"], metaHits["101"]
 	mu.Unlock()
@@ -651,10 +650,10 @@ func TestRefreshSessions_unresolved_library_refetches_metadata(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	// Degraded start: the library list is not known yet.
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	snap := srv.Sessions.SnapshotSessions()
 	if lib := snap["s1"].LibName; lib != "" {
 		t.Fatalf("after poll 1: LibName = %q, want empty (no libraries known)", lib)
@@ -665,7 +664,7 @@ func TestRefreshSessions_unresolved_library_refetches_metadata(t *testing.T) {
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
 	}
-	srv.RefreshSessions(t.Context())
+	srv.refreshSessions(t.Context())
 	mu.Lock()
 	got := metaHits
 	mu.Unlock()
@@ -716,13 +715,13 @@ func TestRefreshSessions_metadata_absent_records_error(t *testing.T) {
 			ts := httptest.NewServer(handler)
 			defer ts.Close()
 
-			client := plextest.NewTestClientFromServer(t, ts)
+			client := newTestClient(t, ts)
 			srv := New(client)
 			srv.Libraries = []library.Library{
 				{ID: "1", Name: "Movies", Type: library.TypeMovie},
 			}
 
-			srv.RefreshSessions(t.Context())
+			srv.refreshSessions(t.Context())
 
 			srv.mu.Lock()
 			errCount := srv.ErrorCounts["metadata_fetch"]

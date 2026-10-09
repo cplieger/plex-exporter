@@ -9,7 +9,6 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plex-exporter/internal/plextest"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -39,7 +38,7 @@ func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
@@ -77,7 +76,7 @@ func TestRefreshLibraryItems_writeback_boundary(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Movies", Type: library.TypeMovie},
@@ -105,7 +104,7 @@ func TestRefreshLibraryItems_no_libraries_is_noop(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = nil
 
@@ -138,7 +137,7 @@ func TestRefreshLibraryItems_artist_fallback_to_type7(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -172,7 +171,7 @@ func TestRefreshLibraryItems_artist_type10_error_falls_back(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -206,7 +205,7 @@ func TestRefreshLibraryItems_artist_type10_returns_zero_falls_to_type7(t *testin
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -241,7 +240,7 @@ func TestRefreshLibraryItems_artist_type7_returns_zero_falls_to_default(t *testi
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -275,7 +274,7 @@ func TestRefreshLibraryItems_artist_both_fail_uses_default_path(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	srv.Libraries = []library.Library{
 		{ID: "1", Name: "Music", Type: library.TypeArtist},
@@ -299,7 +298,7 @@ func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := plextest.NewTestClientFromServer(t, ts)
+	client := newTestClient(t, ts)
 	srv := New(client)
 	lb := library.Library{ID: "not-numeric", Name: "Bad Section", Type: library.TypeMovie}
 
@@ -351,7 +350,7 @@ func TestRefreshLibraryItems_successful_zero_is_published_as_zero(t *testing.T) 
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	srv.ID = "id1"
 	srv.Name = "Srv"
 	srv.Libraries = []library.Library{
@@ -385,7 +384,7 @@ func TestRefreshLibraryItems_fetch_failure_keeps_previous_count(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	srv.ID = "id1"
 	srv.Name = "Srv"
 	srv.Libraries = []library.Library{
@@ -419,7 +418,7 @@ func TestRefreshLibraryItems_unread_library_publishes_nothing(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 	srv.ID = "id1"
 	srv.Name = "Srv"
 	srv.Libraries = []library.Library{
@@ -441,7 +440,7 @@ func TestTryItemCount_negative_total_is_not_an_answer(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	srv := New(plextest.NewTestClientFromServer(t, ts))
+	srv := New(newTestClient(t, ts))
 
 	count, answered := srv.tryItemCount(t.Context(), "1", 0)
 	if answered || count != 0 {

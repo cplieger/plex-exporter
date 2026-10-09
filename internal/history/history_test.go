@@ -163,12 +163,12 @@ func TestBootstrap_counts_deleted_item_rows_apart_from_unmatched(t *testing.T) {
 	}
 }
 
-// A full read can hold MaxCountedRows rows, so its count is exact; later
+// A full read can hold maxCountedRows rows, so its count is exact; later
 // reads saturate at the cap instead of growing without bound.
 func TestBootstrap_counts_every_unmatched_row_of_a_full_read(t *testing.T) {
-	rows := make([]plexapi.HistoryEntry, 0, MaxPages*PageSize)
+	rows := make([]plexapi.HistoryEntry, 0, maxPages*pageSize)
 	rows = append(rows, row("1", 1000))
-	for i := range MaxPages*PageSize - 1 {
+	for i := range maxPages*pageSize - 1 {
 		rows = append(rows, plexapi.HistoryEntry{RatingKey: "bad", HistoryKey: "/status/sessions/history/" + strconv.Itoa(i), ViewedAt: 1})
 	}
 	src := &fakeSource{failPage: -1, rows: rows}
@@ -176,8 +176,8 @@ func TestBootstrap_counts_every_unmatched_row_of_a_full_read(t *testing.T) {
 	if st := s.Bootstrap(t.Context()); st != StatusComplete {
 		t.Fatalf("Bootstrap() = %q, want complete", st)
 	}
-	if v := s.View(); v.Unmatched != MaxPages*PageSize-1 {
-		t.Errorf("after a full read View().Unmatched = %d, want %d", v.Unmatched, MaxPages*PageSize-1)
+	if v := s.View(); v.Unmatched != maxPages*pageSize-1 {
+		t.Errorf("after a full read View().Unmatched = %d, want %d", v.Unmatched, maxPages*pageSize-1)
 	}
 	src.rows = append(src.rows,
 		plexapi.HistoryEntry{RatingKey: "bad", HistoryKey: "/status/sessions/history/new-1", ViewedAt: 2000},
@@ -185,8 +185,8 @@ func TestBootstrap_counts_every_unmatched_row_of_a_full_read(t *testing.T) {
 	if err := s.Incremental(t.Context()); err != nil {
 		t.Fatalf("Incremental() error = %v", err)
 	}
-	if v := s.View(); v.Unmatched != MaxCountedRows {
-		t.Errorf("after two more unmatched rows View().Unmatched = %d, want the cap %d", v.Unmatched, MaxCountedRows)
+	if v := s.View(); v.Unmatched != maxCountedRows {
+		t.Errorf("after two more unmatched rows View().Unmatched = %d, want the cap %d", v.Unmatched, maxCountedRows)
 	}
 }
 
@@ -241,12 +241,12 @@ func TestBootstrap_failure_discards_the_map(t *testing.T) {
 }
 
 func TestBootstrap_over_the_page_limit(t *testing.T) {
-	rows := make([]plexapi.HistoryEntry, MaxPages*PageSize+1)
+	rows := make([]plexapi.HistoryEntry, maxPages*pageSize+1)
 	for i := range rows {
 		rows[i] = row("1", int64(i+1))
 	}
 	s := newStore(&fakeSource{failPage: -1, rows: rows})
-	if st := s.Bootstrap(t.Context()); st != StatusOverLimit {
+	if st := s.Bootstrap(t.Context()); st != statusOverLimit {
 		t.Fatalf("Bootstrap() = %q, want over_limit", st)
 	}
 	if s.Visit(1, 0) != 0 {
@@ -285,18 +285,18 @@ func TestIncremental_cap_moves_past_unmatched_rows(t *testing.T) {
 	src := &fakeSource{failPage: -1, rows: rows}
 	s := newStore(src)
 	mustBootstrap(t.Context(), t, s)
-	for i := range MaxIncrementalPages * PageSize {
+	for i := range maxIncrementalPages * pageSize {
 		src.rows = append(src.rows, row("bad", int64(2000+i)))
 	}
-	src.rows = append(src.rows, row("9", 2000+MaxIncrementalPages*PageSize))
+	src.rows = append(src.rows, row("9", 2000+maxIncrementalPages*pageSize))
 	for i := range 2 {
 		if err := s.Incremental(t.Context()); err != nil {
 			t.Fatalf("Incremental() #%d error = %v", i+1, err)
 		}
 	}
-	if got := s.Visit(9, 0); got != 2000+MaxIncrementalPages*PageSize {
+	if got := s.Visit(9, 0); got != 2000+maxIncrementalPages*pageSize {
 		t.Errorf("Visit(9, 0) after two capped increments = %d, want %d; reads started at %v",
-			got, 2000+MaxIncrementalPages*PageSize, src.since)
+			got, 2000+maxIncrementalPages*pageSize, src.since)
 	}
 }
 
@@ -309,7 +309,7 @@ func TestIncremental_capped_read_inside_one_second_reaches_the_rows_after_it(t *
 	if st := s.Bootstrap(t.Context()); st != StatusComplete {
 		t.Fatalf("Bootstrap() = %q, want complete", st)
 	}
-	for range MaxIncrementalPages * PageSize {
+	for range maxIncrementalPages * pageSize {
 		src.rows = append(src.rows, row("bad", 2000))
 	}
 	src.rows = append(src.rows, row("8", 2000), row("9", 2001))
@@ -330,7 +330,7 @@ func TestIncremental_drain_spans_several_capped_reads(t *testing.T) {
 	src := &fakeSource{failPage: -1, rows: []plexapi.HistoryEntry{row("1", 1000)}}
 	s := newStore(src)
 	mustBootstrap(t.Context(), t, s)
-	for range 2 * MaxIncrementalPages * PageSize {
+	for range 2 * maxIncrementalPages * pageSize {
 		src.rows = append(src.rows, row("bad", 2000))
 	}
 	src.rows = append(src.rows, row("9", 2000))
@@ -350,7 +350,7 @@ func TestIncremental_resumes_the_overlap_after_a_drained_window(t *testing.T) {
 	src := &fakeSource{failPage: -1, rows: []plexapi.HistoryEntry{row("1", 1000)}}
 	s := newStore(src)
 	mustBootstrap(t.Context(), t, s)
-	for range MaxIncrementalPages * PageSize {
+	for range maxIncrementalPages * pageSize {
 		src.rows = append(src.rows, row("bad", 2000))
 	}
 	src.rows = append(src.rows, row("9", 2001))
@@ -360,7 +360,7 @@ func TestIncremental_resumes_the_overlap_after_a_drained_window(t *testing.T) {
 		}
 	}
 	wantSince := []int64{0, 700, 700, 2001 - incrementalOverlap}
-	wantStarts := []int{0, 0, MaxIncrementalPages * PageSize, 0}
+	wantStarts := []int{0, 0, maxIncrementalPages * pageSize, 0}
 	if !slices.Equal(src.since, wantSince) || !slices.Equal(src.starts, wantStarts) {
 		t.Errorf("reads started at since %v, offset %v, want since %v, offset %v", src.since, src.starts, wantSince, wantStarts)
 	}
@@ -372,7 +372,7 @@ func TestIncremental_failure_while_draining_keeps_the_offset(t *testing.T) {
 	src := &fakeSource{failPage: -1, rows: []plexapi.HistoryEntry{row("1", 1000)}}
 	s := newStore(src)
 	mustBootstrap(t.Context(), t, s)
-	for range MaxIncrementalPages * PageSize {
+	for range maxIncrementalPages * pageSize {
 		src.rows = append(src.rows, row("bad", 2000))
 	}
 	src.rows = append(src.rows, row("9", 2000))
@@ -390,8 +390,8 @@ func TestIncremental_failure_while_draining_keeps_the_offset(t *testing.T) {
 	if got := s.Visit(9, 0); got != 2000 {
 		t.Errorf("Visit(9, 0) = %d, want 2000; reads started at since %v, offset %v", got, src.since, src.starts)
 	}
-	if got := src.starts[len(src.starts)-1]; got != MaxIncrementalPages*PageSize {
-		t.Errorf("retry read from offset %d, want %d", got, MaxIncrementalPages*PageSize)
+	if got := src.starts[len(src.starts)-1]; got != maxIncrementalPages*pageSize {
+		t.Errorf("retry read from offset %d, want %d", got, maxIncrementalPages*pageSize)
 	}
 }
 
@@ -401,7 +401,7 @@ func TestBootstrap_closes_an_open_drain(t *testing.T) {
 	src := &fakeSource{failPage: -1, rows: []plexapi.HistoryEntry{row("1", 1000)}}
 	s := newStore(src)
 	mustBootstrap(t.Context(), t, s)
-	for range MaxIncrementalPages * PageSize {
+	for range maxIncrementalPages * pageSize {
 		src.rows = append(src.rows, row("bad", 2000))
 	}
 	src.rows = append(src.rows, row("9", 3000))
@@ -424,19 +424,19 @@ func TestBootstrap_closes_an_open_drain(t *testing.T) {
 // increment starts after them.
 func TestBootstrap_cursor_covers_trailing_unmatched_rows(t *testing.T) {
 	rows := []plexapi.HistoryEntry{row("1", 1000)}
-	for i := range MaxIncrementalPages * PageSize {
+	for i := range maxIncrementalPages * pageSize {
 		rows = append(rows, row("bad", int64(2000+i)))
 	}
 	src := &fakeSource{failPage: -1, rows: rows}
 	s := newStore(src)
 	mustBootstrap(t.Context(), t, s)
-	src.rows = append(src.rows, row("9", 2000+MaxIncrementalPages*PageSize))
+	src.rows = append(src.rows, row("9", 2000+maxIncrementalPages*pageSize))
 	if err := s.Incremental(t.Context()); err != nil {
 		t.Fatalf("Incremental() error = %v", err)
 	}
-	if got := s.Visit(9, 0); got != 2000+MaxIncrementalPages*PageSize {
+	if got := s.Visit(9, 0); got != 2000+maxIncrementalPages*pageSize {
 		t.Errorf("Visit(9, 0) after one increment = %d, want %d; reads started at %v",
-			got, 2000+MaxIncrementalPages*PageSize, src.since)
+			got, 2000+maxIncrementalPages*pageSize, src.since)
 	}
 }
 
@@ -459,13 +459,13 @@ func TestView_stale_after_an_hour_without_a_successful_read(t *testing.T) {
 	start := time.Unix(1_800_000_000, 0)
 	s.now = func() time.Time { return start }
 	mustBootstrap(t.Context(), t, s)
-	s.now = func() time.Time { return start.Add(StaleAfter - time.Second) }
+	s.now = func() time.Time { return start.Add(staleAfter - time.Second) }
 	if !s.View().Current {
-		t.Error("View().Current = false just inside StaleAfter, want true")
+		t.Error("View().Current = false just inside staleAfter, want true")
 	}
-	s.now = func() time.Time { return start.Add(StaleAfter) }
+	s.now = func() time.Time { return start.Add(staleAfter) }
 	if s.View().Current {
-		t.Error("View().Current = true at StaleAfter, want false")
+		t.Error("View().Current = true at staleAfter, want false")
 	}
 }
 
@@ -482,8 +482,8 @@ func TestCatchup_merges_a_late_play(t *testing.T) {
 		t.Fatalf("Visit(2, 0) = %d after the increment, want 0: the play is behind the cursor", s.Visit(2, 0))
 	}
 	for range 2 {
-		if err := s.Catchup(t.Context()); err != nil {
-			t.Fatalf("Catchup() error = %v", err)
+		if err := s.catchup(t.Context()); err != nil {
+			t.Fatalf("catchup() error = %v", err)
 		}
 	}
 	if s.Visit(2, 0) != late {
@@ -518,7 +518,7 @@ func TestPrune_skipped_after_a_rebuild(t *testing.T) {
 }
 
 func TestRead_paces_every_page_request(t *testing.T) {
-	rows := make([]plexapi.HistoryEntry, 3*PageSize)
+	rows := make([]plexapi.HistoryEntry, 3*pageSize)
 	for i := range rows {
 		rows[i] = row("1", int64(i+1))
 	}
@@ -542,7 +542,7 @@ func TestRun_failed_bootstrap_retries_after_backoff(t *testing.T) {
 		if n := src.walks(); n != 1 {
 			t.Fatalf("walks after start = %d, want 1", n)
 		}
-		time.Sleep(FailedRetryFloor - time.Second)
+		time.Sleep(failedRetryFloor - time.Second)
 		synctest.Wait()
 		if n := src.walks(); n != 1 {
 			t.Fatalf("walks before the backoff ends = %d, want 1", n)

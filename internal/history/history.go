@@ -19,23 +19,23 @@ import (
 
 // Fixed bounds of the history reads.
 const (
-	PageSize            = 500
-	MaxPages            = 500
-	MaxIncrementalPages = 20
-	MaxCatchupPages     = 200
-	BootstrapDeadline   = 20 * time.Minute
-	StaleAfter          = time.Hour
-	IncrementalInterval = 5 * time.Minute
-	CatchupInterval     = 24 * time.Hour
-	CatchupWindow       = 30 * 24 * time.Hour
-	RetryInterval       = 24 * time.Hour
-	FailedRetryFloor    = 5 * time.Minute
-	FailedRetryCeiling  = 6 * time.Hour
+	pageSize            = 500
+	maxPages            = 500
+	maxIncrementalPages = 20
+	maxCatchupPages     = 200
+	bootstrapDeadline   = 20 * time.Minute
+	staleAfter          = time.Hour
+	incrementalInterval = 5 * time.Minute
+	catchupInterval     = 24 * time.Hour
+	catchupWindow       = 30 * 24 * time.Hour
+	retryInterval       = 24 * time.Hour
+	failedRetryFloor    = 5 * time.Minute
+	failedRetryCeiling  = 6 * time.Hour
 	incrementalOverlap  = 300
-	// MaxCountedRows caps each of the unmatched and deleted-item row
+	// maxCountedRows caps each of the unmatched and deleted-item row
 	// counts. A full read holds at most this many rows, so its counts are
 	// exact; later reads saturate at it.
-	MaxCountedRows = MaxPages * PageSize
+	maxCountedRows = maxPages * pageSize
 )
 
 // Status is the outcome of the last full history read.
@@ -44,12 +44,12 @@ type Status string
 // Status values published on plex_history_read_status.
 const (
 	StatusComplete  Status = "complete"
-	StatusOverLimit Status = "over_limit"
+	statusOverLimit Status = "over_limit"
 	StatusFailed    Status = "failed"
 )
 
 // Statuses lists every Status in display order.
-var Statuses = []Status{StatusComplete, StatusOverLimit, StatusFailed}
+var Statuses = []Status{StatusComplete, statusOverLimit, StatusFailed}
 
 // Source pages through watch history, calling wait before every page
 // request; *plexapi.Client satisfies it.
@@ -117,7 +117,7 @@ type View struct {
 }
 
 // View reports the state at now. Current means the last full read completed
-// and some read succeeded within StaleAfter. Gen changes each time a full
+// and some read succeeded within the last hour. Gen changes each time a full
 // read ends, so equal Gen values bracket a span in which the watched map was
 // neither rebuilt nor discarded.
 func (s *Store) View() View {
@@ -129,7 +129,7 @@ func (s *Store) View() View {
 		LastSuccess: s.lastSuccess,
 		Unmatched:   len(s.unmatched),
 		Deleted:     len(s.deleted),
-		Current:     s.status == StatusComplete && s.now().Sub(s.lastSuccess) < StaleAfter,
+		Current:     s.status == StatusComplete && s.now().Sub(s.lastSuccess) < staleAfter,
 	}
 }
 
@@ -169,15 +169,15 @@ func (s *Store) Prune(pass uint32, cutoff int64, gen uint64) int {
 var errOverLimit = errors.New("history over the read limit")
 
 // read pages from since, starting at row offset start, pacing every page
-// request, handing at most maxPages*PageSize rows to visit. It returns the
+// request, handing at most pages*pageSize rows to visit. It returns the
 // rows read and reports errOverLimit when a row past that budget arrives.
-func (s *Store) read(ctx context.Context, since int64, start, maxPages int, visit func(plexapi.HistoryEntry)) (int, error) {
+func (s *Store) read(ctx context.Context, since int64, start, pages int, visit func(plexapi.HistoryEntry)) (int, error) {
 	rows := 0
-	for e, err := range s.src.WalkHistory(ctx, since, plexapi.Page{Start: start, Size: PageSize}, s.pace.Wait) {
+	for e, err := range s.src.WalkHistory(ctx, since, plexapi.Page{Start: start, Size: pageSize}, s.pace.Wait) {
 		if err != nil {
 			return rows, err
 		}
-		if rows == maxPages*PageSize {
+		if rows == pages*pageSize {
 			return rows, errOverLimit
 		}
 		visit(e)
@@ -235,7 +235,7 @@ func (s *Store) identity(e *plexapi.HistoryEntry) uint64 {
 }
 
 func (s *Store) count(set map[uint64]struct{}, e *plexapi.HistoryEntry) {
-	if len(set) < MaxCountedRows {
+	if len(set) < maxCountedRows {
 		set[s.identity(e)] = struct{}{}
 	}
 }
@@ -244,12 +244,12 @@ func (s *Store) count(set map[uint64]struct{}, e *plexapi.HistoryEntry) {
 // a read past the limits discards the map, so nothing is built from part
 // of the history.
 func (s *Store) Bootstrap(ctx context.Context) Status {
-	ctx, cancel := context.WithTimeout(ctx, BootstrapDeadline)
+	ctx, cancel := context.WithTimeout(ctx, bootstrapDeadline)
 	defer cancel()
 	watched := make(map[uint64]entry)
 	unmatched, deleted := make(map[uint64]struct{}), make(map[uint64]struct{})
 	var cursor int64
-	_, err := s.read(ctx, 0, 0, MaxPages, func(e plexapi.HistoryEntry) {
+	_, err := s.read(ctx, 0, 0, maxPages, func(e plexapi.HistoryEntry) {
 		cursor = max(cursor, e.ViewedAt)
 		s.fold(watched, unmatched, deleted, &e)
 	})
@@ -257,7 +257,7 @@ func (s *Store) Bootstrap(ctx context.Context) Status {
 	status := StatusComplete
 	switch {
 	case errors.Is(err, errOverLimit) || errors.Is(err, context.DeadlineExceeded):
-		status = StatusOverLimit
+		status = statusOverLimit
 	case err != nil:
 		status = StatusFailed
 	}
@@ -291,7 +291,7 @@ func (s *Store) Incremental(ctx context.Context) error {
 		since, start = s.drain.since, s.drain.offset
 	}
 	s.mu.Unlock()
-	cursor, rows, err := s.merge(ctx, since, start, MaxIncrementalPages)
+	cursor, rows, err := s.merge(ctx, since, start, maxIncrementalPages)
 	capped := errors.Is(err, errOverLimit)
 	if err != nil && !capped {
 		return err
@@ -307,24 +307,24 @@ func (s *Store) Incremental(ctx context.Context) error {
 	return nil
 }
 
-// Catchup re-reads the last 30 days for plays a client reported late. It
+// catchup re-reads the last 30 days for plays a client reported late. It
 // never discards state; a failure or the page cap is returned for logging.
-func (s *Store) Catchup(ctx context.Context) error {
+func (s *Store) catchup(ctx context.Context) error {
 	s.mu.Lock()
 	ok := s.status == StatusComplete
 	s.mu.Unlock()
 	if !ok {
 		return nil
 	}
-	_, _, err := s.merge(ctx, s.now().Add(-CatchupWindow).Unix(), 0, MaxCatchupPages)
+	_, _, err := s.merge(ctx, s.now().Add(-catchupWindow).Unix(), 0, maxCatchupPages)
 	return err
 }
 
 // merge folds rows into the current map; max makes a re-read idempotent.
 // It returns the newest play time of every row read, unusable ones
 // included, and the row count.
-func (s *Store) merge(ctx context.Context, since int64, start, maxPages int) (cursor int64, rows int, err error) {
-	rows, err = s.read(ctx, since, start, maxPages, func(e plexapi.HistoryEntry) {
+func (s *Store) merge(ctx context.Context, since int64, start, pages int) (cursor int64, rows int, err error) {
+	rows, err = s.read(ctx, since, start, pages, func(e plexapi.HistoryEntry) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if s.watched == nil {
@@ -336,13 +336,12 @@ func (s *Store) merge(ctx context.Context, since int64, start, maxPages int) (cu
 	return cursor, rows, err
 }
 
-// Run bootstraps, then reads increments every IncrementalInterval and the
-// last 30 days every CatchupInterval, until ctx ends. After each completed
-// bootstrap it calls onRebuilt. A failed bootstrap retries after
-// FailedRetryFloor, doubling to FailedRetryCeiling; one over the limits retries
-// after RetryInterval.
+// Run bootstraps, then reads new plays every 5 minutes and the last 30 days
+// once a day, until ctx ends. After each completed bootstrap it calls
+// onRebuilt. A failed bootstrap retries after 5 minutes, doubling to 6 hours;
+// one over the limits retries a day later.
 func (s *Store) Run(ctx context.Context, onRebuilt, onError func()) {
-	backoff := FailedRetryFloor
+	backoff := failedRetryFloor
 	for {
 		wait := s.bootstrapOnce(ctx, &backoff, onRebuilt, onError)
 		if wait == 0 {
@@ -370,13 +369,13 @@ func (s *Store) bootstrapOnce(ctx context.Context, backoff *time.Duration, onReb
 		}
 		onRebuilt()
 		return 0
-	case st == StatusOverLimit:
-		slog.Warn("history over limit", "rows", MaxPages*PageSize)
-		return RetryInterval
+	case st == statusOverLimit:
+		slog.Warn("history over limit", "rows", maxPages*pageSize)
+		return retryInterval
 	default:
 		onError()
 		wait := *backoff
-		*backoff = min(*backoff*2, FailedRetryCeiling)
+		*backoff = min(*backoff*2, failedRetryCeiling)
 		slog.Warn("history bootstrap failed", "status", string(st), "retry_in", wait.String())
 		return wait
 	}
@@ -386,9 +385,9 @@ func (s *Store) follow(ctx context.Context, onError func()) {
 	if ctx.Err() != nil {
 		return
 	}
-	inc := time.NewTicker(IncrementalInterval)
+	inc := time.NewTicker(incrementalInterval)
 	defer inc.Stop()
-	daily := time.NewTicker(CatchupInterval)
+	daily := time.NewTicker(catchupInterval)
 	defer daily.Stop()
 	unmatched := s.View().Unmatched
 	for {
@@ -398,7 +397,7 @@ func (s *Store) follow(ctx context.Context, onError func()) {
 		case <-inc.C:
 			unmatched = s.incrementalTick(ctx, unmatched, onError)
 		case <-daily.C:
-			if err := s.Catchup(ctx); err != nil && ctx.Err() == nil {
+			if err := s.catchup(ctx); err != nil && ctx.Err() == nil {
 				slog.Warn("history catch-up incomplete", "error", err)
 			}
 		}

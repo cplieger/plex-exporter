@@ -41,7 +41,7 @@ func bool01(b bool) float64 {
 // Watch-age figures and last-played times publish only for a library walked
 // while history was current at the generation still current now, and only
 // while no history row is unmatched.
-func (s *Server) collectCatalog(ch chan<- prometheus.Metric, snap *Snapshot) {
+func collectCatalog(ch chan<- prometheus.Metric, snap *snapshot) {
 	srv, id := snap.Name, snap.ID
 	walkable, skipped := walkableLibraries(snap.Libraries)
 	hv := snap.history
@@ -75,7 +75,7 @@ func (s *Server) collectCatalog(ch chan<- prometheus.Metric, snap *Snapshot) {
 // emitLibraries emits each walkable library's figures and the server's
 // newest items. walked reports every library has a walk whose last attempt
 // succeeded; stamped that every one publishes watch figures.
-func emitLibraries(ch chan<- prometheus.Metric, snap *Snapshot, walkable []library.Library) (walked, stamped bool) {
+func emitLibraries(ch chan<- prometheus.Metric, snap *snapshot, walkable []library.Library) (walked, stamped bool) {
 	hv := snap.history
 	walked, stamped = true, true
 	recent := make([][]libstats.Item, 0, len(walkable))
