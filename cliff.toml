@@ -137,8 +137,7 @@ exclude_paths = [
   "**/deadset.json",
   "**/deadset-ignore.json",
   "**/deadset-edges.json",
-  # knip's configs, and the retired .punused-ignore repos carry until they delete it.
-  "**/.punused-ignore",
+  # knip's configs.
   "**/knip.json",
   "**/knip.jsonc",
   "**/.knip.json",
