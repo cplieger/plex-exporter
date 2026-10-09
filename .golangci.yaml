@@ -8,9 +8,9 @@ run:
 
 linters:
   default: standard
-  # unused, ineffassign and wastedassign are off: go-ci's deadset step reports
-  # the same findings (DS1002, DS1003, DS1807) and gates on them in every Go
-  # module.
+  # unused, ineffassign and wastedassign are off: the deadset check
+  # (deadset-ci.yaml) reports the same findings (DS1002, DS1003, DS1807) and
+  # gates on them in every Go module.
   disable:
     - unused
     - ineffassign
