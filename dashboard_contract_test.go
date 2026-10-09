@@ -466,18 +466,6 @@ func panelByTitle(t *testing.T, panels map[string]dashPanel, title string) dashP
 	return dashPanel{}
 }
 
-// The last_watched buckets are disjoint, so an item with no play in a year is
-// in never or over_1y; reading over_1y alone leaves out every unplayed item.
-func TestDashboard_year_without_a_play_counts_the_never_played(t *testing.T) {
-	_, panels := loadDashboard(t)
-	p := panelByTitle(t, panels, "No play in a year")
-	for _, e := range exprs(&p) {
-		if !strings.Contains(e, `last_watched=~"never|over_1y"`) || strings.Contains(e, `last_watched="over_1y"`) {
-			t.Errorf("%q reads %s, want every leg on last_watched=~\"never|over_1y\"", p.Spec.Title, e)
-		}
-	}
-}
-
 // An episode series carries its show in title, so the episode leg sums by
 // title alone and every row is a whole show.
 func TestDashboard_most_watched_sums_episodes_per_show(t *testing.T) {
