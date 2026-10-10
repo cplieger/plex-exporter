@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"slices"
@@ -38,6 +39,10 @@ type dashPanel struct {
 				} `json:"transformations"`
 				QueryOptions struct {
 					Interval      string `json:"interval"`
+					TimeFrom      string `json:"timeFrom"`
+					TimeTo        string `json:"timeTo"`
+					TimeShift     string `json:"timeShift"`
+					TimeCompare   string `json:"timeCompare"`
 					MaxDataPoints int    `json:"maxDataPoints"`
 				} `json:"queryOptions"`
 			} `json:"spec"`
@@ -350,11 +355,14 @@ func TestDashboard_bar_subqueries_count_no_step_after_the_range(t *testing.T) {
 	}
 }
 
-// A stat reads its value off the last point of a range query, and Grafana
-// aligns that point down to the step, which at the default 7 days is 30
-// minutes unless the panel asks for more points; a minute keeps it current.
+// A stat reads its value off the last point of a range query, which Grafana
+// aligns down to the step, so the default 7 days must step by at most 2m:
+// gtime.RoundInterval gives 2m up to 210 s. It rounds a step down by up to
+// 43 %, and for any range under about 15 years its 2m band has the tightest
+// cap: past 11000·120/210 points, Prometheus refuses ranges of about 15 to 17
+// days as over its 11,000-point limit (grafana/grafana#46390).
 func TestDashboard_range_stats_show_a_current_value(t *testing.T) {
-	const minutesIn7Days = 7 * 24 * 60
+	const fewest, most = 7 * 24 * 3600 / 210, 11000 * 120 / 210
 	_, panels := loadDashboard(t)
 	ranged := 0
 	for name, p := range panels {
@@ -362,8 +370,8 @@ func TestDashboard_range_stats_show_a_current_value(t *testing.T) {
 			continue
 		}
 		ranged++
-		if got := p.Spec.Data.Spec.QueryOptions.MaxDataPoints; got < minutesIn7Days {
-			t.Errorf("%s %q asks for %d points, want at least %d so its value is under a minute old at 7 days", name, p.Spec.Title, got, minutesIn7Days)
+		if got := p.Spec.Data.Spec.QueryOptions.MaxDataPoints; got < fewest || got > most {
+			t.Errorf("%s %q asks for %d points, want %d to %d so its value is at most 2 minutes old at 7 days and no range under 15 years passes 11,000 points", name, p.Spec.Title, got, fewest, most)
 		}
 	}
 	if ranged == 0 {
@@ -443,15 +451,436 @@ func TestDashboard_item_count_divisor_is_aggregated(t *testing.T) {
 	}
 }
 
-func TestDashboard_busy_libraries_count_each_library_once(t *testing.T) {
-	_, panels := loadDashboard(t)
-	p, ok := panels["panel-101"]
-	if !ok {
-		t.Fatal("panel-101 is missing")
+type layoutNode struct {
+	Kind string `json:"kind"`
+	Spec struct {
+		Layout *layoutNode  `json:"layout"`
+		Title  string       `json:"title"`
+		Tabs   []layoutNode `json:"tabs"`
+		Rows   []layoutNode `json:"rows"`
+		Items  []gridItem   `json:"items"`
+	} `json:"spec"`
+}
+
+func child(t *testing.T, nodes []layoutNode, title string) *layoutNode {
+	t.Helper()
+	for i := range nodes {
+		if nodes[i].Spec.Title == title && nodes[i].Spec.Layout != nil {
+			return nodes[i].Spec.Layout
+		}
 	}
-	e := exprs(&p)[0]
-	if !strings.Contains(e, "count(count by (server, server_id, library_id) (") || !strings.Contains(e, `library_id!=""`) {
-		t.Errorf("%q = %s, want a count of count by (server, server_id, library_id) over library_id!=\"\"", p.Spec.Title, e)
+	t.Fatalf("Setup: no tab or row titled %q", title)
+	return nil
+}
+
+type gridItem = struct {
+	Spec struct {
+		ConditionalRendering *struct {
+			Spec struct {
+				Visibility string `json:"visibility"`
+				Items      []struct {
+					Kind string `json:"kind"`
+					Spec struct {
+						Value bool `json:"value"`
+					} `json:"spec"`
+				} `json:"items"`
+			} `json:"spec"`
+		} `json:"conditionalRendering"`
+		Element struct {
+			Name string `json:"name"`
+		} `json:"element"`
+	} `json:"spec"`
+}
+
+// serverOverview returns the Overview's first grid, which holds the factual
+// tiles and, after them, the tiles for conditions that need the reader.
+func serverOverview(t *testing.T) *layoutNode {
+	t.Helper()
+	raw, err := os.ReadFile("grafana-dashboard.json")
+	if err != nil {
+		t.Fatalf("Setup: read dashboard: %v", err)
+	}
+	var d struct {
+		Spec struct {
+			Layout layoutNode `json:"layout"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		t.Fatalf("Setup: decode dashboard: %v", err)
+	}
+	overview := child(t, d.Spec.Layout.Spec.Tabs, "Overview")
+	return child(t, overview.Spec.Rows, "Server overview")
+}
+
+func showsOnlyWithData(it *gridItem) bool {
+	cr := it.Spec.ConditionalRendering
+	return cr != nil && cr.Spec.Visibility == "show" && len(cr.Spec.Items) == 1 &&
+		cr.Spec.Items[0].Kind == "ConditionalRenderingData" && cr.Spec.Items[0].Spec.Value
+}
+
+// attentionTiles returns the Server overview items drawn only while their
+// query returns data.
+func attentionTiles(t *testing.T) []gridItem {
+	t.Helper()
+	var out []gridItem
+	for _, it := range serverOverview(t).Spec.Items {
+		if showsOnlyWithData(&it) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// Grafana queries a panel only near the viewport unless the dashboard
+// preloads, and a has-data rule cannot hide a tile whose query never ran.
+func TestDashboard_preloads_so_attention_tiles_below_the_fold_can_hide(t *testing.T) {
+	raw, err := os.ReadFile("grafana-dashboard.json")
+	if err != nil {
+		t.Fatalf("Setup: read dashboard: %v", err)
+	}
+	var d struct {
+		Spec struct {
+			Preload bool `json:"preload"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		t.Fatalf("Setup: decode dashboard: %v", err)
+	}
+	if !d.Spec.Preload {
+		t.Error("spec.preload = false, want true")
+	}
+}
+
+// A GridLayoutItem carries no conditional rendering, so a tile hidden until
+// its condition holds must sit in an auto grid with a has-data rule. The
+// factual tiles come first so shown alerts start a line of their own.
+func TestDashboard_attention_tiles_show_only_when_their_query_returns_data(t *testing.T) {
+	facts := []string{"Plex version", "Streams", "Transcodes", "Plex tasks", "Oldest scan", "Items added"}
+	alerts := []string{
+		"plex-exporter", "Plex server", "Session poll", "Library lost items", "Libraries not read", "Failed reads",
+		"Watch history stale", "Watch figures hidden", "Libraries skipped", "Items without a size", "Plex update",
+	}
+	_, panels := loadDashboard(t)
+	grid := serverOverview(t)
+	if grid.Kind != "AutoGridLayout" {
+		t.Fatalf("Server overview layout = %q, want AutoGridLayout", grid.Kind)
+	}
+	var gotFacts, gotAlerts []string
+	for _, it := range grid.Spec.Items {
+		title := panels[it.Spec.Element.Name].Spec.Title
+		if showsOnlyWithData(&it) {
+			gotAlerts = append(gotAlerts, title)
+		} else {
+			if len(gotAlerts) > 0 {
+				t.Errorf("%q always shows but follows an alert tile", title)
+			}
+			gotFacts = append(gotFacts, title)
+		}
+	}
+	if !slices.Equal(gotFacts, facts) {
+		t.Errorf("always-shown tiles = %q, want %q", gotFacts, facts)
+	}
+	if !slices.Equal(gotAlerts, alerts) {
+		t.Errorf("tiles shown only with data = %q, want %q", gotAlerts, alerts)
+	}
+}
+
+// A tile that reads an alert rule's signal names that rule, so a renamed or
+// removed rule fails here instead of leaving the description pointing nowhere.
+func TestDashboard_attention_tiles_name_existing_alert_rules(t *testing.T) {
+	ruleName := regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`)
+	var rules []string
+	for _, f := range []string{"alerts/promql.yaml", "alerts/logql.yaml"} {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("Setup: read %s: %v", f, err)
+		}
+		for _, m := range regexp.MustCompile(`(?m)^\s*- alert: (\S+)$`).FindAllStringSubmatch(string(raw), -1) {
+			rules = append(rules, m[1])
+		}
+	}
+	_, panels := loadDashboard(t)
+	for _, it := range attentionTiles(t) {
+		p := panels[it.Spec.Element.Name]
+		named := ruleName.FindAllString(p.Spec.Description, -1)
+		if len(named) == 0 && !strings.Contains(p.Spec.Description, "No alert rule covers this") {
+			t.Errorf("%q names no alert rule and does not say that none covers it", p.Spec.Title)
+		}
+		for _, n := range named {
+			if !slices.Contains(rules, n) {
+				t.Errorf("%q names %s, which is not a rule in alerts/", p.Spec.Title, n)
+			}
+		}
+	}
+}
+
+// promqlMetrics returns the metric names a PromQL expression reads: every
+// identifier left once label matchers, ranges, strings, label lists and
+// function calls are stripped, minus the operators PromQL spells as words.
+func promqlMetrics(expr string) []string {
+	for _, strip := range []string{`"[^"]*"`, `\{[^}]*\}`, `\[[^\]]*\]`, `\b(on|by|without|ignoring|group_left|group_right)\s*\([^)]*\)`, `[A-Za-z_]\w*\s*\(`} {
+		expr = regexp.MustCompile(strip).ReplaceAllString(expr, " ")
+	}
+	words := map[string]bool{"and": true, "or": true, "unless": true, "bool": true, "offset": true}
+	var out []string
+	for _, id := range regexp.MustCompile(`\b[A-Za-z_:][\w:]*\b`).FindAllString(expr, -1) {
+		if !words[id] && !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// A tile that names a PromQL rule reads every metric that rule reads, so the
+// tile and the alert cannot be built on different signals.
+func TestDashboard_attention_tiles_read_their_rules_metrics(t *testing.T) {
+	raw, err := os.ReadFile("alerts/promql.yaml")
+	if err != nil {
+		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
+	}
+	ruleMetrics := map[string][]string{}
+	for _, block := range strings.Split(string(raw), "- alert: ")[1:] {
+		name, rest, _ := strings.Cut(block, "\n")
+		_, expr, _ := strings.Cut(rest, "expr:")
+		expr, _, _ = strings.Cut(expr, "for:")
+		ruleMetrics[strings.TrimSpace(name)] = promqlMetrics(strings.TrimPrefix(strings.TrimSpace(expr), ">"))
+	}
+	if got := ruleMetrics["PlexSessionPollFailing"]; !slices.Equal(got, []string{"plex_session_poll_reachable", "plex_http_reachable"}) {
+		t.Fatalf("Setup: PlexSessionPollFailing reads %q, want plex_session_poll_reachable and plex_http_reachable", got)
+	}
+	_, panels := loadDashboard(t)
+	for _, it := range attentionTiles(t) {
+		p := panels[it.Spec.Element.Name]
+		tile := strings.Join(exprs(&p), "\n")
+		for _, rule := range regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`).FindAllString(p.Spec.Description, -1) {
+			for _, m := range ruleMetrics[rule] {
+				if !slices.Contains(promqlMetrics(tile), m) {
+					t.Errorf("%q names %s, which reads %s, but the tile's query does not", p.Spec.Title, rule, m)
+				}
+			}
+		}
+	}
+}
+
+// alertSelectors returns the rule names an expression's ALERTS selectors
+// match, split by whether the selector keeps only firing alerts.
+func alertSelectors(expr string) (firing, anyState []string) {
+	sel := regexp.MustCompile(`ALERTS\{alertname=(~?)"([^"]+)"([^}]*)\}`)
+	for _, m := range sel.FindAllStringSubmatch(expr, -1) {
+		names := []string{m[2]}
+		if m[1] == "~" {
+			names = strings.Split(m[2], "|")
+		}
+		if strings.Contains(m[3], `alertstate="firing"`) {
+			firing = append(firing, names...)
+		} else {
+			anyState = append(anyState, names...)
+		}
+	}
+	return firing, anyState
+}
+
+// The ruler's ALERTS series is the alert's own state, so a tile that shows it
+// rises and falls with the alert, whatever the evaluation phase. The tile's
+// own check of the condition stands in only while the ruler has written no
+// ALERTS for the rule, as on a Prometheus without alerts/promql.yaml.
+func TestDashboard_attention_tiles_follow_their_rules_alert_state(t *testing.T) {
+	_, panels := loadDashboard(t)
+	rules := 0
+	for _, it := range attentionTiles(t) {
+		p := panels[it.Spec.Element.Name]
+		tile := strings.Join(exprs(&p), "\n")
+		firing, anyState := alertSelectors(tile)
+		for _, rule := range regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`).FindAllString(p.Spec.Description, -1) {
+			rules++
+			if !slices.Contains(firing, rule) {
+				t.Errorf("%q names %s, but its query reads no firing ALERTS for it", p.Spec.Title, rule)
+			}
+			if !slices.Contains(anyState, rule) || !strings.Contains(tile, "unless on () ") {
+				t.Errorf("%q names %s, but its fallback is not dropped while ALERTS for it exist", p.Spec.Title, rule)
+			}
+		}
+	}
+	if rules == 0 {
+		t.Fatal("Setup: no attention tile names an alert rule")
+	}
+}
+
+// Without the rules loaded the tile checks the condition itself. A rule
+// evaluated each minute fires `for` after its first true evaluation, so a
+// condition held at every minute of for+2 minutes never shows before such an
+// alert could fire.
+func TestDashboard_attention_tiles_wait_out_their_rules_for(t *testing.T) {
+	raw, err := os.ReadFile("alerts/promql.yaml")
+	if err != nil {
+		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
+	}
+	ruleFor := map[string]int{}
+	for _, m := range regexp.MustCompile(`(?s)- alert: (\S+)\n.*?\n\s*for: (\d+)m\n`).FindAllStringSubmatch(string(raw), -1) {
+		minutes, err := strconv.Atoi(m[2])
+		if err != nil {
+			t.Fatalf("Setup: %s for: %q: %v", m[1], m[2], err)
+		}
+		ruleFor[m[1]] = minutes
+	}
+	if ruleFor["PlexExporterCollectionErrors"] != 30 {
+		t.Fatalf("Setup: PlexExporterCollectionErrors for = %dm, want 30m", ruleFor["PlexExporterCollectionErrors"])
+	}
+	_, panels := loadDashboard(t)
+	for _, it := range attentionTiles(t) {
+		p := panels[it.Spec.Element.Name]
+		tile := strings.Join(exprs(&p), "\n")
+		for _, rule := range regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`).FindAllString(p.Spec.Description, -1) {
+			minutes, ok := ruleFor[rule]
+			if !ok {
+				continue
+			}
+			window := fmt.Sprintf("[%dm:1m]) >= %d", minutes+2, minutes+2)
+			if rule == "PlexExporterTargetAbsent" {
+				window = fmt.Sprintf("[%dm:1m])", minutes+2)
+			}
+			if !strings.Contains(tile, window) {
+				t.Errorf("%q names %s (for: %dm), but its query has no %q", p.Spec.Title, rule, minutes, window)
+			}
+		}
+	}
+}
+
+// fixedWindows lists the literal windows a panel keeps: an alert tile's rule
+// windows (for+2, the rule's own range and offset), so tile and alert agree,
+// and the plex-exporter tile's week, which finds an exporter that stopped
+// before a short range. Everything else reads the time picker's range.
+var fixedWindows = map[string][]string{
+	"panel-150": {"17m", "1w"},
+	"panel-151": {"12m"},
+	"panel-152": {"12m"},
+	"panel-153": {"2h", "30m", "32m"},
+	"panel-154": {"32m"},
+	"panel-155": {"15m", "32m"},
+}
+
+var quotedString = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
+
+// literalWindows returns the fixed durations of an expression's ranges,
+// subquery ranges and offsets, and its fixed @ timestamps; a subquery's step
+// is a resolution, not a window. A PromQL duration may join units (1d12h),
+// be bare seconds (300) and sit among spaces, so any range or offset that
+// starts with a digit counts.
+func literalWindows(expr string) []string {
+	expr = quotedString.ReplaceAllString(expr, `""`)
+	fixed := regexp.MustCompile(`\[\s*(\d[^\]:]*?)\s*(?::[^\]]*)?\]|\boffset\s+(-?)\s*(\d[\w.]*)|(@)\s*(-?\d[\w.]*)`)
+	var out []string
+	for _, m := range fixed.FindAllStringSubmatch(expr, -1) {
+		if w := strings.Join(m[1:], ""); !slices.Contains(out, w) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func TestDashboard_counts_over_time_follow_the_time_range(t *testing.T) {
+	windowLabel := regexp.MustCompile(`\bwindow=~?"`)
+	_, panels := loadDashboard(t)
+	for name, p := range panels {
+		if o := p.Spec.Data.Spec.QueryOptions; o.TimeFrom != "" || o.TimeTo != "" || o.TimeShift != "" || o.TimeCompare != "" {
+			t.Errorf("%s %q replaces the time range (timeFrom %q, timeTo %q, timeShift %q, timeCompare %q)",
+				name, p.Spec.Title, o.TimeFrom, o.TimeTo, o.TimeShift, o.TimeCompare)
+		}
+		var used []string
+		for _, e := range exprs(&p) {
+			if windowLabel.MatchString(e) {
+				t.Errorf("%s %q reads a series measured over a fixed window: %s", name, p.Spec.Title, e)
+			}
+			for _, w := range literalWindows(e) {
+				if !slices.Contains(used, w) {
+					used = append(used, w)
+				}
+				if !slices.Contains(fixedWindows[name], w) {
+					t.Errorf("%s %q measures over the fixed %s instead of the time range", name, p.Spec.Title, w)
+				}
+			}
+		}
+		for _, w := range fixedWindows[name] {
+			if !slices.Contains(used, w) {
+				t.Errorf("%s %q no longer uses its listed fixed window %s", name, p.Spec.Title, w)
+			}
+		}
+	}
+	for name := range fixedWindows {
+		if _, ok := panels[name]; !ok {
+			t.Errorf("fixedWindows lists %s, which is not a panel", name)
+		}
+	}
+}
+
+// visibleNames appends every tab, row, panel, link, column, series, variable
+// and annotation name, every no-value and value-mapping text, and every unit
+// in a decoded dashboard, field overrides included. A custom unit draws its
+// text beside each value, and no built-in unit id names a period, so each unit
+// counts whole. A series can take its name from a string in its query
+// (label_replace), so every query string counts.
+func visibleNames(v any, key string, out *[]string) {
+	switch v := v.(type) {
+	case map[string]any:
+		if s, ok := v["value"].(string); ok {
+			switch v["id"] {
+			case "displayName", "noValue", "unit":
+				*out = append(*out, s)
+			}
+		}
+		if spec, ok := v["spec"].(map[string]any); ok && v["kind"] == "AnnotationQuery" {
+			if s, ok := spec["name"].(string); ok {
+				*out = append(*out, s)
+			}
+		}
+		for k, child := range v {
+			s, ok := child.(string)
+			switch {
+			case !ok:
+			case k == "title" || k == "displayName" || k == "legendFormat" || k == "noValue" || k == "text" || k == "label" || k == "unit" || key == "renameByName":
+				*out = append(*out, s)
+			case k == "expr":
+				for _, m := range quotedString.FindAllStringSubmatch(s, -1) {
+					*out = append(*out, m[1])
+				}
+			}
+			visibleNames(child, k, out)
+		}
+	case []any:
+		for _, child := range v {
+			visibleNames(child, key, out)
+		}
+	}
+}
+
+func TestDashboard_visible_text_names_no_fixed_period(t *testing.T) {
+	period := regexp.MustCompile(`(?i)\b\d+[\s-]*(?:ms|[smhdwy]|secs?|seconds?|mins?|minutes?|hrs?|hours?|days?|wks?|weeks?|fortnights?|mos?|months?|qtrs?|quarters?|yrs?|years?)\b|` +
+		`\b(?:\d+(?:ms|[smhdwy]))+\b|` +
+		`\b(?:hourly|daily|weekly|fortnightly|monthly|quarterly|yearly|today|yesterday|overnight)\b|` +
+		`\b(?:last|past|this|previous|prior|next|an?|one|two|three|seven|ten|twelve|thirty|ninety) ` +
+		`(?:hours?|days?|weeks?|fortnights?|months?|quarters?|years?)\b`)
+	raw, err := os.ReadFile("grafana-dashboard.json")
+	if err != nil {
+		t.Fatalf("Setup: read dashboard: %v", err)
+	}
+	var d any
+	if err := json.Unmarshal(raw, &d); err != nil {
+		t.Fatalf("Setup: decode dashboard: %v", err)
+	}
+	// Space by when it was last watched names plex-exporter's last_watched
+	// bands, which count back from now and are not a measurement period.
+	ageBands := []string{"90 days to a year ago", "Within 90 days", "Over a year ago"}
+	var names []string
+	visibleNames(d, "", &names)
+	for _, known := range []string{"Growth in this range", "Last Plex scan", "Direct play", "Storage added on $1", "Nobody is streaming", "Your network", "Data source", "Annotations & Alerts", "suffix:down"} {
+		if !slices.Contains(names, known) {
+			t.Fatalf("Setup: names %q miss the known name %q", names, known)
+		}
+	}
+	for _, n := range names {
+		if period.MatchString(n) && !slices.Contains(ageBands, n) {
+			t.Errorf("visible text %q names a fixed period; the figure follows the time range", n)
+		}
 	}
 }
 

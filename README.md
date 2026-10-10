@@ -5,7 +5,7 @@
 <!-- hub-overview BEGIN -->
 plex-exporter puts your Plex server's streams, transcodes, bandwidth and library sizes into Prometheus, so you can watch them in Grafana and get alerts. It only reads from Plex. Your own Prometheus and Grafana store and show the data.
 
-![The bundled Grafana dashboard showing server status, active streams and transcodes, library totals, a table of six active sessions and storage per library](docs/images/header.png)
+![The bundled Grafana dashboard's Overview tab showing the Plex version, streams, transcodes, Plex tasks, oldest library scan and new items, a Plex update tile that appears only while an update is out, a table of five active sessions and their bandwidth](docs/images/header.png)
 
 ## What it does
 
