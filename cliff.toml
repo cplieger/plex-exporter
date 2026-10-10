@@ -13,16 +13,15 @@ header = ""
 # subheading under "Breaking changes", footer unquoted (a `> ` quote collapses
 # tables and code blocks), else marked in its group. breaking_description
 # falls back to the subject, so "has a footer" is description != message.
-# CLIFF_NOTES_MODE=v3, set only by cplieger/ci's render-notes.sh, hides
-# deps/devdeps scopes and orders Security, Added, Fixed, Performance, Changed.
+# Commits scoped deps or devdeps stay out of the notes, and the sections run
+# Security, Added, Fixed, Performance, Changed.
 # Tera rejects `in` inside a parenthesised condition, hence the `set` flags.
 # Only the footer renders, never the body, which is rationale for git log.
 body = """
-{% set v3 = get_env(name="CLIFF_NOTES_MODE", default="") == "v3" %}\
 {% set_global shown = false %}\
 {% for commit in commits %}\
 {% set footer = commit.breaking and commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
-{% set hidden = v3 and commit.scope in ["deps", "devdeps"] %}\
+{% set hidden = commit.scope in ["deps", "devdeps"] %}\
 {% if footer and not hidden %}\
 {% if not shown %}
 ### Breaking changes
@@ -33,7 +32,6 @@ body = """
 {{ commit.breaking_description | trim | upper_first }}
 {% endif %}\
 {% endfor %}\
-{% if v3 %}\
 {% set_global sections = ["Security", "Added", "Fixed", "Performance", "Changed"] %}\
 {% for group, gcommits in commits | group_by(attribute="group") %}\
 {% set label = group | striptags | trim %}\
@@ -61,24 +59,7 @@ body = """
 - {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
 {% endfor %}
 {% endif %}\
-{% endfor %}\
-{% else %}\
-{% for group, gcommits in commits | group_by(attribute="group") %}\
-{% set_global keep = [] %}\
-{% for commit in gcommits %}\
-{% set footer = commit.breaking and commit.breaking_description and commit.breaking_description | trim != commit.message | trim %}\
-{% if not footer %}\
-{% set_global keep = keep | concat(with=commit) %}\
-{% endif %}\
-{% endfor %}\
-{% if keep | length > 0 %}
-### {{ group | striptags | trim | upper_first }}
-{% for commit in keep %}
-- {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
 {% endfor %}
-{% endif %}\
-{% endfor %}\
-{% endif %}
 """
 trim = true
 
@@ -151,24 +132,18 @@ exclude_paths = [
 commit_parsers = [
   # Order matters: more-specific patterns first.
   { message = "^release:", skip = true },
-  # devDeps don't ship to consumers — Renovate tags devDep PRs with the
-  # `devdeps` scope (see cplieger/.github default.json packageRules), which
-  # cliff skips here so npm devDep updates don't trigger releases.
+  # Renovate scopes devDependency bumps `devdeps` (cplieger/.github
+  # default.json packageRules). They never ship, so they add no change level.
   { message = "^chore\\(devdeps\\)", skip = true },
-  # Dependency bumps for runtime / peer / Dockerfile / gomod use the default
-  # `deps` scope and DO release — base image bumps, runtime lib bumps, etc.
-  # are real artifact changes. CI-only pin bumps (workflow SHAs, action
-  # versions) share this commit type but are dropped by exclude_paths above
-  # (.github/) before parsing ever sees them.
+  # Runtime, peer, Dockerfile and gomod bumps keep the `deps` scope and count
+  # toward the change level; the body hides them from the notes. Must precede
+  # the ^chore skip.
   { message = "^chore\\(deps\\)", group = "<!-- 4 -->Dependencies" },
-  # Renovate types runtime dependency updates `fix(deps)`; they are
-  # dependency bumps, not fixes.
+  # Renovate types runtime dependency updates `fix(deps)`: dependency bumps,
+  # not fixes. Must precede ^fix.
   { message = "^fix\\(deps\\)", group = "<!-- 4 -->Dependencies" },
-  # Pure-meta commits never warrant a release. `no_increment_regex` is
-  # documented to skip these but doesn't actually prevent the patch fallback
-  # (cliff v2.13.1; upstream issue #1570, fixed on main after v2.13.1) —
-  # `skip = true` remains correct regardless: it also keeps these out of the
-  # rendered notes, which no_increment_regex does not.
+  # Meta commits get no line and no change level. `skip = true`, not
+  # `no_increment_regex`, which would keep them in the notes.
   { message = "^chore", skip = true },
   { message = "^ci", skip = true },
   { message = "^docs", skip = true },
@@ -178,14 +153,13 @@ commit_parsers = [
   { message = "^fuzz", skip = true },
   # `lint:` is mechanical lint --fix application; doesn't change behavior.
   { message = "^lint", skip = true },
-  # `debug:` is throw-away debugging code; doesn't warrant a release.
+  # `debug:` is throw-away debugging code.
   { message = "^debug", skip = true },
   # Auto-generated git merge commit subjects (rebase/merge artifacts).
   { message = "^[Mm]erge ", skip = true },
-  # Real changes — bump per cliff. The `<!-- N -->` prefixes are sort keys:
-  # group_by orders sections alphabetically, so without them Dependencies
-  # renders above Fixed/Security. The template's `striptags` removes the
-  # prefix at render time. Order: Added, Fixed, Security, Changed, Dependencies.
+  # Real changes — bump per cliff. The `<!-- N -->` prefixes order any group
+  # the body's section list does not name (group_by sorts alphabetically);
+  # the template's `striptags` removes them at render time.
   { message = "^feat", group = "<!-- 0 -->Added" },
   { message = "^fix", group = "<!-- 1 -->Fixed" },
   { message = "^sec", group = "<!-- 2 -->Security" },
