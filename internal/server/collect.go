@@ -20,7 +20,7 @@ const maxLabelLen = 128
 // Describe implements prometheus.Collector. The descriptor set is the
 // single source of truth published in metrics.AllDescs so that Describe
 // and Collect cannot drift.
-func (s *Server) Describe(ch chan<- *prometheus.Desc) {
+func (*Server) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range metrics.AllDescs {
 		ch <- d
 	}
