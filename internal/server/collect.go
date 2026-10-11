@@ -8,7 +8,7 @@ import (
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

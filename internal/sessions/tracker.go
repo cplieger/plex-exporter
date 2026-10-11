@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/runesafe/v3"
 )
 
 // State is a normalised session playback state derived from the Plex

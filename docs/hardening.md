@@ -44,6 +44,6 @@ The image is one static Go binary on `gcr.io/distroless/static-debian13:nonroot`
 | github.com/cplieger/health | [GitHub](https://github.com/cplieger/health) |
 | github.com/cplieger/envx/v2 | [GitHub](https://github.com/cplieger/envx) |
 | github.com/cplieger/slogx | [GitHub](https://github.com/cplieger/slogx) |
-| github.com/cplieger/runesafe/v2 | [GitHub](https://github.com/cplieger/runesafe) |
+| github.com/cplieger/runesafe/v3 | [GitHub](https://github.com/cplieger/runesafe) |
 | golang.org/x/sync | [golang.org/x](https://pkg.go.dev/golang.org/x/sync) |
 | pgregory.net/rapid | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |
