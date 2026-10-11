@@ -34,7 +34,7 @@ groups:
             No up{job="plex-exporter"} series exists, so the exporter is no
             longer a configured scrape target. Every other rule is blind. Check
             service discovery and your scrape config.
-      - alert: PlexAPIUnreachable
+      - alert: PlexExporterAPIUnreachable
         expr: plex_http_reachable == 0
         for: 10m
         labels:
@@ -45,7 +45,7 @@ groups:
             plex-exporter is running but its authenticated poll of the Plex API
             has returned plex_http_reachable=0 for 10m. The usual cause is a
             revoked or invalid PLEX_TOKEN. Metrics are stale until it recovers.
-      - alert: PlexSessionPollFailing
+      - alert: PlexExporterSessionPollFailing
         expr: >
           plex_session_poll_reachable == 0
           and plex_http_reachable == 1
@@ -70,7 +70,7 @@ groups:
             window for 30m, so Plex metrics of that type are incomplete. The
             usual causes are a Plex API change after a server upgrade or an
             auth issue.
-      - alert: PlexLibraryItemsCollapsed
+      - alert: PlexExporterLibraryItemsCollapsed
         expr: >
           (max_over_time(plex_library_items[2h] offset 30m) - plex_library_items)
           / clamp_min(max_over_time(plex_library_items[2h] offset 30m), 1) > 0.5
@@ -88,7 +88,7 @@ groups:
       # The threshold grows with the last pass's own duration, so a large
       # server is not paged for being large. The uptime arm keeps a restart
       # quiet until the first passes have had time to finish.
-      - alert: PlexLibraryWalkStale
+      - alert: PlexExporterLibraryWalkStale
         expr: >
           (
             (time() - plex_library_walk_last_success_timestamp_seconds)

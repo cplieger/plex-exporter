@@ -645,8 +645,8 @@ func TestDashboard_attention_tiles_read_their_rules_metrics(t *testing.T) {
 		expr, _, _ = strings.Cut(expr, "for:")
 		ruleMetrics[strings.TrimSpace(name)] = promqlMetrics(strings.TrimPrefix(strings.TrimSpace(expr), ">"))
 	}
-	if got := ruleMetrics["PlexSessionPollFailing"]; !slices.Equal(got, []string{"plex_session_poll_reachable", "plex_http_reachable"}) {
-		t.Fatalf("Setup: PlexSessionPollFailing reads %q, want plex_session_poll_reachable and plex_http_reachable", got)
+	if got := ruleMetrics["PlexExporterSessionPollFailing"]; !slices.Equal(got, []string{"plex_session_poll_reachable", "plex_http_reachable"}) {
+		t.Fatalf("Setup: PlexExporterSessionPollFailing reads %q, want plex_session_poll_reachable and plex_http_reachable", got)
 	}
 	_, panels := loadDashboard(t)
 	for _, it := range attentionTiles(t) {

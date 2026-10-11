@@ -7008,7 +7008,7 @@
         "spec": {
           "id": 151,
           "title": "Plex server",
-          "description": "Shows while the PlexAPIUnreachable alert fires for any exporter: plex-exporter has failed to reach the Plex API for 10 minutes, so the other panels show old values. The usual cause is Plex being down or a revoked or wrong PLEX_TOKEN. The reachability metric carries no server name, so the tile does not follow the Server selection. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "description": "Shows while the PlexExporterAPIUnreachable alert fires for any exporter: plex-exporter has failed to reach the Plex API for 10 minutes, so the other panels show old values. The usual cause is Plex being down or a revoked or wrong PLEX_TOKEN. The reachability metric carries no server name, so the tile does not follow the Server selection. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7025,7 +7025,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "(0 * max(ALERTS{alertname=\"PlexAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexAPIUnreachable\"}[12m])))",
+                        "expr": "(0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -7102,7 +7102,7 @@
         "spec": {
           "id": 152,
           "title": "Session poll",
-          "description": "Shows while the PlexSessionPollFailing alert fires for any exporter: the read of current playback has failed for 10 minutes while the rest of the Plex API answers. Streams and Active sessions are then out of date. If it fails only while something plays, look for a decode error in the exporter log. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "description": "Shows while the PlexExporterSessionPollFailing alert fires for any exporter: the read of current playback has failed for 10 minutes while the rest of the Plex API answers. Streams and Active sessions are then out of date. If it fails only while something plays, look for a decode error in the exporter log. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7119,7 +7119,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "(0 * max(ALERTS{alertname=\"PlexSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexSessionPollFailing\"}[12m])))",
+                        "expr": "(0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -7196,7 +7196,7 @@
         "spec": {
           "id": 153,
           "title": "Library lost items",
-          "description": "Shows while the PlexLibraryItemsCollapsed alert fires: a library has held less than half the items it had 1 to 2 hours earlier for 30 minutes. The figure is how many libraries, and Items per library on the Libraries tab shows which. The usual cause is a media folder that went missing or a bulk delete, so check the mount and the library in Plex. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "description": "Shows while the PlexExporterLibraryItemsCollapsed alert fires: a library has held less than half the items it had 1 to 2 hours earlier for 30 minutes. The figure is how many libraries, and Items per library on the Libraries tab shows which. The usual cause is a media folder that went missing or a bulk delete, so check the mount and the library in Plex. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7213,7 +7213,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "(count(ALERTS{alertname=\"PlexLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexLibraryItemsCollapsed\"}[32m])))",
+                        "expr": "(count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -7278,7 +7278,7 @@
         "spec": {
           "id": 154,
           "title": "Libraries not read",
-          "description": "Shows while the PlexLibraryWalkStale alert fires: for 30 minutes, plex-exporter has not finished reading a video library item by item within 4 hours plus twice its last full pass, or has never read it. The figure is how many libraries, and their largest items, storage cleanup and watch figures are out of date. The exporter log names the cause in a library walk failed line, and Catalog read per library on Exporter health shows which library. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself, which like the alert waits 6 hours after the exporter starts.",
+          "description": "Shows while the PlexExporterLibraryWalkStale alert fires: for 30 minutes, plex-exporter has not finished reading a video library item by item within 4 hours plus twice its last full pass, or has never read it. The figure is how many libraries, and their largest items, storage cleanup and watch figures are out of date. The exporter log names the cause in a library walk failed line, and Catalog read per library on Exporter health shows which library. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself, which like the alert waits 6 hours after the exporter starts.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7295,7 +7295,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "(count(ALERTS{alertname=\"PlexLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexLibraryWalkStale\"}[32m])))",
+                        "expr": "(count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
