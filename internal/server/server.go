@@ -246,6 +246,7 @@ type snapshot struct {
 	update            updateState
 	history           history.View
 	passDuration      time.Duration
+	scanInterval      time.Duration
 	HostCPU           float64
 	HostMem           float64
 	TransmitBytes     float64
@@ -292,6 +293,9 @@ func (s *Server) snapshot() snapshot {
 		snap.activities = s.background.activities
 	}
 	snap.update = s.background.update
+	if time.Since(s.background.prefsAt) <= prefsStaleAfter {
+		snap.scanInterval = s.background.scanInterval
+	}
 	if s.History != nil {
 		snap.historyEnabled = true
 		snap.history = s.History.View()

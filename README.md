@@ -5,7 +5,7 @@
 <!-- hub-overview BEGIN -->
 plex-exporter puts your Plex server's streams, transcodes, bandwidth and library sizes into Prometheus, so you can watch them in Grafana and get alerts. It only reads from Plex. Your own Prometheus and Grafana store and show the data.
 
-![The bundled Grafana dashboard's Overview tab showing the Plex version, streams, transcodes, Plex tasks, oldest library scan and new items, a Plex update tile that appears only while an update is out, a table of five active sessions and their bandwidth](docs/images/header.png)
+![The bundled Grafana dashboard's Overview tab showing the Plex version, streams, transcodes and the items added in 7 days, a Needs attention row holding a Plex update tile, which appears only while an update is out, a table of five active sessions and their bandwidth](docs/images/header.png)
 
 ## What it does
 
@@ -21,7 +21,7 @@ plex-exporter lets you follow your Plex server in Grafana and alerts you to prob
 
 plex-exporter is built for Plex server owners. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
 
-You need a Plex Media Server and its admin token. plex-exporter's graphs and seven alerts come from your Prometheus, Grafana and Alertmanager, and three from Loki, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#the-smallest-stack-sends-notifications-only) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
+You need a Plex Media Server and its admin token. plex-exporter's graphs and eight alerts come from your Prometheus, Grafana and Alertmanager, and three from Loki, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#the-smallest-stack-sends-notifications-only) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
 
 Consider [Tautulli](https://github.com/Tautulli/Tautulli) if you want a web app made for Plex, with watch history, per-user statistics and notifications for streams and recently added media.
 
@@ -129,7 +129,7 @@ At startup, the container exits on an error only you can fix, and Docker restart
 
 ## Monitoring
 
-plex-exporter serves 44 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Seven PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+plex-exporter serves 45 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Eight PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
 
 ## Documentation
 

@@ -429,6 +429,7 @@ func TestCollect_every_emitted_family_is_described(t *testing.T) {
 	fp.sections = twoSections
 	fp.activities = `{"MediaContainer":{"Activity":[{"uuid":"a","type":"library.update.section","progress":40,"Context":{"librarySectionID":"1"}}]}}`
 	fp.updater = `{"MediaContainer":{"checkedAt":1700000000,"status":0,"Release":[{"version":"2","state":"available"}]}}`
+	fp.prefs = prefsBody("true", "3600")
 	fp.libs["1"] = []string{movieRow(10, 500)}
 	fp.history = []historyRow{{RatingKey: "10", ViewedAt: time.Now().Unix()}}
 	srv := newWalkServer(t, fp, library.Library{ID: "1", Name: "Movies", Type: library.TypeMovie, ItemsCount: 1, ItemsKnown: true})

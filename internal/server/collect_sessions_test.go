@@ -33,7 +33,7 @@ func TestCollectSessionsPlaying(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -53,7 +53,7 @@ func TestCollectSessionsSkipsZeroPlayStarted(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -79,7 +79,7 @@ func TestCollectSessionsLibraryLookup(t *testing.T) {
 
 	libs := []library.Library{{ID: "3", Name: "4K Movies", Type: library.TypeMovie}}
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", libs)
 	close(ch)
 
@@ -103,7 +103,7 @@ func TestCollectSessionsUnknownLibrary(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -131,7 +131,7 @@ func TestCollectSessionsPendingTranscodeNormalized(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -162,7 +162,7 @@ func TestCollectSessionsEpisodeLabels(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -208,7 +208,7 @@ func TestCollectSessionsMultipleSessions(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 30)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -247,7 +247,7 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -320,7 +320,7 @@ func TestCollectSessions_no_media_uses_defaults(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -369,7 +369,7 @@ func TestCollectSessions_local_true_label(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -414,7 +414,7 @@ func TestCollectSessions_library_lookup_sets_labels(t *testing.T) {
 
 	libs := []library.Library{{ID: "5", Name: "4K Movies", Type: library.TypeMovie}}
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 30)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", libs)
 	close(ch)
 
@@ -466,7 +466,7 @@ func TestCollectSessions_bandwidth_only_when_positive(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 
@@ -495,7 +495,7 @@ func TestCollectSessions_play_seconds_stopped_uses_prev(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.collectSessions(ch, "Srv", "id1", nil)
 	close(ch)
 

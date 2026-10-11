@@ -1684,316 +1684,6 @@
           }
         }
       },
-      "panel-50": {
-        "kind": "Panel",
-        "spec": {
-          "id": 50,
-          "title": "Items per library",
-          "description": "Item count of each library over time, stacked so the top edge is the total for the selected servers. A show library counts episodes and a music library counts tracks, read every 15 minutes, so a large scan shows up as a step. On a large library a small change barely shows, so Growth in this range and Change per library show it. History reaches back as far as your Prometheus keeps metrics.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "(label_join(label_replace(label_join((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"})) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"})), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"}), \"name\", \"$1\", \"library\", \"(.*)\")",
-                        "legendFormat": "{{name}}"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "sortBy": "Last *",
-                  "sortDesc": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "drawStyle": "line",
-                    "lineWidth": 1,
-                    "fillOpacity": 30,
-                    "spanNulls": true,
-                    "showPoints": "never",
-                    "stacking": {
-                      "mode": "normal",
-                      "group": "A"
-                    }
-                  },
-                  "min": 0,
-                  "noValue": "No item count yet",
-                  "decimals": 0
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-60": {
-        "kind": "Panel",
-        "spec": {
-          "id": 60,
-          "title": "Items by type",
-          "description": "Movies, episodes, music tracks and photos across the selected servers, counted from every library of that type. A show library counts its episodes, not its shows. A type you have no library for is left out, and No libraries yet means plex-exporter has not counted the items.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"movies\"})",
-                        "legendFormat": "Movies",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"episodes\"})",
-                        "legendFormat": "Episodes",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"tracks\"})",
-                        "legendFormat": "Tracks",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"photos\"})",
-                        "legendFormat": "Photos",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "D",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "vertical",
-                "textMode": "value_and_name",
-                "wideLayout": true,
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 28
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "noValue": "No libraries yet",
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "purple"
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-63": {
-        "kind": "Panel",
-        "spec": {
-          "id": 63,
-          "title": "Storage per library",
-          "description": "Disk space of each library over time, stacked so the top edge is the total for the selected servers. A band that thickens is a library growing, a step down means files were removed or replaced by smaller ones, and the legend shows each library's current size. On a large library a small change barely shows, so Growth in this range and Change per library show it. History reaches back as far as your Prometheus keeps metrics.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "(label_join(label_replace(label_join((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"})) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"})), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"}), \"name\", \"$1\", \"library\", \"(.*)\")",
-                        "legendFormat": "{{name}}"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "options": {
-                "legend": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "displayMode": "table",
-                  "placement": "right",
-                  "sortBy": "Last *",
-                  "sortDesc": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "decbytes",
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "drawStyle": "line",
-                    "lineWidth": 1,
-                    "fillOpacity": 30,
-                    "spanNulls": true,
-                    "showPoints": "never",
-                    "stacking": {
-                      "mode": "normal",
-                      "group": "A"
-                    }
-                  },
-                  "min": 0,
-                  "noValue": "No storage reading yet"
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "panel-70": {
         "kind": "Panel",
         "spec": {
@@ -2364,7 +2054,7 @@
         "kind": "Panel",
         "spec": {
           "id": 72,
-          "title": "Watch time by user",
+          "title": "Watch time by user in ${span} ${spanunit}",
           "description": "Time each user spent playing in the selected range, longest first. Times are estimates from plex-exporter's 5-second session check, and history reaches back only as far as your Prometheus keeps metrics. Each stream can lose up to one scrape interval, so short streams count low or are missed. No watch time in this range means nothing played, or plex-exporter was not scraped.",
           "links": [],
           "data": {
@@ -2524,7 +2214,7 @@
         "kind": "Panel",
         "spec": {
           "id": 73,
-          "title": "Watch time by library",
+          "title": "Watch time by library in ${span} ${spanunit}",
           "description": "Time spent playing from each library in the selected range, longest first, estimated from plex-exporter's 5-second session check, so short streams count low or are missed. Unknown library covers streams whose library plex-exporter could not resolve. History reaches back only as far as your Prometheus keeps metrics. No watch time in this range means nothing played, or plex-exporter was not scraped.",
           "links": [],
           "data": {
@@ -2684,7 +2374,7 @@
         "kind": "Panel",
         "spec": {
           "id": 74,
-          "title": "Most watched titles",
+          "title": "Most watched titles in ${span} ${spanunit}",
           "description": "The 20 shows, films and music tracks played longest in the selected range, each show counted whole, its watch time the sum of its episodes. A music row names the artist as its title, with the album and track beside it. Times are estimates from plex-exporter's 5-second session check that reach back only as far as your Prometheus keeps metrics, so short streams count low or are missed. No plays in this range means nothing played, or plex-exporter was not scraped.",
           "links": [],
           "data": {
@@ -3000,7 +2690,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -3060,170 +2752,12 @@
           }
         }
       },
-      "panel-102": {
-        "kind": "Panel",
-        "spec": {
-          "id": 102,
-          "title": "Plex tasks",
-          "description": "Background tasks Plex is running now: scans, media analysis and metadata refreshes in each library, and server-wide tasks such as database maintenance, each listed in Current library work below. A task that runs for hours points at a stuck scan or a busy server. Zero is the normal idle state, and also what the tile reads when plex-exporter cannot read the task list, which then shows as Failed reads. Unknown means plex-exporter has not reached Plex.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "count(plex_server_activity_progress_ratio{server=~\"$server\", activity_type!=\"streaming\"}) or (0 * count(plex_server_info{server=~\"$server\"}))",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 28
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "noValue": "Unknown",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "blue"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 0
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-103": {
-        "kind": "Panel",
-        "spec": {
-          "id": 103,
-          "title": "Oldest scan",
-          "description": "How long ago Plex last scanned the library that has gone longest without a scan. A library that stops scanning usually means its media folder went missing, so check the mount. No value means Plex reports no scan time for any library.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "max(time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"})",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "text": {
-                  "titleSize": 14,
-                  "valueSize": 28
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "noValue": "No scan time reported",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "blue"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 0
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "panel-104": {
         "kind": "Panel",
         "spec": {
           "id": 104,
-          "title": "Items added",
-          "description": "Items the selected servers' libraries gained in the selected time range: movies, episodes, tracks and photos added, minus any removed, so a negative figure means more were removed. Zero over a week on a server that usually grows means your downloads or imports have stopped, and Growth in this range on the Libraries tab shows which library. Unknown means there is no item count from the start of the range, as when plex-exporter was set up since or your Prometheus keeps no metrics that old. A library added during the range is not counted, as in Growth in this range.",
+          "title": "Items added in ${span} ${spanunit}",
+          "description": "Items the selected servers' libraries gained in the selected time range: movies, episodes, tracks and photos added, minus any removed, so a negative figure means more were removed. Zero over a week on a server that usually grows means your downloads or imports have stopped, and the Growth table on the Libraries tab shows which library. Unknown means there is no item count from the start of the range, as when plex-exporter was set up since or your Prometheus keeps no metrics that old. A library added during the range is not counted, as in the Growth table.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3546,7 +3080,7 @@
         "spec": {
           "id": 117,
           "title": "Library activity",
-          "description": "How long ago each library's newest item arrived, how long ago Plex scanned it, and how long ago plex-exporter last read it item by item, the hourly read behind the Storage cleanup figures. Growth in this range below shows what each library added in the selected range. A dash means that figure has not been read yet, and music and photo libraries have no catalog read.",
+          "description": "How long ago each library's newest item arrived, how long ago Plex scanned it, and how long ago plex-exporter last read it item by item, the hourly read behind the Storage cleanup figures. The Growth table below shows what each library added in the selected range. A dash means that figure has not been read yet, and music and photo libraries have no catalog read.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3730,7 +3264,7 @@
                     "properties": [
                       {
                         "id": "unit",
-                        "value": "s"
+                        "value": "dtdurations"
                       },
                       {
                         "id": "decimals",
@@ -3746,7 +3280,7 @@
                     "properties": [
                       {
                         "id": "unit",
-                        "value": "s"
+                        "value": "dtdurations"
                       },
                       {
                         "id": "decimals",
@@ -3762,7 +3296,7 @@
                     "properties": [
                       {
                         "id": "unit",
-                        "value": "s"
+                        "value": "dtdurations"
                       },
                       {
                         "id": "decimals",
@@ -5728,7 +5262,7 @@
         "kind": "Panel",
         "spec": {
           "id": 122,
-          "title": "Transcode time by player",
+          "title": "Transcode time by player in ${span} ${spanunit}",
           "description": "Video transcoding time in the selected range, paused streams included, for the 8 player and encoder pairs with the most, with Encoder saying whether Plex encoded on hardware or software. A player that transcodes a lot is often fixed with a client setting, such as raising its streaming quality on your network. Software time on a server with a GPU means Plex could not use the GPU for those streams. Check the hardware acceleration settings in Plex, the GPU's limit on simultaneous encodes and the Plex log.",
           "links": [],
           "data": {
@@ -5917,7 +5451,7 @@
         "kind": "Panel",
         "spec": {
           "id": 123,
-          "title": "Transcode time by codec",
+          "title": "Transcode time by codec in ${span} ${spanunit}",
           "description": "Video transcoding time in the selected range, paused streams included, by the codec of the file Plex converted, top 8, with Encoder saying whether Plex encoded on hardware or software. H.265 or AV1 files that transcode often are the ones to keep a compatible copy of. Unknown codec means Plex reported no source codec.",
           "links": [],
           "data": {
@@ -6106,7 +5640,7 @@
         "kind": "Panel",
         "spec": {
           "id": 124,
-          "title": "Transcode time by resolution",
+          "title": "Transcode time by resolution in ${span} ${spanunit}",
           "description": "Video transcoding time in the selected range, paused streams included, by the resolution of the file Plex converted, top 8, with Encoder saying whether Plex encoded on hardware or software. Software transcoding of 4K files is the heaviest load a Plex server takes. Unknown resolution means Plex reported none for the file.",
           "links": [],
           "data": {
@@ -6295,7 +5829,7 @@
         "kind": "Panel",
         "spec": {
           "id": 130,
-          "title": "Failed reads by type",
+          "title": "Failed reads by type in ${span} ${spanunit}",
           "description": "Failed Plex reads in the selected range, by what plex-exporter was reading, listing only the reads that failed. A steady count on one type means that part of the dashboard is stale, and the exporter log names the cause. No failed reads in this range means every read succeeded, or plex-exporter was not scraped.",
           "links": [],
           "data": {
@@ -6697,7 +6231,7 @@
                     "properties": [
                       {
                         "id": "unit",
-                        "value": "s"
+                        "value": "dtdurations"
                       },
                       {
                         "id": "decimals",
@@ -6808,7 +6342,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "dtdurations",
                   "noValue": "No pass finished yet",
                   "thresholds": {
                     "mode": "absolute",
@@ -6834,7 +6368,7 @@
         "kind": "Panel",
         "spec": {
           "id": 141,
-          "title": "Plex request retries",
+          "title": "Plex request retries in ${span} ${spanunit}",
           "description": "Plex requests plex-exporter had to send again in the selected range, after a timeout or a server error. A few retries during a Plex restart are normal, and a steady climb means Plex or the network is struggling. No value means the exporter was not scraped.",
           "links": [],
           "data": {
@@ -6943,7 +6477,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7037,7 +6573,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7131,7 +6669,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7196,7 +6736,7 @@
         "spec": {
           "id": 153,
           "title": "Library lost items",
-          "description": "Shows while the PlexExporterLibraryItemsCollapsed alert fires: a library has held less than half the items it had 1 to 2 hours earlier for 30 minutes. The figure is how many libraries, and Items per library on the Libraries tab shows which. The usual cause is a media folder that went missing or a bulk delete, so check the mount and the library in Plex. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "description": "Shows while the PlexExporterLibraryItemsCollapsed alert fires: a library has held less than half the items it had 1 to 2 hours earlier for 30 minutes. The figure is how many libraries, and Library sizes on the Libraries tab shows which. The usual cause is a media folder that went missing or a bulk delete, so check the mount and the library in Plex. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -7225,7 +6765,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7307,7 +6849,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7359,7 +6903,7 @@
         "kind": "Panel",
         "spec": {
           "id": 155,
-          "title": "Failed reads",
+          "title": "Failed reads in ${span} ${spanunit}",
           "description": "Shows when the PlexExporterCollectionErrors alert fired at any point in the selected time range, for any exporter: plex-exporter kept failing to read part of Plex for 30 minutes. The figure is every failed read in the range, and can be 0 when a short range catches only the end of an alert. Failed reads by type on Exporter health says which part of the dashboard is affected, and also lists the odd failure, such as one during a Plex restart, which does not show here. Without the alert rules from alerts/promql.yaml, the tile shows when their condition held for those 30 minutes in the range.",
           "links": [],
           "data": {
@@ -7389,7 +6933,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7471,7 +7017,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7497,7 +7045,7 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "s",
+                  "unit": "dtdurations",
                   "decimals": 0,
                   "noValue": "Nothing to report",
                   "color": {
@@ -7569,7 +7117,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7668,7 +7218,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7750,7 +7302,9 @@
                 }
               ],
               "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
             }
           },
           "vizConfig": {
@@ -7802,8 +7356,8 @@
         "kind": "Panel",
         "spec": {
           "id": 170,
-          "title": "Growth in this range",
-          "description": "How much each library grew over the selected time range: the space and items added, and each as a share of what the library held at the start. A large library can add many gigabytes and still look flat on the stacked charts, so this table and Change per library show the change. A negative figure means more was removed, or replaced by smaller files, than was added. A dash means there is no reading from the start of the range, as for a library added since.",
+          "title": "Growth in ${span} ${spanunit}",
+          "description": "How much each library grew over the selected time range: the space and items added, and each as a share of what the library held at the start. A negative figure means more was removed, or replaced by smaller files, than was added. A dash means there is no reading from the start of the range, as for a library added since.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -8091,12 +7645,12 @@
           }
         }
       },
-      "panel-171": {
+      "panel-160": {
         "kind": "Panel",
         "spec": {
-          "id": 171,
-          "title": "${library_id:text}",
-          "description": "How much this library's storage and item count changed since the start of the time range, storage on the left axis and items on the right. Each axis fits this library's own change, so a few gigabytes added to a library of many terabytes still shows, and a fall below zero means more was removed than added. Items count episodes in a show library and tracks in a music library, read every 15 minutes.",
+          "id": 160,
+          "title": "Library scans overdue",
+          "description": "Shows while the PlexExporterLibraryScanOverdue alert fires: Plex is set to scan your libraries on a schedule, and has not scanned one for more than twice its library scan interval plus an hour. The figure is how many libraries, and Library activity on the Libraries tab shows when Plex last scanned each. A scan that keeps failing usually means the media folder is missing or unreadable, so check the mount and the Plex log. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -8113,14 +7667,79 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "label_replace(sum by (server, server_id) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start())), \"name\", \"Storage added\", \"\", \"\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) == 1) or on (server, server_id) label_replace(sum by (server, server_id) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start())), \"name\", \"Storage added on $1\", \"server\", \"(.*)\")",
-                        "legendFormat": "{{name}}"
+                        "expr": "(count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
                     "hidden": false
                   }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "values": false
                 },
+                "textMode": "auto",
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "noValue": "Nothing to report",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "yellow"
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-172": {
+        "kind": "Panel",
+        "spec": {
+          "id": 172,
+          "title": "Storage change",
+          "description": "How much each library's disk space changed since the start of the selected time range, one band per library stacked on the others. Gains stack above zero and losses below it, as when files are removed or replaced by smaller ones. A library with no reading from the start of the range, as one added since, is left out, as in the Growth table.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
                 {
                   "kind": "PanelQuery",
                   "spec": {
@@ -8132,11 +7751,11 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "label_replace(sum by (server, server_id) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start())), \"name\", \"Items added\", \"\", \"\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) == 1) or on (server, server_id) label_replace(sum by (server, server_id) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start())), \"name\", \"Items added on $1\", \"server\", \"(.*)\")",
+                        "expr": "(label_join(label_replace(label_join((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start())) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start()))) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start())) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start()))), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start())) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_storage_bytes{server=~\"$server\", library_id=~\"$library_id\"} @ start())), \"name\", \"$1\", \"library\", \"(.*)\")",
                         "legendFormat": "{{name}}"
                       }
                     },
-                    "refId": "B",
+                    "refId": "A",
                     "hidden": false
                   }
                 }
@@ -8152,72 +7771,438 @@
             "spec": {
               "options": {
                 "legend": {
+                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": true,
-                  "calcs": []
+                  "showLegend": true
                 },
                 "tooltip": {
                   "mode": "multi",
-                  "sort": "none"
+                  "sort": "desc"
                 }
               },
               "fieldConfig": {
                 "defaults": {
                   "unit": "decbytes",
-                  "noValue": "No storage reading yet",
                   "color": {
                     "mode": "palette-classic"
                   },
                   "custom": {
                     "drawStyle": "line",
-                    "lineWidth": 2,
-                    "fillOpacity": 20,
+                    "lineWidth": 1,
+                    "fillOpacity": 30,
                     "spanNulls": true,
                     "showPoints": "never",
-                    "axisPlacement": "left"
-                  }
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    }
+                  },
+                  "noValue": "No reading from the start of the range"
                 },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byRegexp",
-                      "options": "^Items.*"
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-173": {
+        "kind": "Panel",
+        "spec": {
+          "id": 173,
+          "title": "Items change",
+          "description": "How much each library's item count changed since the start of the selected time range, one band per library stacked on the others. Gains stack above zero and removals below it. A show library counts episodes and a music library counts tracks, read every 15 minutes. A library with no reading from the start of the range, as one added since, is left out, as in the Growth table.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "(label_join(label_replace(label_join((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start())) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start()))) and on (server) (count without (server_id) (count by (server, server_id) (plex_server_info{server=~\"$server\"})) > 1), \"name\", \"|\", \"server\", \"server_id\"), \"name\", \"$1 (id $2)\", \"name\", \"(.*)[|]([^|]{1,8})[^|]*\") or on (server, server_id, library_id, library) label_replace((label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start())) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start()))), \"name\", \"$1\", \"server\", \"(.*)\"), \"name\", \": \", \"name\", \"library\") and on () (count(count by (server_id) (plex_server_info{server=~\"$server\"})) > 1)) or on (server, server_id, library_id, library) label_replace(label_replace(label_join(sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start())) and on (server, server_id, library) (count by (server, server_id, library) (plex_library_storage_bytes{server=~\"$server\"}) > 1), \"library\", \" (id \", \"library\", \"library_id\"), \"library\", \"$1)\", \"library\", \"(.*)\") or on (server, server_id, library_id) sum by (server, server_id, library_id, library) (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} - (plex_library_items{server=~\"$server\", library_id=~\"$library_id\"} @ start())), \"name\", \"$1\", \"library\", \"(.*)\")",
+                        "legendFormat": "{{name}}"
+                      }
                     },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "short"
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 1,
+                    "fillOpacity": 30,
+                    "spanNulls": true,
+                    "showPoints": "never",
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    }
+                  },
+                  "noValue": "No reading from the start of the range",
+                  "decimals": 0
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-61": {
+        "kind": "Panel",
+        "spec": {
+          "id": 61,
+          "title": "Movies",
+          "description": "Movies across the selected libraries, counted from every movie library. plex-exporter counts them every 15 minutes. The tile shows only while there is at least one.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
                       },
+                      "spec": {
+                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"movies\"}) > 0",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
                       {
-                        "id": "decimals",
-                        "value": 0
-                      },
-                      {
-                        "id": "custom.axisPlacement",
-                        "value": "right"
-                      },
-                      {
-                        "id": "custom.lineWidth",
-                        "value": 1
-                      },
-                      {
-                        "id": "custom.fillOpacity",
-                        "value": 0
-                      },
-                      {
-                        "id": "custom.lineStyle",
-                        "value": {
-                          "fill": "dash",
-                          "dash": [
-                            10,
-                            10
-                          ]
-                        }
+                        "value": null,
+                        "color": "purple"
                       }
                     ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "No movies"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-62": {
+        "kind": "Panel",
+        "spec": {
+          "id": 62,
+          "title": "Episodes",
+          "description": "TV episodes across the selected libraries, counted from every show library, so a show counts its episodes and not itself. plex-exporter counts them every 15 minutes. The tile shows only while there is at least one.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"episodes\"}) > 0",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
                   }
-                ]
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "No episodes"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-64": {
+        "kind": "Panel",
+        "spec": {
+          "id": 64,
+          "title": "Tracks",
+          "description": "Music tracks across the selected libraries, counted from every music library. plex-exporter counts them every 15 minutes. The tile shows only while there is at least one.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"tracks\"}) > 0",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "No tracks"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-65": {
+        "kind": "Panel",
+        "spec": {
+          "id": 65,
+          "title": "Photos",
+          "description": "Photos across the selected libraries, counted from every photo library. plex-exporter counts them every 15 minutes. The tile shows only while there is at least one.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"photos\"}) > 0",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                },
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "No photos"
+                },
+                "overrides": []
               }
             }
           }
@@ -8242,17 +8227,16 @@
                         "title": "Server overview",
                         "collapse": false,
                         "layout": {
-                          "kind": "AutoGridLayout",
+                          "kind": "GridLayout",
                           "spec": {
-                            "maxColumnCount": 6,
-                            "columnWidthMode": "custom",
-                            "rowHeightMode": "custom",
-                            "rowHeight": 106,
-                            "fillScreen": false,
                             "items": [
                               {
-                                "kind": "AutoGridLayoutItem",
+                                "kind": "GridLayoutItem",
                                 "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 6,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-4"
@@ -8260,8 +8244,12 @@
                                 }
                               },
                               {
-                                "kind": "AutoGridLayoutItem",
+                                "kind": "GridLayoutItem",
                                 "spec": {
+                                  "x": 6,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-40"
@@ -8269,8 +8257,12 @@
                                 }
                               },
                               {
-                                "kind": "AutoGridLayoutItem",
+                                "kind": "GridLayoutItem",
                                 "spec": {
+                                  "x": 11,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-3"
@@ -8278,32 +8270,55 @@
                                 }
                               },
                               {
-                                "kind": "AutoGridLayoutItem",
+                                "kind": "GridLayoutItem",
                                 "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-102"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-103"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
+                                  "x": 16,
+                                  "y": 0,
+                                  "width": 8,
+                                  "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-104"
                                   }
                                 }
-                              },
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Needs attention",
+                        "collapse": false,
+                        "conditionalRendering": {
+                          "kind": "ConditionalRenderingGroup",
+                          "spec": {
+                            "visibility": "show",
+                            "condition": "and",
+                            "items": [
+                              {
+                                "kind": "ConditionalRenderingVariable",
+                                "spec": {
+                                  "variable": "attention",
+                                  "operator": "matches",
+                                  "value": "^[1-9]"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "maxColumnCount": 4,
+                            "columnWidthMode": "custom",
+                            "rowHeightMode": "custom",
+                            "rowHeight": 106,
+                            "fillScreen": false,
+                            "columnWidth": 272,
+                            "items": [
                               {
                                 "kind": "AutoGridLayoutItem",
                                 "spec": {
@@ -8315,12 +8330,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8339,12 +8360,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8363,12 +8390,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8387,12 +8420,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8411,12 +8450,48 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-160"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8435,12 +8510,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8459,12 +8540,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8483,12 +8570,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8507,12 +8600,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8531,12 +8630,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8555,12 +8660,18 @@
                                     "kind": "ConditionalRenderingGroup",
                                     "spec": {
                                       "visibility": "show",
-                                      "condition": "and",
+                                      "condition": "or",
                                       "items": [
                                         {
                                           "kind": "ConditionalRenderingData",
                                           "spec": {
                                             "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
                                           }
                                         }
                                       ]
@@ -8568,8 +8679,7 @@
                                   }
                                 }
                               }
-                            ],
-                            "columnWidth": 235
+                            ]
                           }
                         }
                       }
@@ -8606,33 +8716,6 @@
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-21"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Library work",
-                        "collapse": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 5,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-105"
                                   }
                                 }
                               }
@@ -8708,7 +8791,7 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 8,
                                   "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
@@ -8719,26 +8802,13 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 5,
+                                  "x": 8,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 8,
                                   "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-43"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 10,
-                                  "y": 0,
-                                  "width": 6,
-                                  "height": 3,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-44"
                                   }
                                 }
                               },
@@ -8751,7 +8821,164 @@
                                   "height": 3,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-60"
+                                    "name": "panel-44"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Items by type",
+                        "collapse": false,
+                        "conditionalRendering": {
+                          "kind": "ConditionalRenderingGroup",
+                          "spec": {
+                            "visibility": "show",
+                            "condition": "and",
+                            "items": [
+                              {
+                                "kind": "ConditionalRenderingVariable",
+                                "spec": {
+                                  "variable": "itemtypes",
+                                  "operator": "matches",
+                                  "value": "^[1-9]"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "maxColumnCount": 4,
+                            "columnWidthMode": "custom",
+                            "rowHeightMode": "custom",
+                            "rowHeight": 106,
+                            "fillScreen": false,
+                            "columnWidth": 200,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-61"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-62"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-64"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-65"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
                                   }
                                 }
                               }
@@ -8803,6 +9030,33 @@
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
+                        "title": "Library work",
+                        "collapse": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 5,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-105"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
                         "title": "Growth",
                         "collapse": false,
                         "layout": {
@@ -8827,56 +9081,24 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 10,
-                                  "width": 24,
-                                  "height": 8,
+                                  "width": 12,
+                                  "height": 10,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-63"
+                                    "name": "panel-172"
                                   }
                                 }
                               },
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 0,
-                                  "y": 18,
-                                  "width": 24,
-                                  "height": 8,
+                                  "x": 12,
+                                  "y": 10,
+                                  "width": 12,
+                                  "height": 10,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-50"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Change per library",
-                        "collapse": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 6,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-171"
-                                  },
-                                  "repeat": {
-                                    "mode": "variable",
-                                    "value": "library_id",
-                                    "direction": "v"
+                                    "name": "panel-173"
                                   }
                                 }
                               }
@@ -9091,7 +9313,7 @@
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Watch time in this range",
+                        "title": "Watch time",
                         "collapse": false,
                         "layout": {
                           "kind": "GridLayout",
@@ -9536,6 +9758,162 @@
           "multi": true,
           "includeAll": true,
           "allValue": ".+",
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "spanread",
+          "label": "Range length source",
+          "description": "Reads the length of the time range for span, spanunit and spanthe, all their words in one answer.",
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "hide": "hideVariable",
+          "refresh": "onTimeRangeChanged",
+          "skipUrlSync": true,
+          "query": {
+            "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "spec": {
+              "query": "query_result(label_replace(label_replace(count_values by (u) (\"n\", label_replace(round(vector($__range_s / 86400), 0.1) and on () (vector($__range_s) >= 172800), \"u\", \"days\", \"\", \"\") or on () label_replace(round(vector($__range_s / 3600), 0.1) and on () (vector($__range_s) >= 7200), \"u\", \"hours\", \"\", \"\") or on () label_replace(round(vector($__range_s / 60)) and on () (vector($__range_s) >= 120), \"u\", \"minutes\", \"\", \"\") or on () label_replace(round(vector($__range_s)), \"u\", \"seconds\", \"\", \"\")), \"n\", \"$1 : \", \"n\", \"(.+)\"), \"u\", \"$1 : \", \"u\", \"(.+)\"))"
+            }
+          },
+          "regex": "/^\\{n=\"(?<value>[^\"]+)\",u=\"(?<text>[^\"]+)\"\\} /",
+          "sort": "disabled",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false,
+          "definition": "query_result(label_replace(label_replace(count_values by (u) (\"n\", label_replace(round(vector($__range_s / 86400), 0.1) and on () (vector($__range_s) >= 172800), \"u\", \"days\", \"\", \"\") or on () label_replace(round(vector($__range_s / 3600), 0.1) and on () (vector($__range_s) >= 7200), \"u\", \"hours\", \"\", \"\") or on () label_replace(round(vector($__range_s / 60)) and on () (vector($__range_s) >= 120), \"u\", \"minutes\", \"\", \"\") or on () label_replace(round(vector($__range_s)), \"u\", \"seconds\", \"\", \"\")), \"n\", \"$1 : \", \"n\", \"(.+)\"), \"u\", \"$1 : \", \"u\", \"(.+)\"))"
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "name": "span",
+          "label": "Range length",
+          "description": "The number of the dashboard time range's length, such as \"30\" in \"30 days\", from spanread. It reads \"the\" until spanread has read a length.",
+          "query": "${spanread}the",
+          "current": {
+            "text": "the",
+            "value": "the"
+          },
+          "options": [],
+          "hide": "hideVariable",
+          "skipUrlSync": true,
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "name": "spanunit",
+          "label": "Range unit",
+          "description": "The unit of the dashboard time range's length, such as \"days\" in \"30 days\", from spanread. It reads \"range\" until spanread has read a length.",
+          "query": "${spanread:text}range",
+          "current": {
+            "text": "range",
+            "value": "range"
+          },
+          "options": [],
+          "hide": "hideVariable",
+          "skipUrlSync": true,
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "name": "spanthe",
+          "label": "Range length with its article",
+          "description": "The word \"the\" and the number of the dashboard time range's length, such as \"the 30\" in \"the 30 days\", from spanread. It reads \"the\" until spanread has read a length.",
+          "query": "the ${spanread}${spanread:text}",
+          "current": {
+            "text": "the",
+            "value": "the"
+          },
+          "options": [],
+          "hide": "hideVariable",
+          "skipUrlSync": true,
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "attention",
+          "label": "Attention tiles shown",
+          "description": "How many Needs attention tiles have data. The row shows only while one does.",
+          "current": {
+            "text": "0",
+            "value": "0"
+          },
+          "hide": "hideVariable",
+          "refresh": "onTimeRangeChanged",
+          "skipUrlSync": true,
+          "query": {
+            "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "spec": {
+              "query": "query_result(count(label_replace(count((count(ALERTS{alertname=\"PlexExporterTargetDown\", alertstate=\"firing\"}) or -max(ALERTS{alertname=\"PlexExporterTargetAbsent\", alertstate=\"firing\"})) or ((count((count_over_time((up == 0)[17m:1m]) >= 17) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w]))) or -absent(count_over_time((up)[17m:1m]) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w])))) unless on () count(max_over_time(ALERTS{alertname=~\"PlexExporterTargetDown|PlexExporterTargetAbsent\"}[17m])))), \"tile\", \"150\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))), \"tile\", \"151\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))), \"tile\", \"152\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))), \"tile\", \"153\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))), \"tile\", \"154\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))), \"tile\", \"160\", \"\", \"\") or label_replace(count((round(sum(increase(plex_exporter_errors_total[$__range]))) or vector(0)) and on () ((count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"}[$__range])) or count(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"} offset $__range)) or (count(max_over_time(((count_over_time((sum by (type) (rate(plex_exporter_errors_total[15m])) > 0)[32m:1m]) >= 32))[$__range:1m])) unless on () (count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[$__range])) or count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[32m] offset $__range)))))), \"tile\", \"155\", \"\", \"\") or label_replace(count(max((time() - max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"}) > 1800) or on (server, server_id) (-1 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"failed\"}) == 1) unless on (server, server_id) max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"})))), \"tile\", \"156\", \"\", \"\") or label_replace(count(max(label_replace(0 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"over_limit\"}) == 1) + 2, \"reason\", \"limit\", \"\", \"\") or label_replace(0 * (max by (server, server_id) (plex_history_unmatched_rows{server=~\"$server\"}) > 0) + 1, \"reason\", \"unmatched\", \"\", \"\"))), \"tile\", \"157\", \"\", \"\") or label_replace(count(sum(max by (server, server_id) (plex_library_walk_skipped_libraries{server=~\"$server\"})) > 0), \"tile\", \"158\", \"\", \"\") or label_replace(count(sum(plex_library_unsized_items{server=~\"$server\"}) > 0), \"tile\", \"159\", \"\", \"\") or label_replace(count(max(plex_server_update_available{server=~\"$server\"} and on (server, server_id) (time() - plex_server_update_checked_timestamp_seconds < 604800)) == 1), \"tile\", \"100\", \"\", \"\")) or vector(0))"
+            }
+          },
+          "definition": "query_result(count(label_replace(count((count(ALERTS{alertname=\"PlexExporterTargetDown\", alertstate=\"firing\"}) or -max(ALERTS{alertname=\"PlexExporterTargetAbsent\", alertstate=\"firing\"})) or ((count((count_over_time((up == 0)[17m:1m]) >= 17) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w]))) or -absent(count_over_time((up)[17m:1m]) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w])))) unless on () count(max_over_time(ALERTS{alertname=~\"PlexExporterTargetDown|PlexExporterTargetAbsent\"}[17m])))), \"tile\", \"150\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))), \"tile\", \"151\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))), \"tile\", \"152\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))), \"tile\", \"153\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))), \"tile\", \"154\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))), \"tile\", \"160\", \"\", \"\") or label_replace(count((round(sum(increase(plex_exporter_errors_total[$__range]))) or vector(0)) and on () ((count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"}[$__range])) or count(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"} offset $__range)) or (count(max_over_time(((count_over_time((sum by (type) (rate(plex_exporter_errors_total[15m])) > 0)[32m:1m]) >= 32))[$__range:1m])) unless on () (count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[$__range])) or count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[32m] offset $__range)))))), \"tile\", \"155\", \"\", \"\") or label_replace(count(max((time() - max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"}) > 1800) or on (server, server_id) (-1 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"failed\"}) == 1) unless on (server, server_id) max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"})))), \"tile\", \"156\", \"\", \"\") or label_replace(count(max(label_replace(0 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"over_limit\"}) == 1) + 2, \"reason\", \"limit\", \"\", \"\") or label_replace(0 * (max by (server, server_id) (plex_history_unmatched_rows{server=~\"$server\"}) > 0) + 1, \"reason\", \"unmatched\", \"\", \"\"))), \"tile\", \"157\", \"\", \"\") or label_replace(count(sum(max by (server, server_id) (plex_library_walk_skipped_libraries{server=~\"$server\"})) > 0), \"tile\", \"158\", \"\", \"\") or label_replace(count(sum(plex_library_unsized_items{server=~\"$server\"}) > 0), \"tile\", \"159\", \"\", \"\") or label_replace(count(max(plex_server_update_available{server=~\"$server\"} and on (server, server_id) (time() - plex_server_update_checked_timestamp_seconds < 604800)) == 1), \"tile\", \"100\", \"\", \"\")) or vector(0))",
+          "regex": "/^\\{\\} ([0-9]+) /",
+          "sort": "disabled",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "itemtypes",
+          "label": "Item type tiles shown",
+          "description": "How many item type tiles have data. The Items by type row shows only while one does.",
+          "current": {
+            "text": "0",
+            "value": "0"
+          },
+          "hide": "hideVariable",
+          "refresh": "onTimeRangeChanged",
+          "skipUrlSync": true,
+          "query": {
+            "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "spec": {
+              "query": "query_result(count(label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"movies\"}) > 0), \"tile\", \"61\", \"\", \"\") or label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"episodes\"}) > 0), \"tile\", \"62\", \"\", \"\") or label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"tracks\"}) > 0), \"tile\", \"64\", \"\", \"\") or label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"photos\"}) > 0), \"tile\", \"65\", \"\", \"\")) or vector(0))"
+            }
+          },
+          "definition": "query_result(count(label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"movies\"}) > 0), \"tile\", \"61\", \"\", \"\") or label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"episodes\"}) > 0), \"tile\", \"62\", \"\", \"\") or label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"tracks\"}) > 0), \"tile\", \"64\", \"\", \"\") or label_replace(count(sum(plex_library_items{server=~\"$server\", library_id=~\"$library_id\", content_type=\"photos\"}) > 0), \"tile\", \"65\", \"\", \"\")) or vector(0))",
+          "regex": "/^\\{\\} ([0-9]+) /",
+          "sort": "disabled",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
           "allowCustomValue": false
         }
       }

@@ -480,7 +480,7 @@ func TestCollectServerMetrics(t *testing.T) {
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 
@@ -507,7 +507,7 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 
@@ -521,7 +521,7 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 	}
 
-	ch = make(chan prometheus.Metric, 50)
+	ch = make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 	byDesc := collectByDesc(ch)
@@ -573,7 +573,7 @@ func TestCollectWithActiveSessions(t *testing.T) {
 		Sessions: tracker,
 	}
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 
@@ -600,7 +600,7 @@ func TestCollectMultipleLibraries(t *testing.T) {
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 
@@ -625,7 +625,7 @@ func TestCollect_host_metrics_values(t *testing.T) {
 		Sessions:      sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 20)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 
@@ -666,7 +666,7 @@ func TestCollect_library_items_published_for_a_known_count_including_zero(t *tes
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 30)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 
@@ -744,7 +744,7 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	srv.RecordError("refresh")
 	srv.SetHTTPReachable(false)
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 	ms := drainMetrics(ch)
@@ -819,7 +819,7 @@ func TestCollect_plex_pass_gauges_absent_until_read(t *testing.T) {
 	srv.ID = "id1"
 	srv.Name = "Srv"
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 	byDesc := collectByDesc(ch)
@@ -837,7 +837,7 @@ func TestCollect_plex_pass_gauges_absent_until_read(t *testing.T) {
 
 	srv.refreshResources(t.Context())
 
-	ch = make(chan prometheus.Metric, 50)
+	ch = make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 	byDesc = collectByDesc(ch)
@@ -914,7 +914,7 @@ func TestCollect_identity_persists_across_failed_refresh(t *testing.T) {
 	}
 	srv.SetHTTPReachable(false)
 
-	ch := make(chan prometheus.Metric, 50)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 	byDesc := collectByDesc(ch)

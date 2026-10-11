@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"math"
@@ -19,6 +20,7 @@ const (
 	sectionsInterval   = time.Minute
 	activitiesInterval = 30 * time.Second
 	updaterInterval    = 15 * time.Minute
+	prefsInterval      = 15 * time.Minute
 )
 
 // backgroundDeadline bounds each of those reads; a var so a test can
@@ -28,6 +30,10 @@ var backgroundDeadline = 10 * time.Second
 // activitiesStaleAfter is how long the last good activities answer is
 // published as current; it outlasts one failed read.
 const activitiesStaleAfter = 3 * activitiesInterval
+
+// prefsStaleAfter is how long the last good scan schedule is published; it
+// outlasts two failed reads, so one does not reset PlexExporterLibraryScanOverdue.
+const prefsStaleAfter = 3 * prefsInterval
 
 // section is one /library/sections entry; scannedAt is 0 when unknown.
 type section struct {
@@ -48,17 +54,18 @@ type updateState struct {
 }
 
 type backgroundState struct {
-	lastSections, lastActivities, lastUpdater time.Time
-	// activitiesAt is when activities was last read successfully.
-	activitiesAt time.Time
-	sections     []section
-	activities   map[activityKey]float64
-	update       updateState
-	sectionsRead bool
+	lastSections, lastActivities, lastUpdater, lastPrefs time.Time
+	// activitiesAt and prefsAt are when each was last read successfully.
+	activitiesAt, prefsAt time.Time
+	sections              []section
+	activities            map[activityKey]float64
+	update                updateState
+	scanInterval          time.Duration
+	sectionsRead          bool
 }
 
-// refreshBackground runs whichever of the sections, activities and update
-// reads are due. Each has its own deadline and error type and never fails
+// refreshBackground runs whichever of the sections, activities, update and
+// preference reads are due. Each has its own deadline and error type and never fails
 // the caller's refresh.
 func (s *Server) refreshBackground(ctx context.Context) {
 	now := time.Now()
@@ -68,6 +75,7 @@ func (s *Server) refreshBackground(ctx context.Context) {
 	needSections := due(b.lastSections, sectionsInterval)
 	needActivities := due(b.lastActivities, activitiesInterval)
 	needUpdater := due(b.lastUpdater, updaterInterval)
+	needPrefs := due(b.lastPrefs, prefsInterval)
 	s.mu.Unlock()
 
 	if needSections {
@@ -78,6 +86,9 @@ func (s *Server) refreshBackground(ctx context.Context) {
 	}
 	if needUpdater {
 		s.refreshUpdater(ctx)
+	}
+	if needPrefs {
+		s.refreshPrefs(ctx)
 	}
 }
 
@@ -253,6 +264,58 @@ func decideUpdate(st *plexapi.UpdateStatus, running string) updateState {
 		}
 	}
 	return out
+}
+
+// prefSetting is one /:/prefs entry. Plex types value by the setting, so it
+// stays raw until the setting is known.
+type prefSetting struct {
+	ID    string          `json:"id"`
+	Value json.RawMessage `json:"value"`
+}
+
+func (s *Server) refreshPrefs(ctx context.Context) {
+	ctx, cancel, ok := s.paced(ctx)
+	if !ok {
+		return
+	}
+	defer cancel()
+	var prefs plexapi.MC[struct {
+		Setting []prefSetting `json:"Setting"`
+	}]
+	err := s.Client.Get(ctx, "/:/prefs", &prefs)
+	if err != nil && !errors.Is(err, plex.ErrNotFound) {
+		slog.Debug("server preferences unavailable", "error", err)
+		s.RecordError("prefs_fetch")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.background.lastPrefs = time.Now()
+	if err == nil {
+		s.background.scanInterval = scheduledScanInterval(prefs.MediaContainer.Setting)
+		s.background.prefsAt = time.Now()
+	}
+}
+
+// scheduledScanInterval returns how often Plex scans every library on its
+// own, or 0 while "Scan my library periodically" is off or either setting is
+// missing or unreadable.
+func scheduledScanInterval(settings []prefSetting) time.Duration {
+	var enabled plexapi.FlexBool
+	var seconds plexapi.FlexInt
+	for _, st := range settings {
+		switch st.ID {
+		case "ScheduledLibraryUpdatesEnabled":
+			_ = json.Unmarshal(st.Value, &enabled) // FlexBool reads an unknown value as false
+		case "ScheduledLibraryUpdateInterval":
+			if json.Unmarshal(st.Value, &seconds) != nil {
+				seconds = 0
+			}
+		}
+	}
+	if !enabled.Bool() || seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 func numericID(id string) bool {

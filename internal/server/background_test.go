@@ -232,6 +232,94 @@ func TestRefreshUpdater_no_update_available_reads_up_to_date(t *testing.T) {
 	}
 }
 
+func prefsBody(enabled, interval string) string {
+	return `{"MediaContainer":{"size":3,"Setting":[
+		{"id":"FriendlyName","type":"text","value":"home"},
+		{"id":"ScheduledLibraryUpdatesEnabled","type":"bool","default":false,"value":` + enabled + `},
+		{"id":"ScheduledLibraryUpdateInterval","type":"int","default":3600,"value":` + interval + `,"enumValues":"900:every 15 minutes|86400:daily"}]}}`
+}
+
+func TestRefreshPrefs_publishes_the_scheduled_scan_interval(t *testing.T) {
+	tests := []struct {
+		name, body string
+		want       float64
+		present    bool
+	}{
+		{"on hourly", prefsBody("true", "3600"), 3600, true},
+		{"on daily as strings", prefsBody(`"1"`, `"86400"`), 86400, true},
+		{"off", prefsBody("false", "3600"), 0, false},
+		{"unreadable flag", prefsBody(`"sometimes"`, "3600"), 0, false},
+		{"unreadable interval", prefsBody("true", `"hourly"`), 0, false},
+		{"zero interval", prefsBody("true", "0"), 0, false},
+		{"settings missing", `{"MediaContainer":{"size":1,"Setting":[{"id":"FriendlyName","value":"home"}]}}`, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fp := newFakePlex()
+			fp.prefs = tt.body
+			srv := newWalkServer(t, fp, movies)
+			srv.refreshPrefs(t.Context())
+			v, ok := valueOf(t, srv, metrics.DescScanInterval, map[string]string{"server": "srv", "server_id": "mid"})
+			if ok != tt.present || v != tt.want {
+				t.Errorf("scan interval = %v (present %v), want %v (present %v)", v, ok, tt.want, tt.present)
+			}
+		})
+	}
+}
+
+// One failed read must not drop the schedule, or PlexExporterLibraryScanOverdue
+// would start its for: again; a schedule that cannot be read for longer
+// stops being published.
+func TestRefreshPrefs_failed_reads_stop_publishing_the_last_schedule(t *testing.T) {
+	fp := newFakePlex()
+	fp.prefs = prefsBody("true", "3600")
+	srv := newWalkServer(t, fp, movies)
+	srv.refreshPrefs(t.Context())
+	if got := series(t, srv, metrics.DescScanInterval); len(got) != 1 {
+		t.Fatalf("Setup: scan interval series after a good read = %d, want 1", len(got))
+	}
+
+	fp.do(func(f *fakePlex) { f.prefsFail = true })
+	srv.refreshPrefs(t.Context())
+	if got := series(t, srv, metrics.DescScanInterval); len(got) != 1 {
+		t.Errorf("scan interval series after one failed read = %d, want 1", len(got))
+	}
+
+	srv.mu.Lock()
+	srv.background.prefsAt = time.Now().Add(-prefsStaleAfter - time.Second)
+	srv.mu.Unlock()
+	if got := series(t, srv, metrics.DescScanInterval); len(got) != 0 {
+		t.Errorf("scan interval series once the last good read is %v old = %v, want none", prefsStaleAfter, got)
+	}
+	srv.mu.Lock()
+	n := srv.ErrorCounts["prefs_fetch"]
+	srv.mu.Unlock()
+	if n != 1 {
+		t.Errorf("prefs_fetch errors = %v, want 1", n)
+	}
+}
+
+func TestRefreshBackground_reads_the_scan_schedule(t *testing.T) {
+	fp := newFakePlex()
+	fp.prefs = prefsBody("true", "21600")
+	srv := newWalkServer(t, fp, movies)
+	srv.refreshBackground(t.Context())
+	if v, ok := valueOf(t, srv, metrics.DescScanInterval, nil); !ok || v != 21600 {
+		t.Errorf("scan interval after a background refresh = %v (present %v), want 21600", v, ok)
+	}
+}
+
+func TestRefreshPrefs_not_found_counts_no_error(t *testing.T) {
+	srv := newWalkServer(t, newFakePlex(), movies)
+	srv.refreshPrefs(t.Context())
+	srv.mu.Lock()
+	n := srv.ErrorCounts["prefs_fetch"]
+	srv.mu.Unlock()
+	if got := series(t, srv, metrics.DescScanInterval); n != 0 || len(got) != 0 {
+		t.Errorf("prefs 404: errors=%v series=%d, want 0 and 0", n, len(got))
+	}
+}
+
 func TestBackgroundReads_wait_for_their_cadence(t *testing.T) {
 	fp := newFakePlex()
 	fp.sections = twoSections

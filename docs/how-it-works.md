@@ -16,6 +16,7 @@ It also reads three background endpoints inside that 5-second refresh, whenever 
 - Every 30 seconds, `/activities`, for the scans and analysis Plex is running.
 - Every 60 seconds, `/library/sections`, for each library's last scan time.
 - Every 15 minutes, `/updater/status`, for whether a Plex update is out.
+- Every 15 minutes, `/:/prefs`, for how often Plex scans your libraries on its own.
 
 Two longer reads run on schedules of their own, so they never hold up the refresh:
 
