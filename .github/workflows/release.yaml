@@ -61,3 +61,17 @@ jobs:
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  # A red publish otherwise reaches only the Actions tab. `needs:` must list
+  # every other job in this workflow.
+  notify:
+    needs: release
+    if: always()
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    uses: cplieger/ci/.github/workflows/notify-failure.yaml@c339e212463034ba5168ee8e05235eb271fab437 # v3
+    with:
+      workflow: ${{ github.workflow }}
+      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
