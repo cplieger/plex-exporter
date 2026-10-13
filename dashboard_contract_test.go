@@ -466,6 +466,7 @@ type layoutNode struct {
 		Items                []gridItem      `json:"items"`
 		MaxColumnCount       int             `json:"maxColumnCount"`
 		ColumnWidth          float64         `json:"columnWidth"`
+		HideHeader           bool            `json:"hideHeader"`
 	} `json:"spec"`
 }
 
@@ -785,6 +786,71 @@ func TestDashboard_item_type_tiles_share_one_line(t *testing.T) {
 		if columns := autoGridColumns(grid, w); columns < len(grid.Spec.Items) {
 			t.Errorf("a %.0f px grid fits %d of the %d type tiles on a line", w, columns, len(grid.Spec.Items))
 		}
+	}
+}
+
+// headerEarnsItsClick reports whether a row may fold its items under a
+// header: one panel does not repay the click, and the reader cannot tell
+// whether more is folded there. A row of several tiles that each show only
+// with data is exempt, as it lights several panels.
+func headerEarnsItsClick(items []gridItem) bool {
+	shown := 0
+	for i := range items {
+		if !hasDataRule(&items[i]) {
+			shown++
+		}
+	}
+	return shown >= 2 || (shown == 0 && len(items) >= 2)
+}
+
+func TestHeaderEarnsItsClick(t *testing.T) {
+	const always = `{"spec": {}}`
+	const gated = `{"spec": {"conditionalRendering": {"spec": {"items": [{"kind": "ConditionalRenderingData"}]}}}}`
+	for _, c := range []struct {
+		name  string
+		items []string
+		want  bool
+	}{
+		{"one panel", []string{always}, false},
+		{"two panels", []string{always, always}, true},
+		{"one tile shown only with data", []string{gated}, false},
+		{"two tiles shown only with data", []string{gated, gated}, true},
+		{"one panel beside tiles shown only with data", []string{always, gated, gated}, false},
+		{"two panels beside a tile shown only with data", []string{always, always, gated}, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var items []gridItem
+			if err := json.Unmarshal([]byte("["+strings.Join(c.items, ",")+"]"), &items); err != nil {
+				t.Fatalf("Setup: decode items: %v", err)
+			}
+			if got := headerEarnsItsClick(items); got != c.want {
+				t.Errorf("headerEarnsItsClick(%s) = %v, want %v", c.items, got, c.want)
+			}
+		})
+	}
+}
+
+func TestDashboard_row_headers_fold_at_least_two_panels(t *testing.T) {
+	_, panels := loadDashboard(t)
+	checked := 0
+	for _, tab := range dashboardLayout(t).Spec.Tabs {
+		for _, r := range tab.Spec.Layout.Spec.Rows {
+			if r.Spec.HideHeader {
+				continue
+			}
+			checked++
+			if items := r.Spec.Layout.Spec.Items; !headerEarnsItsClick(items) {
+				var titles []string
+				for _, it := range items {
+					titles = append(titles, panels[it.Spec.Element.Name].Spec.Title)
+				}
+				t.Errorf("tab %q row %q shows a header over %q, want two always-shown panels, several tiles shown only with data, or hideHeader",
+					tab.Spec.Title, r.Spec.Title, titles)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("Setup: no row with a header; the walk no longer reads the dashboard")
 	}
 }
 
