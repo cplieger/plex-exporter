@@ -18,7 +18,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cplieger/httpx/v5 v5.0.5 // indirect
+	github.com/cplieger/httpx/v5 v5.1.0-dev.1 // indirect
 	github.com/cplieger/pathinside/v2 v2.0.3 // indirect
 	github.com/cplieger/xmlx v1.0.6 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
