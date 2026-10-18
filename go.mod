@@ -8,7 +8,7 @@ require (
 	github.com/cplieger/plexapi/v2 v2.3.0-dev.2
 	github.com/cplieger/runesafe/v3 v3.1.0-dev.1
 	github.com/cplieger/slogx v1.7.0
-	github.com/cplieger/webhttp/v3 v3.0.2
+	github.com/cplieger/webhttp/v4 v4.0.0-dev.1
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	golang.org/x/sync v0.24.0
