@@ -6,7 +6,7 @@ require (
 	github.com/cplieger/envx/v2 v2.0.7
 	github.com/cplieger/health v1.8.2
 	github.com/cplieger/plexapi/v2 v2.3.0-dev.1
-	github.com/cplieger/runesafe/v3 v3.0.0
+	github.com/cplieger/runesafe/v3 v3.1.0-dev.1
 	github.com/cplieger/slogx v1.7.0
 	github.com/cplieger/webhttp/v3 v3.0.2
 	github.com/prometheus/client_golang v1.25.0
