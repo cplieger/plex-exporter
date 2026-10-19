@@ -10,8 +10,8 @@ github.com/cplieger/httpx/v5 v5.1.0 h1:0niQwaY2Ref1Sc4SVGv3Nc0lo7N1bnHOXefxyTDSG
 github.com/cplieger/httpx/v5 v5.1.0/go.mod h1:+oL1fPTCSNuzy7HZEC2eCSirL+D3fh/AblvN/nQPSt0=
 github.com/cplieger/pathinside/v2 v2.0.3 h1:g7V1tj/OHvHIaB0W2rwS3HvoaK2Mv5sZWf++tbz9+Fk=
 github.com/cplieger/pathinside/v2 v2.0.3/go.mod h1:WmVoGiWfzmYnkpgGArhVtnGOmANMdGjFy0se76jmg9w=
-github.com/cplieger/plexapi/v2 v2.3.0-dev.3 h1:pTliksnXE69wtC4rp5a41KLW7nCkxxPbFl7iCbBr8Oc=
-github.com/cplieger/plexapi/v2 v2.3.0-dev.3/go.mod h1:ZuEtZkWJoRtO6Ibr+QTySnx2hCK9XHHkOj3Dzm8g9HA=
+github.com/cplieger/plexapi/v2 v2.3.0-dev.4 h1:EnvLhECEMrfKxIoL4Umn/DAcVZMdO+ChzlMoPdYKewk=
+github.com/cplieger/plexapi/v2 v2.3.0-dev.4/go.mod h1:Kb4ixBifeSCCR2zNmqXYSzzG3v5wk+j2/tLPsnFuXdQ=
 github.com/cplieger/runesafe/v3 v3.1.0-dev.1 h1:vMd+tU7kdH5WsC/OdPV/+QqMygMrFsl2byY/dXO/KkQ=
 github.com/cplieger/runesafe/v3 v3.1.0-dev.1/go.mod h1:fRNhoxNxl4NHo4xkFyf5hePwPE7lGwcuGYN9MwyKZDU=
 github.com/cplieger/slogx v1.7.0 h1:BObi90ZGndVLzhbNvGZevH3RQQiHsTGhVR1tmT9N5FI=
