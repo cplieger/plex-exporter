@@ -6,12 +6,12 @@ github.com/cplieger/envx/v2 v2.0.7 h1:psUbYc3N+71/3Jouy2Py1YX731B/EuAH56N+HBx0XJ
 github.com/cplieger/envx/v2 v2.0.7/go.mod h1:xMjvjS+CI1VcUzZyzGPyeNpCyfEDBN+6FzcY6OEyJBY=
 github.com/cplieger/health v1.8.2 h1:diGNLq2UwTYpprTMJg0Dc5sd5l4Ec1wNFk1Ri8vaEGQ=
 github.com/cplieger/health v1.8.2/go.mod h1:uiQm1zh3/7TGZffTX9W0p+GRTbVXfEM9POyWe1Rf0PU=
-github.com/cplieger/httpx/v5 v5.1.0-dev.2 h1:WDqizpth0NZHNE9nxAKmbVZPMGVty4uWwKerBge9BME=
-github.com/cplieger/httpx/v5 v5.1.0-dev.2/go.mod h1:+oL1fPTCSNuzy7HZEC2eCSirL+D3fh/AblvN/nQPSt0=
+github.com/cplieger/httpx/v5 v5.1.0 h1:0niQwaY2Ref1Sc4SVGv3Nc0lo7N1bnHOXefxyTDSGzM=
+github.com/cplieger/httpx/v5 v5.1.0/go.mod h1:+oL1fPTCSNuzy7HZEC2eCSirL+D3fh/AblvN/nQPSt0=
 github.com/cplieger/pathinside/v2 v2.0.3 h1:g7V1tj/OHvHIaB0W2rwS3HvoaK2Mv5sZWf++tbz9+Fk=
 github.com/cplieger/pathinside/v2 v2.0.3/go.mod h1:WmVoGiWfzmYnkpgGArhVtnGOmANMdGjFy0se76jmg9w=
-github.com/cplieger/plexapi/v2 v2.3.0-dev.2 h1:/afeuukuXEr49OpS1fChLeZVN28Dx2Ayzv1uYlorZVk=
-github.com/cplieger/plexapi/v2 v2.3.0-dev.2/go.mod h1:rbEQalg/xRm+JHx+RzFJouFDqg0Oke4QZQW2M8tyjMw=
+github.com/cplieger/plexapi/v2 v2.3.0-dev.3 h1:pTliksnXE69wtC4rp5a41KLW7nCkxxPbFl7iCbBr8Oc=
+github.com/cplieger/plexapi/v2 v2.3.0-dev.3/go.mod h1:ZuEtZkWJoRtO6Ibr+QTySnx2hCK9XHHkOj3Dzm8g9HA=
 github.com/cplieger/runesafe/v3 v3.1.0-dev.1 h1:vMd+tU7kdH5WsC/OdPV/+QqMygMrFsl2byY/dXO/KkQ=
 github.com/cplieger/runesafe/v3 v3.1.0-dev.1/go.mod h1:fRNhoxNxl4NHo4xkFyf5hePwPE7lGwcuGYN9MwyKZDU=
 github.com/cplieger/slogx v1.7.0 h1:BObi90ZGndVLzhbNvGZevH3RQQiHsTGhVR1tmT9N5FI=
