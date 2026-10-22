@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/cplieger/envx/v2 v2.1.0
 	github.com/cplieger/health v1.10.0
-	github.com/cplieger/plexapi/v2 v2.3.0-dev.8
+	github.com/cplieger/plexapi/v2 v2.3.0-dev.9
 	github.com/cplieger/runesafe/v3 v3.2.0
 	github.com/cplieger/slogx v1.8.0
 	github.com/cplieger/webhttp/v3 v3.0.2
