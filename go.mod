@@ -5,10 +5,10 @@ go 1.27.3
 require (
 	github.com/cplieger/envx/v2 v2.1.0
 	github.com/cplieger/health v1.10.0
-	github.com/cplieger/plexapi/v2 v2.2.0
+	github.com/cplieger/plexapi/v2 v2.2.1
 	github.com/cplieger/runesafe/v3 v3.2.0
 	github.com/cplieger/slogx v1.8.0
-	github.com/cplieger/webhttp/v3 v3.0.2
+	github.com/cplieger/webhttp/v3 v3.0.3
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	golang.org/x/sync v0.24.0
