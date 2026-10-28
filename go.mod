@@ -21,7 +21,7 @@ require (
 	github.com/cplieger/httpx/v5 v5.2.0 // indirect
 	github.com/cplieger/pathinside/v2 v2.1.0 // indirect
 	github.com/cplieger/xmlx v1.1.0 // indirect
-	github.com/hashicorp/go-uuid v1.0.3 // indirect
+	github.com/hashicorp/go-uuid v1.0.4 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pandatix/go-abnf v0.5.1 // indirect
 	github.com/prometheus/common v0.73.0 // indirect
