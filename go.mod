@@ -22,7 +22,7 @@ require (
 	github.com/cplieger/pathinside/v2 v2.1.0 // indirect
 	github.com/cplieger/xmlx v1.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/pandatix/go-abnf v0.5.2 // indirect
+	github.com/pandatix/go-abnf v0.5.3 // indirect
 	github.com/prometheus/common v0.73.0 // indirect
 	github.com/prometheus/procfs v0.23.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
