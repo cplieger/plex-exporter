@@ -325,7 +325,7 @@ func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
 // whether the gauge was published for it at all.
 func libItemsGauge(t *testing.T, srv *Server, libName string) (float64, bool) {
 	t.Helper()
-	ch := make(chan prometheus.Metric, 64)
+	ch := make(chan prometheus.Metric, 4096)
 	srv.Collect(ch)
 	close(ch)
 	for _, m := range collectByDesc(ch)[descKey(metrics.DescLibItems)] {

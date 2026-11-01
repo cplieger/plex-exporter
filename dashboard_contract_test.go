@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
 	"slices"
@@ -57,6 +58,9 @@ type dashPanel struct {
 							CellOptions struct {
 								Type string `json:"type"`
 							} `json:"cellOptions"`
+							Stacking struct {
+								Mode string `json:"mode"`
+							} `json:"stacking"`
 							DrawStyle    string `json:"drawStyle"`
 							BarAlignment int    `json:"barAlignment"`
 						} `json:"custom"`
@@ -147,7 +151,7 @@ func TestDashboard_queries_name_served_metrics(t *testing.T) {
 // Item identity labels may only be grouped on by the tables built to list
 // items; anywhere else they would create one series per title at query time.
 func TestDashboard_item_labels_grouped_only_by_item_tables(t *testing.T) {
-	allowed := []string{"Largest items on $server", "Most watched titles"}
+	allowed := []string{"Largest items on $server", "Most watched titles in ${span} ${spanunit}"}
 	_, panels := loadDashboard(t)
 	for name, p := range panels {
 		for _, e := range exprs(&p) {
@@ -454,11 +458,44 @@ func TestDashboard_item_count_divisor_is_aggregated(t *testing.T) {
 type layoutNode struct {
 	Kind string `json:"kind"`
 	Spec struct {
-		Layout *layoutNode  `json:"layout"`
-		Title  string       `json:"title"`
-		Tabs   []layoutNode `json:"tabs"`
-		Rows   []layoutNode `json:"rows"`
-		Items  []gridItem   `json:"items"`
+		Layout               *layoutNode     `json:"layout"`
+		ConditionalRendering *conditionGroup `json:"conditionalRendering"`
+		Title                string          `json:"title"`
+		Tabs                 []layoutNode    `json:"tabs"`
+		Rows                 []layoutNode    `json:"rows"`
+		Items                []gridItem      `json:"items"`
+		MaxColumnCount       int             `json:"maxColumnCount"`
+		ColumnWidth          float64         `json:"columnWidth"`
+		HideHeader           bool            `json:"hideHeader"`
+	} `json:"spec"`
+}
+
+type conditionRule struct {
+	Kind string `json:"kind"`
+	Spec struct {
+		Value    any    `json:"value"`
+		Variable string `json:"variable"`
+		Operator string `json:"operator"`
+	} `json:"spec"`
+}
+
+type conditionGroup struct {
+	Spec struct {
+		Visibility string          `json:"visibility"`
+		Condition  string          `json:"condition"`
+		Items      []conditionRule `json:"items"`
+	} `json:"spec"`
+}
+
+type gridItem = struct {
+	Spec struct {
+		ConditionalRendering *conditionGroup `json:"conditionalRendering"`
+		Element              struct {
+			Name string `json:"name"`
+		} `json:"element"`
+		X     int `json:"x"`
+		Y     int `json:"y"`
+		Width int `json:"width"`
 	} `json:"spec"`
 }
 
@@ -466,35 +503,14 @@ func child(t *testing.T, nodes []layoutNode, title string) *layoutNode {
 	t.Helper()
 	for i := range nodes {
 		if nodes[i].Spec.Title == title && nodes[i].Spec.Layout != nil {
-			return nodes[i].Spec.Layout
+			return &nodes[i]
 		}
 	}
 	t.Fatalf("Setup: no tab or row titled %q", title)
 	return nil
 }
 
-type gridItem = struct {
-	Spec struct {
-		ConditionalRendering *struct {
-			Spec struct {
-				Visibility string `json:"visibility"`
-				Items      []struct {
-					Kind string `json:"kind"`
-					Spec struct {
-						Value bool `json:"value"`
-					} `json:"spec"`
-				} `json:"items"`
-			} `json:"spec"`
-		} `json:"conditionalRendering"`
-		Element struct {
-			Name string `json:"name"`
-		} `json:"element"`
-	} `json:"spec"`
-}
-
-// serverOverview returns the Overview's first grid, which holds the factual
-// tiles and, after them, the tiles for conditions that need the reader.
-func serverOverview(t *testing.T) *layoutNode {
+func dashboardLayout(t *testing.T) layoutNode {
 	t.Helper()
 	raw, err := os.ReadFile("grafana-dashboard.json")
 	if err != nil {
@@ -508,27 +524,53 @@ func serverOverview(t *testing.T) *layoutNode {
 	if err := json.Unmarshal(raw, &d); err != nil {
 		t.Fatalf("Setup: decode dashboard: %v", err)
 	}
-	overview := child(t, d.Spec.Layout.Spec.Tabs, "Overview")
-	return child(t, overview.Spec.Rows, "Server overview")
+	return d.Spec.Layout
 }
 
-func showsOnlyWithData(it *gridItem) bool {
+// row returns the layout node of the row titled title on the tab titled tab.
+func row(t *testing.T, tab, title string) *layoutNode {
+	t.Helper()
+	root := dashboardLayout(t)
+	return child(t, child(t, root.Spec.Tabs, tab).Spec.Layout.Spec.Rows, title)
+}
+
+func hasDataRule(it *gridItem) bool {
 	cr := it.Spec.ConditionalRendering
-	return cr != nil && cr.Spec.Visibility == "show" && len(cr.Spec.Items) == 1 &&
-		cr.Spec.Items[0].Kind == "ConditionalRenderingData" && cr.Spec.Items[0].Spec.Value
+	return cr != nil && slices.ContainsFunc(cr.Spec.Items, func(c conditionRule) bool {
+		return c.Kind == "ConditionalRenderingData"
+	})
 }
 
-// attentionTiles returns the Server overview items drawn only while their
-// query returns data.
+// startsHiddenUntilData reports why a has-data item could show before its
+// query answers, or "" when it cannot. Grafana 13.2.3 treats a has-data rule
+// as undecided while its query loads and shows an item whose rules are all
+// undecided, so the item also carries an always-false range rule under "any
+// of". A display:none panel measures no width, so its panel pins
+// maxDataPoints or its query never runs. Drop both once
+// https://github.com/grafana/grafana/issues/134713 is fixed.
+func startsHiddenUntilData(it *gridItem, panels map[string]dashPanel) string {
+	cr := it.Spec.ConditionalRendering
+	if cr.Spec.Visibility != "show" || cr.Spec.Condition != "or" {
+		return fmt.Sprintf("group is %s/%s, want show/or", cr.Spec.Visibility, cr.Spec.Condition)
+	}
+	var rules []string
+	for _, c := range cr.Spec.Items {
+		rules = append(rules, fmt.Sprintf("%s=%v", c.Kind, c.Spec.Value))
+	}
+	slices.Sort(rules)
+	if want := []string{"ConditionalRenderingData=true", "ConditionalRenderingTimeRangeSize=0s"}; !slices.Equal(rules, want) {
+		return fmt.Sprintf("rules are %q, want %q", rules, want)
+	}
+	if n := panels[it.Spec.Element.Name].Spec.Data.Spec.QueryOptions.MaxDataPoints; n <= 0 {
+		return fmt.Sprintf("maxDataPoints = %d, want a positive pin", n)
+	}
+	return ""
+}
+
+// attentionTiles returns the Needs attention row's items.
 func attentionTiles(t *testing.T) []gridItem {
 	t.Helper()
-	var out []gridItem
-	for _, it := range serverOverview(t).Spec.Items {
-		if showsOnlyWithData(&it) {
-			out = append(out, it)
-		}
-	}
-	return out
+	return row(t, "Overview", "Needs attention").Spec.Layout.Spec.Items
 }
 
 // Grafana queries a panel only near the viewport unless the dashboard
@@ -551,37 +593,264 @@ func TestDashboard_preloads_so_attention_tiles_below_the_fold_can_hide(t *testin
 	}
 }
 
-// A GridLayoutItem carries no conditional rendering, so a tile hidden until
-// its condition holds must sit in an auto grid with a has-data rule. The
-// factual tiles come first so shown alerts start a line of their own.
-func TestDashboard_attention_tiles_show_only_when_their_query_returns_data(t *testing.T) {
-	facts := []string{"Plex version", "Streams", "Transcodes", "Plex tasks", "Oldest scan", "Items added"}
-	alerts := []string{
-		"plex-exporter", "Plex server", "Session poll", "Library lost items", "Libraries not read", "Failed reads",
-		"Watch history stale", "Watch figures hidden", "Libraries skipped", "Items without a size", "Plex update",
-	}
-	_, panels := loadDashboard(t)
-	grid := serverOverview(t)
-	if grid.Kind != "AutoGridLayout" {
-		t.Fatalf("Server overview layout = %q, want AutoGridLayout", grid.Kind)
-	}
-	var gotFacts, gotAlerts []string
-	for _, it := range grid.Spec.Items {
-		title := panels[it.Spec.Element.Name].Spec.Title
-		if showsOnlyWithData(&it) {
-			gotAlerts = append(gotAlerts, title)
-		} else {
-			if len(gotAlerts) > 0 {
-				t.Errorf("%q always shows but follows an alert tile", title)
+// gatedGrids walks the layout and returns every auto grid holding an item
+// with a has-data rule, keyed by its row's title.
+func gatedGrids(t *testing.T) map[string]*layoutNode {
+	t.Helper()
+	out := map[string]*layoutNode{}
+	var walk func(n *layoutNode, title string)
+	walk = func(n *layoutNode, title string) {
+		if n == nil {
+			return
+		}
+		for i := range n.Spec.Items {
+			if hasDataRule(&n.Spec.Items[i]) {
+				out[title] = n
 			}
-			gotFacts = append(gotFacts, title)
+		}
+		for i := range n.Spec.Tabs {
+			walk(n.Spec.Tabs[i].Spec.Layout, n.Spec.Tabs[i].Spec.Title)
+		}
+		for i := range n.Spec.Rows {
+			walk(n.Spec.Rows[i].Spec.Layout, n.Spec.Rows[i].Spec.Title)
 		}
 	}
-	if !slices.Equal(gotFacts, facts) {
-		t.Errorf("always-shown tiles = %q, want %q", gotFacts, facts)
+	root := dashboardLayout(t)
+	walk(&root, "")
+	if len(out) == 0 {
+		t.Fatal("Setup: no item with a has-data rule; the walk no longer reads the dashboard")
 	}
-	if !slices.Equal(gotAlerts, alerts) {
-		t.Errorf("tiles shown only with data = %q, want %q", gotAlerts, alerts)
+	return out
+}
+
+func TestDashboard_tiles_shown_only_with_data_start_hidden(t *testing.T) {
+	_, panels := loadDashboard(t)
+	for title, grid := range gatedGrids(t) {
+		for _, it := range grid.Spec.Items {
+			if !hasDataRule(&it) {
+				continue
+			}
+			if why := startsHiddenUntilData(&it, panels); why != "" {
+				t.Errorf("%s %q in row %q can show before its query answers: %s",
+					it.Spec.Element.Name, panels[it.Spec.Element.Name].Spec.Title, title, why)
+			}
+		}
+	}
+}
+
+func variableQuery(t *testing.T, name string) string {
+	t.Helper()
+	v, ok := dashVariables(t)[name]
+	if !ok {
+		t.Errorf("variable %s missing", name)
+		return ""
+	}
+	if v.Kind != "QueryVariable" || v.Spec.Hide != "hideVariable" || v.Spec.Refresh != "onTimeRangeChanged" ||
+		v.Spec.Current.Value != "0" || v.Spec.Regex != `/^\{\} ([0-9]+) /` {
+		t.Errorf("variable %s is %s hide %q refresh %q saves %v regex %q, want a hidden QueryVariable refreshed on time range change, saving 0, reading the count",
+			name, v.Kind, v.Spec.Hide, v.Spec.Refresh, v.Spec.Current.Value, v.Spec.Regex)
+	}
+	return v.dataQuery(t).Spec.Query
+}
+
+// A row still draws its header and space when every tile in it is hidden, so
+// a row of tiles shown only with data shows only while a hidden variable,
+// counting exactly its tiles' queries, reads above zero. Such a grid holds no
+// always-shown tile, so a shown tile never trails a full line of facts.
+func TestDashboard_rows_of_tiles_shown_only_with_data_show_while_one_has_data(t *testing.T) {
+	_, panels := loadDashboard(t)
+	root := dashboardLayout(t)
+	gated := gatedGrids(t)
+	for _, tab := range root.Spec.Tabs {
+		for _, r := range tab.Spec.Layout.Spec.Rows {
+			grid, ok := gated[r.Spec.Title]
+			if !ok {
+				continue
+			}
+			cr := r.Spec.ConditionalRendering
+			if cr == nil || cr.Spec.Visibility != "show" || len(cr.Spec.Items) != 1 ||
+				cr.Spec.Items[0].Kind != "ConditionalRenderingVariable" || cr.Spec.Items[0].Spec.Operator != "matches" ||
+				cr.Spec.Items[0].Spec.Value != "^[1-9]" {
+				t.Errorf("row %q holds tiles shown only with data but is not shown by a variable matching ^[1-9]", r.Spec.Title)
+				continue
+			}
+			counted := variableQuery(t, cr.Spec.Items[0].Spec.Variable)
+			if got := strings.Count(counted, `, "tile", "`); got != len(grid.Spec.Items) {
+				t.Errorf("row %q variable counts %d queries, want one per tile, %d", r.Spec.Title, got, len(grid.Spec.Items))
+			}
+			for _, it := range grid.Spec.Items {
+				p := panels[it.Spec.Element.Name]
+				if !hasDataRule(&it) {
+					t.Errorf("%q always shows but shares row %q with tiles shown only with data", p.Spec.Title, r.Spec.Title)
+				}
+				for _, e := range exprs(&p) {
+					if !strings.Contains(counted, "count("+e+")") {
+						t.Errorf("%q query is not counted by row %q's variable", p.Spec.Title, r.Spec.Title)
+					}
+				}
+			}
+		}
+	}
+}
+
+// contentWidths are the widths an auto grid gets on the 1600 (menu undocked
+// and docked), 1376 (menu docked) and 1024 px renders, measured in Grafana
+// 13.2.3.
+var contentWidths = []float64{1480, 1158, 934, 912}
+
+// autoGridColumns returns how many tiles share a line in an auto grid width
+// px wide. Grafana lays the grid out as repeat(auto-fit, minmax(min(max(100% /
+// maxColumnCount - 8px, columnWidth), 100%), 1fr)) with an 8 px gap
+// (AutoGridLayoutManager getTemplateColumnsTemplate), and auto-fit drops the
+// empty tracks, so fewer shown tiles than columns stretch across one line.
+func autoGridColumns(grid *layoutNode, width float64) int {
+	track := min(max(width/float64(grid.Spec.MaxColumnCount)-8, grid.Spec.ColumnWidth), width)
+	return max(int((width+8)/(track+8)), 1)
+}
+
+// The tiles for conditions that need the reader sit in a row of their own
+// below the server's facts, and each shows only while its query has data.
+func TestDashboard_attention_tiles_show_only_when_their_query_returns_data(t *testing.T) {
+	alerts := []string{
+		"plex-exporter", "Plex server", "Session poll", "Library lost items", "Libraries not read", "Library scans overdue",
+		"Failed reads in ${span} ${spanunit}", "Watch history stale", "Watch figures hidden", "Libraries skipped",
+		"Items without a size", "Plex update",
+	}
+	_, panels := loadDashboard(t)
+	rows := child(t, dashboardLayout(t).Spec.Tabs, "Overview").Spec.Layout.Spec.Rows
+	if len(rows) < 2 || rows[0].Spec.Title != "Server overview" || rows[1].Spec.Title != "Needs attention" {
+		t.Fatalf("Overview rows start %q, want Server overview then Needs attention", rows[0].Spec.Title)
+	}
+	grid := rows[1].Spec.Layout
+	if grid.Kind != "AutoGridLayout" {
+		t.Fatalf("Needs attention layout = %q, want AutoGridLayout", grid.Kind)
+	}
+	var got []string
+	for _, it := range grid.Spec.Items {
+		title := panels[it.Spec.Element.Name].Spec.Title
+		got = append(got, title)
+		if !hasDataRule(&it) {
+			t.Errorf("%q always shows, want it shown only while its query has data", title)
+		}
+	}
+	if !slices.Equal(got, alerts) {
+		t.Errorf("Needs attention tiles = %q, want %q", got, alerts)
+	}
+}
+
+// An auto grid of N always-shown tiles has a band of widths, one track wide,
+// where it lays out N-1 columns and leaves one tile alone on a line. A grid
+// row on one line keeps every tile beside the others at any desktop width,
+// and Grafana stacks a grid row one panel per line on a phone.
+func TestDashboard_always_shown_tile_rows_fill_one_line(t *testing.T) {
+	_, panels := loadDashboard(t)
+	for _, c := range []struct {
+		tab, row string
+		want     []string
+	}{
+		{"Overview", "Server overview", []string{"Plex version", "Streams", "Transcodes", "Items added in ${span} ${spanunit}"}},
+		{"Libraries", "Totals", []string{"Total items", "Total storage", "Total duration"}},
+	} {
+		grid := row(t, c.tab, c.row).Spec.Layout
+		if grid.Kind != "GridLayout" {
+			t.Errorf("%s layout = %q, want GridLayout", c.row, grid.Kind)
+			continue
+		}
+		var got []string
+		x := 0
+		for _, it := range grid.Spec.Items {
+			got = append(got, panels[it.Spec.Element.Name].Spec.Title)
+			if it.Spec.Y != 0 || it.Spec.X != x {
+				t.Errorf("%s %q at x %d y %d, want x %d y 0", c.row, got[len(got)-1], it.Spec.X, it.Spec.Y, x)
+			}
+			x = it.Spec.X + it.Spec.Width
+		}
+		if x != 24 {
+			t.Errorf("%s tiles end at column %d, want 24", c.row, x)
+		}
+		if !slices.Equal(got, c.want) {
+			t.Errorf("%s tiles = %q, want %q", c.row, got, c.want)
+		}
+	}
+}
+
+// Each item type that has items shows in one line beside the others, so no
+// combination of types leaves a tile alone on a line at a wide width.
+func TestDashboard_item_type_tiles_share_one_line(t *testing.T) {
+	grid := row(t, "Libraries", "Items by type").Spec.Layout
+	if grid.Kind != "AutoGridLayout" || grid.Spec.MaxColumnCount < len(grid.Spec.Items) {
+		t.Fatalf("Items by type is %s with %d columns for %d tiles, want an auto grid with a column per tile",
+			grid.Kind, grid.Spec.MaxColumnCount, len(grid.Spec.Items))
+	}
+	for _, w := range contentWidths {
+		if columns := autoGridColumns(grid, w); columns < len(grid.Spec.Items) {
+			t.Errorf("a %.0f px grid fits %d of the %d type tiles on a line", w, columns, len(grid.Spec.Items))
+		}
+	}
+}
+
+// headerEarnsItsClick reports whether a row may fold its items under a
+// header: one panel does not repay the click, and the reader cannot tell
+// whether more is folded there. A row of several tiles that each show only
+// with data is exempt, as it lights several panels.
+func headerEarnsItsClick(items []gridItem) bool {
+	shown := 0
+	for i := range items {
+		if !hasDataRule(&items[i]) {
+			shown++
+		}
+	}
+	return shown >= 2 || (shown == 0 && len(items) >= 2)
+}
+
+func TestHeaderEarnsItsClick(t *testing.T) {
+	const always = `{"spec": {}}`
+	const gated = `{"spec": {"conditionalRendering": {"spec": {"items": [{"kind": "ConditionalRenderingData"}]}}}}`
+	for _, c := range []struct {
+		name  string
+		items []string
+		want  bool
+	}{
+		{"one panel", []string{always}, false},
+		{"two panels", []string{always, always}, true},
+		{"one tile shown only with data", []string{gated}, false},
+		{"two tiles shown only with data", []string{gated, gated}, true},
+		{"one panel beside tiles shown only with data", []string{always, gated, gated}, false},
+		{"two panels beside a tile shown only with data", []string{always, always, gated}, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var items []gridItem
+			if err := json.Unmarshal([]byte("["+strings.Join(c.items, ",")+"]"), &items); err != nil {
+				t.Fatalf("Setup: decode items: %v", err)
+			}
+			if got := headerEarnsItsClick(items); got != c.want {
+				t.Errorf("headerEarnsItsClick(%s) = %v, want %v", c.items, got, c.want)
+			}
+		})
+	}
+}
+
+func TestDashboard_row_headers_fold_at_least_two_panels(t *testing.T) {
+	_, panels := loadDashboard(t)
+	checked := 0
+	for _, tab := range dashboardLayout(t).Spec.Tabs {
+		for _, r := range tab.Spec.Layout.Spec.Rows {
+			if r.Spec.HideHeader {
+				continue
+			}
+			checked++
+			if items := r.Spec.Layout.Spec.Items; !headerEarnsItsClick(items) {
+				var titles []string
+				for _, it := range items {
+					titles = append(titles, panels[it.Spec.Element.Name].Spec.Title)
+				}
+				t.Errorf("tab %q row %q shows a header over %q, want two always-shown panels, several tiles shown only with data, or hideHeader",
+					tab.Spec.Title, r.Spec.Title, titles)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("Setup: no row with a header; the walk no longer reads the dashboard")
 	}
 }
 
@@ -706,6 +975,27 @@ func TestDashboard_attention_tiles_follow_their_rules_alert_state(t *testing.T) 
 	}
 }
 
+// Without the rules loaded, Library scans overdue checks the rule's own
+// comparison, so the tile and the alert share one threshold.
+func TestDashboard_scan_overdue_tile_checks_the_rules_comparison(t *testing.T) {
+	raw, err := os.ReadFile("alerts/promql.yaml")
+	if err != nil {
+		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
+	}
+	_, block, ok := strings.Cut(string(raw), "- alert: PlexExporterLibraryScanOverdue\n")
+	_, expr, _ := strings.Cut(block, "expr: >\n")
+	expr, _, _ = strings.Cut(expr, "for:")
+	if !ok || strings.TrimSpace(expr) == "" {
+		t.Fatal("Setup: no PlexExporterLibraryScanOverdue expr in alerts/promql.yaml")
+	}
+	_, panels := loadDashboard(t)
+	p := panelByTitle(t, panels, "Library scans overdue")
+	tile := strings.ReplaceAll(exprs(&p)[0], `{server=~"$server"}`, "")
+	if rule := strings.Join(strings.Fields(expr), " "); !strings.Contains(tile, rule) {
+		t.Errorf("%q = %s, want the rule's comparison %s", p.Spec.Title, tile, rule)
+	}
+}
+
 // Without the rules loaded the tile checks the condition itself. A rule
 // evaluated each minute fires `for` after its first true evaluation, so a
 // condition held at every minute of for+2 minutes never shows before such an
@@ -757,6 +1047,7 @@ var fixedWindows = map[string][]string{
 	"panel-153": {"2h", "30m", "32m"},
 	"panel-154": {"32m"},
 	"panel-155": {"15m", "32m"},
+	"panel-160": {"17m"},
 }
 
 var quotedString = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
@@ -872,7 +1163,7 @@ func TestDashboard_visible_text_names_no_fixed_period(t *testing.T) {
 	ageBands := []string{"90 days to a year ago", "Within 90 days", "Over a year ago"}
 	var names []string
 	visibleNames(d, "", &names)
-	for _, known := range []string{"Growth in this range", "Last Plex scan", "Direct play", "Storage added on $1", "Nobody is streaming", "Your network", "Data source", "Annotations & Alerts", "suffix:down"} {
+	for _, known := range []string{"Growth in ${span} ${spanunit}", "Last Plex scan", "Direct play", "Server-wide", "Nobody is streaming", "Your network", "Data source", "Annotations & Alerts", "suffix:down"} {
 		if !slices.Contains(names, known) {
 			t.Fatalf("Setup: names %q miss the known name %q", names, known)
 		}
@@ -899,7 +1190,7 @@ func panelByTitle(t *testing.T, panels map[string]dashPanel, title string) dashP
 // title alone and every row is a whole show.
 func TestDashboard_most_watched_sums_episodes_per_show(t *testing.T) {
 	_, panels := loadDashboard(t)
-	p := panelByTitle(t, panels, "Most watched titles")
+	p := panelByTitle(t, panels, "Most watched titles in ${span} ${spanunit}")
 	e := exprs(&p)[0]
 	const showLeg = `sum by (media_type, title) (increase(plex_play_seconds_total{server=~"$server", media_type="episode"}`
 	if !strings.Contains(e, showLeg) || !strings.Contains(e, `media_type!="episode"`) {
@@ -921,6 +1212,270 @@ func TestDashboard_panels_explain_themselves(t *testing.T) {
 			if strings.TrimSpace(p.Spec.VizConfig.Spec.FieldConfig.Defaults.NoValue) == "" {
 				t.Errorf("%s %q has no no-value text", name, p.Spec.Title)
 			}
+		}
+	}
+}
+
+const spanTitle = "${span} ${spanunit}"
+
+type dashVariable struct {
+	Kind string `json:"kind"`
+	Spec struct {
+		Name        string `json:"name"`
+		Hide        string `json:"hide"`
+		Refresh     string `json:"refresh"`
+		Regex       string `json:"regex"`
+		SkipURLSync bool   `json:"skipUrlSync"`
+		Current     struct {
+			Text  any `json:"text"`
+			Value any `json:"value"`
+		} `json:"current"`
+		// Query is a data query on a QueryVariable and a string on a
+		// CustomVariable.
+		Query json.RawMessage `json:"query"`
+	} `json:"spec"`
+}
+
+type variableDataQuery struct {
+	Group      string `json:"group"`
+	Datasource struct {
+		Name string `json:"name"`
+	} `json:"datasource"`
+	Spec struct {
+		Query string `json:"query"`
+	} `json:"spec"`
+}
+
+func (v *dashVariable) dataQuery(t *testing.T) variableDataQuery {
+	t.Helper()
+	var q variableDataQuery
+	if err := json.Unmarshal(v.Spec.Query, &q); err != nil {
+		t.Errorf("variable %s query %s is not a data query: %v", v.Spec.Name, v.Spec.Query, err)
+	}
+	return q
+}
+
+func dashVariables(t *testing.T) map[string]dashVariable {
+	t.Helper()
+	raw, err := os.ReadFile("grafana-dashboard.json")
+	if err != nil {
+		t.Fatalf("Setup: read dashboard: %v", err)
+	}
+	var d struct {
+		Spec struct {
+			Variables []dashVariable `json:"variables"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		t.Fatalf("Setup: decode dashboard: %v", err)
+	}
+	vars := map[string]dashVariable{}
+	for _, v := range d.Spec.Variables {
+		vars[v.Spec.Name] = v
+	}
+	return vars
+}
+
+// customText is the text Grafana gives a custom variable whose query is query,
+// which titles render. The parse follows CustomVariable.transformCsvStringToOptions,
+// https://github.com/grafana/scenes/blob/main/packages/scenes/src/variables/variants/CustomVariable.tsx.
+// More than one option would let Grafana keep a stale choice, so it fails.
+func customText(t *testing.T, query string) string {
+	t.Helper()
+	entries := regexp.MustCompile(`(?:\\,|[^,])+`).FindAllString(query, -1)
+	if len(entries) != 1 {
+		t.Errorf("custom query %q gives %d options, want 1", query, len(entries))
+		return ""
+	}
+	if m := regexp.MustCompile(`^\s*(.+)\s:\s(.+)$`).FindStringSubmatch(entries[0]); m != nil {
+		return strings.TrimSpace(m[1])
+	}
+	return strings.TrimSpace(entries[0])
+}
+
+// rangeWordVars are the variables a title names the range length with.
+var rangeWordVars = []string{"span", "spanunit", "spanthe"}
+
+// rangeWords is the text of each range word variable once spanread holds the
+// option Grafana makes of row, or none at all (""), as on a failed first read.
+func rangeWords(t *testing.T, vars map[string]dashVariable, row string) map[string]string {
+	t.Helper()
+	read := vars["spanread"]
+	rx, err := regexp.Compile(strings.TrimSuffix(strings.TrimPrefix(read.Spec.Regex, "/"), "/"))
+	if err != nil || rx.SubexpIndex("value") < 0 || rx.SubexpIndex("text") < 0 {
+		t.Fatalf("spanread regex %q: %v, want value and text groups", read.Spec.Regex, err)
+	}
+	var value, text string
+	if row != "" {
+		m := rx.FindStringSubmatch(row)
+		if m == nil {
+			t.Fatalf("spanread regex %v does not match %s", rx, row)
+		}
+		value, text = m[rx.SubexpIndex("value")], m[rx.SubexpIndex("text")]
+	}
+	fill := strings.NewReplacer("${spanread:text}", text, "${spanread}", value)
+	words := map[string]string{}
+	for _, name := range rangeWordVars {
+		var query string
+		_ = json.Unmarshal(vars[name].Spec.Query, &query)
+		words[name] = customText(t, fill.Replace(query))
+	}
+	return words
+}
+
+// A figure over the time range reads only with the range's length, so every
+// panel outside the charts whose query reads $__range names it through span
+// and spanunit. Every range word is a custom variable over spanread's one
+// answer, so a title never pairs words from two reads, and they read "the
+// range" until spanread has read a length. The lengths are spanread's query
+// run at each side of every unit's threshold and at decimal roundings. The
+// plex-exporter tile reads the range only to find exporters.
+func TestDashboard_range_figures_name_the_range_length(t *testing.T) {
+	vars := dashVariables(t)
+	for _, name := range slices.Sorted(maps.Keys(vars)) {
+		if name != "spanread" && strings.Contains(string(vars[name].Spec.Query), "$__range_s") {
+			t.Errorf("variable %s reads $__range_s, want spanread alone to read the range length", name)
+		}
+	}
+	read, ok := vars["spanread"]
+	if !ok {
+		t.Fatal("variable spanread missing, want one read of the range length for every range word")
+	}
+	q := read.dataQuery(t)
+	if read.Kind != "QueryVariable" || read.Spec.Hide != "hideVariable" || read.Spec.Refresh != "onTimeRangeChanged" ||
+		q.Group != "prometheus" || q.Datasource.Name != "${datasource}" {
+		t.Errorf("spanread is %s hide %q refresh %q on %s %q, want a hidden Prometheus QueryVariable on ${datasource}, refreshed on time range change",
+			read.Kind, read.Spec.Hide, read.Spec.Refresh, q.Group, q.Datasource.Name)
+	}
+	if read.Spec.Current.Text != "" || read.Spec.Current.Value != "" {
+		t.Errorf("spanread saves %v/%v, want it empty so a failed first read leaves the fallback",
+			read.Spec.Current.Text, read.Spec.Current.Value)
+	}
+	if !read.Spec.SkipURLSync {
+		t.Error("spanread syncs to the URL, want skipUrlSync so a shared link cannot carry a stale read")
+	}
+	ref := regexp.MustCompile(`\$\{?(\w+)`)
+	for _, name := range rangeWordVars {
+		v, ok := vars[name]
+		var query string
+		_ = json.Unmarshal(v.Spec.Query, &query)
+		refs := ref.FindAllStringSubmatch(query, -1)
+		if !ok || v.Kind != "CustomVariable" || v.Spec.Hide != "hideVariable" || len(refs) == 0 ||
+			slices.ContainsFunc(refs, func(m []string) bool { return m[1] != "spanread" }) {
+			t.Fatalf("variable %s is %q hide %q query %q, want a hidden CustomVariable reading only spanread",
+				name, v.Kind, v.Spec.Hide, query)
+		}
+		if !v.Spec.SkipURLSync {
+			t.Errorf("variable %s syncs to the URL, want skipUrlSync so a shared link cannot carry a stale word", name)
+		}
+	}
+	none := rangeWords(t, vars, "")
+	if want := map[string]string{"span": "the", "spanunit": "range", "spanthe": "the"}; !maps.Equal(none, want) {
+		t.Errorf("range words before spanread reads a length are %v, want %v", none, want)
+	}
+	for _, name := range rangeWordVars {
+		if c := vars[name].Spec.Current; c.Text != none[name] || c.Value != none[name] {
+			t.Errorf("variable %s saves %v/%v, want %q, its text before spanread reads a length",
+				name, c.Text, c.Value, none[name])
+		}
+	}
+	for _, c := range []struct {
+		rangeS     int
+		span, unit string
+	}{
+		{1, "1", "seconds"},
+		{45, "45", "seconds"},
+		{119, "119", "seconds"},
+		{120, "2", "minutes"},
+		{150, "3", "minutes"},
+		{5400, "90", "minutes"},
+		{7199, "120", "minutes"},
+		{7200, "2", "hours"},
+		{19980, "5.6", "hours"},
+		{129600, "36", "hours"},
+		{172799, "48", "hours"},
+		{172800, "2", "days"},
+		{216000, "2.5", "days"},
+		{277200, "3.2", "days"},
+		{282240, "3.3", "days"},
+		{2592000, "30", "days"},
+	} {
+		got := rangeWords(t, vars, queryResultRow(t, q.Spec.Query, c.rangeS))
+		if want := map[string]string{"span": c.span, "spanunit": c.unit, "spanthe": "the " + c.span}; !maps.Equal(got, want) {
+			t.Errorf("range words at a %d s range are %v, want %v", c.rangeS, got, want)
+		}
+	}
+	_, panels := loadDashboard(t)
+	figures := 0
+	for name, p := range panels {
+		title := p.Spec.Title
+		if strings.Contains(title, "${span}") && !strings.Contains(title, spanTitle) {
+			t.Errorf("%s title %q names ${span} without its unit, want %q", name, title, spanTitle)
+		}
+		if strings.Contains(strings.ToLower(title), "the "+spanTitle) {
+			t.Errorf("%s title %q reads \"the the range\" before the length is read", name, title)
+		}
+		if p.Spec.VizConfig.Group == "timeseries" || name == "panel-150" {
+			continue
+		}
+		if slices.ContainsFunc(exprs(&p), func(e string) bool { return strings.Contains(e, "$__range") }) {
+			figures++
+			if !strings.Contains(title, spanTitle) {
+				t.Errorf("%s %q reads $__range, want the title to name %s", name, title, spanTitle)
+			}
+		}
+	}
+	if figures == 0 {
+		t.Error("no range figure found; the pattern no longer reads the dashboard")
+	}
+}
+
+// Each item type has its own tile, drawn only while that type has an item, so
+// a server without photos shows no empty Photos box.
+func TestDashboard_item_type_tiles_show_only_types_with_items(t *testing.T) {
+	grid := row(t, "Libraries", "Items by type").Spec.Layout
+	_, panels := loadDashboard(t)
+	want := map[string]string{"Movies": "movies", "Episodes": "episodes", "Tracks": "tracks", "Photos": "photos"}
+	seen := 0
+	for _, it := range grid.Spec.Items {
+		p := panels[it.Spec.Element.Name]
+		ctype, isType := want[p.Spec.Title]
+		if !isType {
+			continue
+		}
+		seen++
+		e := exprs(&p)
+		if !hasDataRule(&it) || len(e) != 1 || !strings.Contains(e[0], `content_type="`+ctype+`"`) || !strings.HasSuffix(e[0], ") > 0") {
+			t.Errorf("%q = %q (shown only with data %v), want one query of content_type %q ending > 0 that hides the tile when empty",
+				p.Spec.Title, e, hasDataRule(&it), ctype)
+		}
+	}
+	if seen != len(want) {
+		t.Errorf("Items by type holds %d of the %d item type tiles", seen, len(want))
+	}
+}
+
+// The change charts stack one band per library, each the change since the
+// range start, so the stack shows every library's share of the change; a
+// floor at zero would hide a library that shrank.
+func TestDashboard_change_charts_stack_each_library_from_the_range_start(t *testing.T) {
+	_, panels := loadDashboard(t)
+	for _, c := range []struct{ title, metric string }{
+		{"Storage change", "plex_library_storage_bytes"},
+		{"Items change", "plex_library_items"},
+	} {
+		p := panelByTitle(t, panels, c.title)
+		sel := c.metric + `{server=~"$server", library_id=~"$library_id"}`
+		change := `sum by (server, server_id, library_id, library) (` + sel + ` - (` + sel + ` @ start()))`
+		e := exprs(&p)
+		if len(e) != 1 || !strings.Contains(e[0], change) {
+			t.Errorf("%q = %q, want each library's change since the range start, %s", c.title, e, change)
+		}
+		if mode := p.Spec.VizConfig.Spec.FieldConfig.Defaults.Custom.Stacking.Mode; mode != "normal" {
+			t.Errorf("%q stacks %q, want normal", c.title, mode)
+		}
+		if m := p.Spec.VizConfig.Spec.FieldConfig.Defaults.Min; m != nil {
+			t.Errorf("%q has min %v, which hides a library that shrank", c.title, *m)
 		}
 	}
 }

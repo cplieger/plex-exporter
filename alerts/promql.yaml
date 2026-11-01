@@ -112,3 +112,24 @@ groups:
             {{ $labels.library_id }} for over 4h plus twice its last pass time.
             The largest-items, storage and watch figures for it are out of
             date. Check the exporter log for "library walk failed".
+      # Plex counts its scan schedule from when the server started
+      # (https://support.plex.tv/articles/200289526-library/), so a restart
+      # just before a scan can push the next one almost two intervals out.
+      # The extra hour covers a long scan. The interval series exists only
+      # while Plex's "Scan my library periodically" setting is on.
+      - alert: PlexExporterLibraryScanOverdue
+        expr: >
+          (time() - plex_library_last_scan_timestamp_seconds)
+            > on (server, server_id) group_left ()
+            (2 * plex_server_scheduled_scan_interval_seconds + 3600)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Plex has not scanned library {{ $labels.library_id }} on its schedule"
+          description: >
+            Plex last scanned library {{ $labels.library_id }} more than twice
+            its library scan interval plus an hour ago, while Scan my library
+            periodically is on. A scan that keeps failing usually means
+            the library's media folder is missing or unreadable, so check the
+            mount and the Plex Media Server log.

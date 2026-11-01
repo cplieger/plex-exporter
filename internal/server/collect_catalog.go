@@ -37,7 +37,8 @@ func bool01(b bool) float64 {
 	return 0
 }
 
-// collectCatalog emits the walk, history, activity and update families.
+// collectCatalog emits the walk, history, activity, update and scan schedule
+// families.
 // Watch-age figures and last-played times publish only for a library walked
 // while history was current at the generation still current now, and only
 // while no history row is unmatched.
@@ -69,6 +70,9 @@ func collectCatalog(ch chan<- prometheus.Metric, snap *snapshot) {
 	if u := snap.update; u.known {
 		gauge(ch, metrics.DescUpdateAvailable, u.available, srv, id, u.state)
 		gauge(ch, metrics.DescUpdateChecked, float64(u.checkedAt), srv, id)
+	}
+	if snap.scanInterval > 0 {
+		gauge(ch, metrics.DescScanInterval, snap.scanInterval.Seconds(), srv, id)
 	}
 }
 

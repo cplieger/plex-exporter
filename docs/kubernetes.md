@@ -104,4 +104,4 @@ resource "grafana_apps_dashboard_dashboard_v2" "plex_exporter" {
 }
 ```
 
-If you deliver the dashboard through a Flux Kustomization with `postBuild.substitute`, escape its `${datasource}`. That is Grafana's data source variable, and Flux rewrites every `${...}`. Write it as `$${datasource}`, or set `kustomize.toolkit.fluxcd.io/substitute: disabled` on the `GrafanaManifest`.
+If you deliver the dashboard through a Flux Kustomization with `postBuild.substitute`, escape every `${...}` in it, because Flux rewrites them. Each is a Grafana variable, such as `${datasource}`, the data source, or `${span}` and `${spanunit}`, which name the time range's length in titles. Write each as `$${...}`, for example `$${datasource}`, or set `kustomize.toolkit.fluxcd.io/substitute: disabled` on the `GrafanaManifest`.

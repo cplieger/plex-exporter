@@ -28,9 +28,11 @@ type fakePlex struct {
 	sections    string
 	activities  string
 	updater     string
+	prefs       string
 	showYears   map[string]int
 	history     []historyRow
 	historyFail bool
+	prefsFail   bool
 	metaReads   int
 	pageCap     int
 	mu          sync.Mutex
@@ -112,6 +114,10 @@ func (f *fakePlex) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, f.activities)
 	case path == "/updater/status" && f.updater != "":
 		fmt.Fprint(w, f.updater)
+	case path == "/:/prefs" && f.prefsFail:
+		w.WriteHeader(http.StatusInternalServerError)
+	case path == "/:/prefs" && f.prefs != "":
+		fmt.Fprint(w, f.prefs)
 	case strings.HasPrefix(path, "/library/metadata/"):
 		f.metaReads++
 		key := strings.TrimPrefix(path, "/library/metadata/")

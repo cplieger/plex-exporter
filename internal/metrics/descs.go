@@ -204,6 +204,8 @@ var (
 		"1 when Plex reports a release newer than the running version", "state")
 	DescUpdateChecked = srvDesc("plex_server_update_checked_timestamp_seconds",
 		"When Plex last checked for an update, as a Unix time")
+	DescScanInterval = srvDesc("plex_server_scheduled_scan_interval_seconds",
+		"How often Plex scans every library on its own schedule, present only while that schedule is on")
 	DescSessionVideoTranscode = srvDesc("plex_session_video_transcode",
 		"1 for each session transcoding video and 0 once it has ended, by where Plex decodes and encodes it",
 		"session", "decode", "encode", "source_codec", "target_codec")
@@ -225,7 +227,7 @@ var AllDescs = []*prometheus.Desc{
 	DescWalkable, DescLastScan, DescWalkLastSuccess, DescWalkDuration, DescUnsizedItems,
 	DescWalkPassDuration, DescWalkSkipped, DescWalkComplete, DescWatchAgeComplete,
 	DescHistoryReadStatus, DescHistoryLastSuccess, DescHistoryUnmatched, DescHistoryDeleted,
-	DescActivityProgress, DescUpdateAvailable, DescUpdateChecked,
+	DescActivityProgress, DescUpdateAvailable, DescUpdateChecked, DescScanInterval,
 	DescSessionVideoTranscode,
 }
 
@@ -236,6 +238,7 @@ var ErrorTypes = []string{
 	"refresh", "sessions_fetch", "metadata_fetch",
 	"invalid_rating_key", "metrics_server", "library_items",
 	"library_walk", "history_fetch", "activities_fetch", "sections_fetch", "updater_fetch",
+	"prefs_fetch",
 }
 
 // LabelAllowlist defines a bounded set of valid Prometheus label values.
