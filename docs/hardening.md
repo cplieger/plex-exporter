@@ -40,7 +40,7 @@ The image is one static Go binary on `gcr.io/distroless/static-debian13:nonroot`
 | github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
 | github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_model) |
 | github.com/cplieger/plexapi/v2 | [GitHub](https://github.com/cplieger/plexapi) |
-| github.com/cplieger/webhttp/v3 | [GitHub](https://github.com/cplieger/webhttp) |
+| github.com/cplieger/webhttp/v4 | [GitHub](https://github.com/cplieger/webhttp) |
 | github.com/cplieger/health | [GitHub](https://github.com/cplieger/health) |
 | github.com/cplieger/envx/v2 | [GitHub](https://github.com/cplieger/envx) |
 | github.com/cplieger/slogx | [GitHub](https://github.com/cplieger/slogx) |
