@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // Fixed bounds of the history reads.

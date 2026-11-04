@@ -4,18 +4,18 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/plex-exporter/internal/history"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/libstats"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/runesafe/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // itemTitle bounds an item title label: one line, no control or bidi runes,
 // at most maxLabelLen bytes with the cut marked.
 func itemTitle(s string) string {
-	t, _ := runesafe.SanitizeSingleLineCapped(s, maxLabelLen, "...")
+	t, _ := textsafe.SanitizeSingleLineCapped(s, maxLabelLen, "...")
 	return t
 }
 

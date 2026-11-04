@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // The HTTP transport (retry, redirects, status mapping) is
-// github.com/cplieger/plexapi/v2 and is tested there; these tests
+// github.com/cplieger/plexapi/v3 and is tested there; these tests
 // pin only the exporter's adapter layer on top of it.
 
 func newTestClient(serverURL string, token plexapi.Token, hc *http.Client) (*Client, error) {

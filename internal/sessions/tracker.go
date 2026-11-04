@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/go/textsafe"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // State is a normalised session playback state derived from the Plex
@@ -108,7 +108,7 @@ func NewTracker() *Tracker {
 // the key is emitted verbatim as the `session` Prometheus label, and an
 // invalid label value panics the collector goroutine.
 func normalizeKey(id string) string {
-	return runesafe.CapBytes(id, maxSessionKeyLen)
+	return textsafe.CapBytes(id, maxSessionKeyLen)
 }
 
 // UpdateLibraryLabels applies fn to the session identified by id under

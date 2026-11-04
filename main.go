@@ -17,13 +17,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/envx/v2"
-	"github.com/cplieger/health"
+	"github.com/cplieger/go/envx"
+	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"
-	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/slogx"
-	"github.com/cplieger/webhttp/v4"
+	"github.com/cplieger/plexapi/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -112,18 +112,18 @@ func run() int {
 	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
 	// machine-scraped, non-browser. ProbeLogLevel keeps a healthy probe at
 	// Debug and surfaces a failing one at Warn/Error with status + request id.
-	handler := webhttp.Chain(mux,
-		webhttp.Logging(webhttp.ProbeLogLevel("/metrics", "/api/health")),
-		webhttp.Recoverer(),
-		webhttp.SecurityHeaders(),
+	handler := httpserver.Chain(mux,
+		httpserver.Logging(httpserver.ProbeLogLevel("/metrics", "/api/health")),
+		httpserver.Recoverer(),
+		httpserver.SecurityHeaders(),
 	)
 
 	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; NewServer
 	// leaves them unset by default.
-	srv := webhttp.NewServer(handler,
-		webhttp.WithReadHeaderTimeout(5*time.Second),
-		webhttp.WithReadTimeout(5*time.Second),
-		webhttp.WithWriteTimeout(10*time.Second),
+	srv := httpserver.New(handler,
+		httpserver.WithReadHeaderTimeout(5*time.Second),
+		httpserver.WithReadTimeout(5*time.Second),
+		httpserver.WithWriteTimeout(10*time.Second),
 	)
 
 	// Bind the listener before marking healthy so a port-in-use failure is
@@ -144,15 +144,15 @@ func run() int {
 
 	slog.Info("starting metrics server", "addr", listener.Addr().String())
 	// WithPreDrain flips the health marker to unhealthy strictly BEFORE
-	// webhttp.Run drains, so probes see red during the drain window (the
+	// httpserver.Run drains, so probes see red during the drain window (the
 	// marker is a FILE the healthcheck CLI reads; listener closure alone does
 	// not cover it). On a serve-error exit Run skips it; deferred marker.Cleanup
 	// covers that path.
-	preDrain := webhttp.WithPreDrain(func(context.Context) {
+	preDrain := httpserver.WithPreDrain(func(context.Context) {
 		marker.Set(false)
 		slog.Info("shutting down", "cause", context.Cause(ctx))
 	})
-	if srvErr := webhttp.Run(ctx, srv, listener, nil, webhttp.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
+	if srvErr := httpserver.Run(ctx, srv, listener, nil, httpserver.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
 		slog.Error("metrics server failed", "error", srvErr)
 		ps.RecordError("metrics_server")
 		return 1

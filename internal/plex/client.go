@@ -1,4 +1,4 @@
-// Package plex adapts the shared github.com/cplieger/plexapi/v2 client for the
+// Package plex adapts the shared github.com/cplieger/plexapi/v3 client for the
 // exporter. The transport — header-borne token, refuse-all redirects,
 // same-origin path guard, CA pinning, transparent retry with Retry-After
 // honoring, bounded reads — is the library's; this package owns the
@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 const (
