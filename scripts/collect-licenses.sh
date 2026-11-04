@@ -1,7 +1,7 @@
 #!/bin/sh
 # Synced from cplieger/ci/configs/collect-licenses.sh. Change it there.
-# Copy every linked Go module's license files into the image's /usr/share/licenses
-# tree. usage: collect-licenses.sh --name IMAGE [--out DIR] [--src DIR] [PACKAGE ...]
+# Copy every linked Go module's license files, and the Go standard library's (under go/),
+# into the image's /usr/share/licenses tree. usage: collect-licenses.sh --name IMAGE [--out DIR] [--src DIR] [PACKAGE ...]
 # A module with no license file fails the build rather than being skipped, because a
 # missing notice is a redistribution breach and the fix is a human decision.
 set -eu
@@ -41,6 +41,10 @@ case "$NAME" in
     ;;
   *[!A-Za-z0-9._-]*)
     printf 'collect-licenses: --name must be a single path component, got "%s"\n' "$NAME" >&2
+    exit 2
+    ;;
+  go)
+    printf 'collect-licenses: --name go would share the Go toolchain'\''s license directory\n' >&2
     exit 2
     ;;
 esac
@@ -95,6 +99,22 @@ if [ -f "$main_dir/THIRD_PARTY_NOTICES.md" ]; then
 fi
 modules=$((modules + 1))
 files=$((files + copied))
+
+# Every Go binary links the standard library, whose BSD-3-Clause license asks a
+# binary distribution to carry its notice; `go list -deps` above skips it.
+goroot=$(go env GOROOT)
+if [ ! -f "$goroot/LICENSE" ]; then
+  printf 'collect-licenses: the Go toolchain at %s has no LICENSE\n' "$goroot" >&2
+  exit 1
+fi
+mkdir -p "$OUT/go"
+cp -f "$goroot/LICENSE" "$OUT/go/"
+files=$((files + 1))
+if [ -f "$goroot/PATENTS" ]; then
+  cp -f "$goroot/PATENTS" "$OUT/go/"
+  files=$((files + 1))
+fi
+modules=$((modules + 1))
 
 while IFS='|' read -r path dir; do
   [ "$path" = "$main_path" ] && continue
