@@ -39,11 +39,11 @@ The image is one static Go binary on `gcr.io/distroless/static-debian13:nonroot`
 | gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
 | github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
 | github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_model) |
-| github.com/cplieger/plexapi/v2 | [GitHub](https://github.com/cplieger/plexapi) |
-| github.com/cplieger/webhttp/v4 | [GitHub](https://github.com/cplieger/webhttp) |
-| github.com/cplieger/health | [GitHub](https://github.com/cplieger/health) |
-| github.com/cplieger/envx/v2 | [GitHub](https://github.com/cplieger/envx) |
-| github.com/cplieger/slogx | [GitHub](https://github.com/cplieger/slogx) |
-| github.com/cplieger/runesafe/v3 | [GitHub](https://github.com/cplieger/runesafe) |
+| github.com/cplieger/plexapi/v3 | [GitHub](https://github.com/cplieger/plexapi) |
+| github.com/cplieger/go/httpserver | [GitHub](https://github.com/cplieger/go/tree/main/httpserver) |
+| github.com/cplieger/go/health | [GitHub](https://github.com/cplieger/go/tree/main/health) |
+| github.com/cplieger/go/envx | [GitHub](https://github.com/cplieger/go/tree/main/envx) |
+| github.com/cplieger/go/slogx | [GitHub](https://github.com/cplieger/go/tree/main/slogx) |
+| github.com/cplieger/go/textsafe | [GitHub](https://github.com/cplieger/go/tree/main/textsafe) |
 | golang.org/x/sync | [golang.org/x](https://pkg.go.dev/golang.org/x/sync) |
 | pgregory.net/rapid | [pkg.go.dev](https://pkg.go.dev/pgregory.net/rapid) |

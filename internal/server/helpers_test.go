@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/plex"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // testToken is the credential of every test client. The leading "$" mimics

@@ -13,7 +13,7 @@ import (
 	"github.com/cplieger/plex-exporter/internal/history"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/libstats"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // Bounds of the catalog walk.

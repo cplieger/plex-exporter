@@ -17,7 +17,7 @@ import (
 	"github.com/cplieger/plex-exporter/internal/pacer"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 	"golang.org/x/sync/errgroup"
 )
 

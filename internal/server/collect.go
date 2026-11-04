@@ -4,11 +4,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v3"
+	"github.com/cplieger/plexapi/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -134,7 +134,7 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 // truncLabel bounds a label value to maxLabelLen bytes, capping Prometheus
 // cardinality from user-controlled Plex API strings.
 func truncLabel(s string) string {
-	return runesafe.CapBytes(s, maxLabelLen)
+	return textsafe.CapBytes(s, maxLabelLen)
 }
 
 // streamLabels returns (streamType, resolution) derived from the
