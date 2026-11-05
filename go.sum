@@ -8,8 +8,8 @@ github.com/cplieger/go/health v1.0.0-dev.1 h1:nf+UtWxFasAo1LLcUkJVI1oxIuZHM9BLxM
 github.com/cplieger/go/health v1.0.0-dev.1/go.mod h1:Qo0xx+JK05tjEi+oAjPT0zcRrhZkcKFEO32SRkjZd7I=
 github.com/cplieger/go/httpclient v1.0.0-dev.3 h1:gxGUwZYy8NvQNJm3m2pt9OAOwByp0fjo95lA9ZXAlkE=
 github.com/cplieger/go/httpclient v1.0.0-dev.3/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
-github.com/cplieger/go/httpserver v1.0.0-dev.2 h1:y24UT+M8GtLM6HHs5oxMpNqZ0MznDpwb1chjTvCGSZk=
-github.com/cplieger/go/httpserver v1.0.0-dev.2/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
+github.com/cplieger/go/httpserver v1.0.0-dev.3 h1:cxmEdEXhRh591+2/lrhRlxn9cTenL7s9q66ATUtNt2s=
+github.com/cplieger/go/httpserver v1.0.0-dev.3/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
 github.com/cplieger/go/pathinside v1.0.0-dev.1 h1:iVkDRXYDDAgaTBm02ekQ+VH7KhXZTIpdpx8O9pGprY8=
 github.com/cplieger/go/pathinside v1.0.0-dev.1/go.mod h1:+Fj6L8z2GUfDFi/uvAzoxF1iIADDf83g4fMbrvelDUY=
 github.com/cplieger/go/slogx v1.0.0-dev.1 h1:oYkkLGxYkUHebk+OtaWVzD9NwPqTmq13HztG6NaArn4=
