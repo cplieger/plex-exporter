@@ -18,8 +18,8 @@ github.com/cplieger/go/textsafe v1.0.0-dev.1 h1:NqiLs9uk4eOoXXkTQo0O8lMtYddo3XZu
 github.com/cplieger/go/textsafe v1.0.0-dev.1/go.mod h1:5IH0ZWTC+U864nzWGtcwGkp+PtA5hrlcfY2zLY/TexM=
 github.com/cplieger/go/xmlx v1.0.0-dev.2 h1:5KZgCyZfbB73q0rxXQj/AwByLLmBir3Hi30C2vlp3ns=
 github.com/cplieger/go/xmlx v1.0.0-dev.2/go.mod h1:trImI1H9TuogwyGZHYJt1f1fskANBuZSR3A+LPdEdVY=
-github.com/cplieger/plexapi/v3 v3.0.0-dev.3 h1:xnHzxHeYyNM6q/7I1seewQ6t4YjCpt/XfmQoY6QugoY=
-github.com/cplieger/plexapi/v3 v3.0.0-dev.3/go.mod h1:JSb5/tD/RlMMgQefWTSJHLKtTRh0qvPjoJL5HAJjcts=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.4 h1:nDhHcWxawWlpFfe9Z/bYugIIziv5cPOeSQKTGYnw0tk=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.4/go.mod h1:e5QGI56ytBnFgCakzATwnpYzxlUpjE/wkv9ULiyQHGM=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/klauspost/compress v1.20.1 h1:T7kKElXUMXrUJ2E9QhQhxFtcK5rPyLdsGZvdbLMPdiQ=
