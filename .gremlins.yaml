@@ -62,6 +62,7 @@ unleash:
     - '(^|/)testsupport/'
     - '(^|/)testcerts/'
     - '(^|/)authtest/'          # cplieger/auth's test-helper subpackage
+    - '(^|/)accesstest/'        # cplieger/access's test-helper subpackage
     - '(^|/)test-helpers/'
 
     # Build-time codegen tools
@@ -109,33 +110,36 @@ unleash:
     - '^routes\.go$'
     - '(^|/)server/routes\.go$'
 
-  # All mutators enabled. Equivalent mutants (semantically-no-op mutations
-  # that show as LIVED no matter the test suite — a real phenomenon for
-  # invert-logical especially) become a stable noise floor that bakes into
-  # the rolling 12-week baseline; the regression alert triggers on actual
-  # mean shifts, not on the constant noise. The "Current live mutants"
-  # section in each tracker issue surfaces every individual finding so you
-  # can decide which are actionable.
-  mutants:
-    arithmetic-base:
-      enabled: true
-    conditionals-boundary:
-      enabled: true
-    conditionals-negation:
-      enabled: true
-    increment-decrement:
-      enabled: true
-    invert-assignments:
-      enabled: true
-    invert-bitwise:
-      enabled: true
-    invert-bwassign:
-      enabled: true
-    invert-negatives:
-      enabled: true
-    invert-logical:
-      enabled: true
-    invert-loopctrl:
-      enabled: true
-    remove-self-assignments:
-      enabled: true
+# Every gremlins mutator type, six of which gremlins leaves off by default.
+# gremlins reads this block only at the top level (mutants.<type>.enabled); the
+# same block nested under unleash is silently ignored.
+#
+# Equivalent mutants (mutations that change nothing observable and so survive
+# any test suite, common for invert-logical) form a stable noise floor that
+# the rolling 12-week baseline absorbs; the regression label fires on a shift
+# in the mean, not on that constant floor. The "Current live mutants" section
+# of each tracker issue lists every survivor so you can decide which matter.
+# Changing which types run starts a new baseline (scripts/gremlins-aggregate.py).
+mutants:
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-assignments:
+    enabled: true
+  invert-bitwise:
+    enabled: true
+  invert-bwassign:
+    enabled: true
+  invert-negatives:
+    enabled: true
+  invert-logical:
+    enabled: true
+  invert-loopctrl:
+    enabled: true
+  remove-self-assignments:
+    enabled: true
