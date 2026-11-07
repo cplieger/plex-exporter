@@ -63,52 +63,32 @@ unleash:
     - '(^|/)testcerts/'
     - '(^|/)authtest/'          # cplieger/auth's test-helper subpackage
     - '(^|/)accesstest/'        # cplieger/access's test-helper subpackage
-    - '(^|/)test-helpers/'
 
     # Build-time codegen tools
     - '(^|/)cmd/wire-codegen/'
 
-    # Platform-specific stubs (single-line returns; every mutation equivalent).
-    # The _signal_ pattern also covers hub/shell_signal_unix.go.
-    - '(^|/)login_proc_[^/]*\.go$'
+    # Platform-specific stubs (single-line returns; every mutation equivalent),
+    # such as hub/shell_signal_unix.go.
     - '(^|/)[^/]*_signal_[^/]*\.go$'
 
     # Lifecycle/server orchestration that requires live HTTP/PTY/WS to test
     - '(^|/)embed\.go$'
     - '(^|/)server/server\.go$'
     - '(^|/)server/server_static\.go$'
-    - '(^|/)server/lifecycle\.go$'
-    - '(^|/)server/poller\.go$'
-    - '(^|/)server/scheduler\.go$'
-    - '(^|/)server/scheduler_scan\.go$'
-    - '(^|/)server/listen\.go$'
-    - '(^|/)wsclient/listen\.go$'
     - '(^|/)notify/listener\.go$'
-    - '(^|/)scheduler/scheduler\.go$'
     - '(^|/)users/refresh\.go$'
     - '(^|/)orchestrator/orchestrator\.go$'
     - '(^|/)watch/watch\.go$'
-    - '(^|/)wiring/wiring\.go$'
     - '(^|/)composition/composition\.go$'
 
-    # Hub / SSE / mcp subsystems (marotte) — heavily concurrent, need
-    # integration to kill mutations
-    - '(^|/)hub/sse\.go$'
-    - '(^|/)hub/sse_controller\.go$'
+    # mcp subsystem (marotte), heavily concurrent; integration kills its mutants
     - '(^|/)mcp/prewarm/prewarm\.go$'
 
     # Trivial wrappers / version stamps
     - '(^|/)version/version\.go$'
-    - '(^|/)metrics/metrics\.go$'  # prometheus counter registration, no logic
-    - '(^|/)metrics/process\.go$'  # /proc parsing — needs Linux env to exercise
-
-    # Thin httputil adapters (already covered by cplieger/httpx tests)
-    - '(^|/)internal/httputil/httputil\.go$'
-    - '(^|/)internal/httpx/client\.go$'
 
     # SPA route registration (no business logic)
     - '^routes\.go$'
-    - '(^|/)server/routes\.go$'
 
 # Every gremlins mutator type, six of which gremlins leaves off by default.
 # gremlins reads this block only at the top level (mutants.<type>.enabled); the
