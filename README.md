@@ -119,12 +119,12 @@ The exporter only connects out, to the Plex server you configure. It sends the t
 
 The image's healthcheck runs `/plex-exporter health`, which asks `GET /healthz` on the exporter's own port. `/healthz` reads a marker file the exporter writes in `/tmp` once its metrics server is listening, and answers 503 while the exporter starts or stops. Plex being unreachable never makes it unhealthy: that shows as `plex_http_reachable` at `0`.
 
-At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `PLEX_CA_CERT_PATH` cannot be read or the listen port cannot be bound, and Docker restarts it. Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running with `plex_http_reachable` at `0`, and it retries every 5 seconds.
+At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `PLEX_URL` is not an http or https address, `PLEX_CA_CERT_PATH` cannot be read or holds no certificate, or the listen port cannot be bound, and Docker restarts it. Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running with `plex_http_reachable` at `0`, and it retries every 5 seconds.
 
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
 - Host CPU, memory and `plex_transmit_bytes_total` are missing. They need Plex Pass, and appear once Plex has answered for them.
-- With `read_only: true` in your compose file, `/healthz` answers 503 and Docker marks the container unhealthy. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
+- With `read_only: true` in your compose file, `/healthz` answers 503, Docker marks the container unhealthy and the log shows a failed `/healthz` request every 30 seconds. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
 - A library's item count lags after a large scan, because counts are read every 15 minutes.
 
 ## Monitoring

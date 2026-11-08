@@ -94,7 +94,7 @@ type Session struct {
 type Tracker struct {
 	Sessions map[string]Session
 	dropped  uint64
-	// fullDrops counts the sessions refused since the map last filled, and
+	// fullDrops counts the refusals since the map last filled, and
 	// is non-zero exactly while the map is logged as full.
 	fullDrops uint64
 	mu        sync.Mutex
@@ -127,8 +127,8 @@ func (t *Tracker) UpdateLibraryLabels(id string, fn func(*Session)) {
 	}
 }
 
-// Counts returns how many sessions the tracker holds and how many new
-// sessions it has refused at its cap since it was created.
+// Counts returns how many sessions the tracker holds and how many times it
+// has refused a new session at its cap since it was created.
 func (t *Tracker) Counts() (tracked int, dropped uint64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

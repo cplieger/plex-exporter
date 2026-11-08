@@ -149,9 +149,17 @@ func (p *exporterProc) exitCode(t *testing.T) int {
 	case <-p.exited:
 		return p.cmd.ProcessState.ExitCode()
 	case <-time.After(20 * time.Second):
-		t.Fatalf("exporter still running after 20s; stderr:\n%s", p.stderr.String())
+		t.Fatalf("exporter still running after 20s; stderr:\n%s", p.dump())
 		return -1
 	}
+}
+
+// dump kills the process and returns its stderr. exec copies stderr on its
+// own goroutine until the process exits, so reading it earlier races.
+func (p *exporterProc) dump() string {
+	_ = p.cmd.Process.Kill()
+	<-p.exited
+	return p.stderr.String()
 }
 
 // stop sends SIGTERM and returns the exit code.
@@ -200,7 +208,7 @@ func (p *exporterProc) waitMetrics(t *testing.T, what string, cond func(string) 
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("timed out waiting for %s; last /metrics:\n%s\nstderr:\n%s", what, last, p.stderr.String())
+	t.Fatalf("timed out waiting for %s; last /metrics:\n%s\nstderr:\n%s", what, last, p.dump())
 	return ""
 }
 

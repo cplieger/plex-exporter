@@ -858,14 +858,7 @@ func TestDashboard_row_headers_fold_at_least_two_panels(t *testing.T) {
 // removed rule fails here instead of leaving the description pointing nowhere.
 func TestDashboard_attention_tiles_name_existing_alert_rules(t *testing.T) {
 	ruleName := regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`)
-	raw, err := os.ReadFile("alerts/promql.yaml")
-	if err != nil {
-		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
-	}
-	var rules []string
-	for _, m := range regexp.MustCompile(`(?m)^\s*- alert: (\S+)$`).FindAllStringSubmatch(string(raw), -1) {
-		rules = append(rules, m[1])
-	}
+	rules := ruleExprs(t, "alerts/promql.yaml")
 	_, panels := loadDashboard(t)
 	for _, it := range attentionTiles(t) {
 		p := panels[it.Spec.Element.Name]
@@ -874,7 +867,7 @@ func TestDashboard_attention_tiles_name_existing_alert_rules(t *testing.T) {
 			t.Errorf("%q names no alert rule and does not say that none covers it", p.Spec.Title)
 		}
 		for _, n := range named {
-			if !slices.Contains(rules, n) {
+			if _, ok := rules[n]; !ok {
 				t.Errorf("%q names %s, which is not a rule in alerts/", p.Spec.Title, n)
 			}
 		}
@@ -901,16 +894,9 @@ func promqlMetrics(expr string) []string {
 // A tile that names a PromQL rule reads every metric that rule reads, so the
 // tile and the alert cannot be built on different signals.
 func TestDashboard_attention_tiles_read_their_rules_metrics(t *testing.T) {
-	raw, err := os.ReadFile("alerts/promql.yaml")
-	if err != nil {
-		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
-	}
 	ruleMetrics := map[string][]string{}
-	for _, block := range strings.Split(string(raw), "- alert: ")[1:] {
-		name, rest, _ := strings.Cut(block, "\n")
-		_, expr, _ := strings.Cut(rest, "expr:")
-		expr, _, _ = strings.Cut(expr, "for:")
-		ruleMetrics[strings.TrimSpace(name)] = promqlMetrics(strings.TrimPrefix(strings.TrimSpace(expr), ">"))
+	for name, expr := range ruleExprs(t, "alerts/promql.yaml") {
+		ruleMetrics[name] = promqlMetrics(expr)
 	}
 	if got := ruleMetrics["PlexExporterSessionPollFailing"]; !slices.Equal(got, []string{"plex_session_poll_reachable", "plex_http_reachable"}) {
 		t.Fatalf("Setup: PlexExporterSessionPollFailing reads %q, want plex_session_poll_reachable and plex_http_reachable", got)

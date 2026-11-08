@@ -123,7 +123,7 @@ var (
 	)
 	DescSessionsDropped = prometheus.NewDesc(
 		"plex_sessions_dropped_total",
-		"New Plex sessions refused because the exporter already tracked 256",
+		"Times a new Plex session was refused because the exporter already tracked 256, counted on each poll",
 		nil, nil,
 	)
 	DescRefreshDeadlineExceeded = prometheus.NewDesc(

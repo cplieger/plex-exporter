@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cplieger/plex-exporter/internal/history"
@@ -50,7 +49,6 @@ type Server struct {
 	LastBandwidthAt   int
 	ActiveTranscodes  int
 	mu                sync.Mutex
-	refreshing        atomic.Bool
 	HTTPReachable     bool
 	SessionsReachable bool
 	PlexPass          bool
@@ -210,7 +208,7 @@ func (s *Server) StartDegraded(err error) {
 }
 
 // RunRefreshLoop invokes Refresh on a 5-second ticker until ctx is
-// cancelled, skipping a tick if the previous Refresh is still in-flight.
+// cancelled; time.Ticker drops the ticks that fall while a Refresh runs.
 func (s *Server) RunRefreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -227,10 +225,6 @@ func (s *Server) RunRefreshLoop(ctx context.Context) {
 // refreshTick runs one Refresh and records its outcome. Every failure
 // counts in plex_exporter_errors_total; the log follows refreshOutage.
 func (s *Server) refreshTick(ctx context.Context) {
-	if !s.refreshing.CompareAndSwap(false, true) {
-		return
-	}
-	defer s.refreshing.Store(false)
 	if err := s.Refresh(ctx); err != nil {
 		s.SetHTTPReachable(false)
 		s.RecordError("refresh")
