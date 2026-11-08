@@ -119,7 +119,7 @@ The exporter only connects out, to the Plex server you configure. It sends the t
 
 The image's healthcheck runs `/plex-exporter health`, which reads a marker file the exporter writes in `/tmp` once its metrics server is listening. `/api/health` reads the same marker and answers 503 while the exporter starts or stops.
 
-At startup, the container exits on an error only you can fix, and Docker restarts it. That is a rejected token, any other 4xx status except 408 and 429, a TLS failure (a certificate the exporter cannot verify, or a server that does not answer TLS at an `https://` address) or a listen port it cannot bind. On a DNS error, a timeout, a 408, a 429 or a 5xx, it starts anyway with `plex_http_reachable` at `0`. Once started, it keeps running through Plex errors and retries every 5 seconds.
+At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `PLEX_CA_CERT_PATH` cannot be read or the listen port cannot be bound, and Docker restarts it. Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running with `plex_http_reachable` at `0`, and it retries every 5 seconds.
 
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.

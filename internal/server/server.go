@@ -108,7 +108,7 @@ const providersRefreshInterval = time.Minute
 // Refresh polls Plex for server identity, library list, host resources,
 // and bandwidth. Called from startup and from RunRefreshLoop on a ticker.
 // The zero LastProvidersRefresh on the first call always fetches providers,
-// so startup fail-fast classification still keys on that endpoint.
+// so startup's error classification still keys on that endpoint.
 func (s *Server) Refresh(outerCtx context.Context) error {
 	ctx, cancel := context.WithTimeout(outerCtx, 45*time.Second)
 	defer cancel()

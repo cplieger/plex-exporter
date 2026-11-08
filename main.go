@@ -81,14 +81,14 @@ func run() int {
 			slog.Info("shutdown requested during startup", "cause", context.Cause(ctx))
 			return 0
 		}
-		if isFatalStartupError(refreshErr) {
+		// Every Plex failure starts degraded: plex_http_reachable 0 and the
+		// refresh error count carry it, and RunRefreshLoop clears both once
+		// Plex answers. The level tells the reader whether to act.
+		if operatorFixable(refreshErr) {
 			slog.Error("cannot connect to plex server", "error", refreshErr)
-			ps.RecordError("refresh")
-			return 1
+		} else {
+			slog.Warn("initial plex connection failed; starting in degraded state", "error", refreshErr)
 		}
-		// Transient failure: start degraded rather than crash-loop. RunRefreshLoop
-		// recovers and flips plex_http_reachable to 1 once Plex is reachable.
-		slog.Warn("initial plex connection failed; starting in degraded state", "error", refreshErr)
 		ps.RecordError("refresh")
 		ps.SetHTTPReachable(false)
 	} else {
@@ -158,12 +158,12 @@ func run() int {
 	return 0
 }
 
-// isFatalStartupError reports whether an initial Plex Refresh error will
-// not resolve without operator action (bad token/URL, a 404, or a TLS
-// failure httpclient.CauseOf names: a certificate, a fatal alert or a
-// plain-HTTP answer) versus a transient connectivity failure that
-// RunRefreshLoop can recover from (dial/DNS/timeout, or a 5xx).
-func isFatalStartupError(err error) bool {
+// operatorFixable reports whether an initial Plex Refresh error will not
+// resolve without operator action (bad token/URL, a 404, or a TLS failure
+// httpclient.CauseOf names: a certificate, a fatal alert or a plain-HTTP
+// answer) versus a transient connectivity failure (dial/DNS/timeout, or a
+// 5xx).
+func operatorFixable(err error) bool {
 	if plexapi.IsConfigError(err) {
 		return true
 	}
