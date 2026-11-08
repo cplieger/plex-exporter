@@ -18,16 +18,16 @@ The exporter writes its readiness marker to `/tmp/.healthy`. With `securityConte
         mountPath: /tmp
 ```
 
-Without it, `/api/health` answers 503 for as long as the exporter runs, so an HTTP probe on that endpoint fails. [Security](hardening.md#read-only-root-filesystem) explains why.
+Without it, `/healthz` answers 503 for as long as the exporter runs, so an HTTP probe on that endpoint fails. [Security](hardening.md#read-only-root-filesystem) explains why.
 
 ## Probes
 
-These probes are a starting point. Both read `/api/health`, so with `readOnlyRootFilesystem: true` they need the `/tmp` mount above.
+These probes are a starting point. Both ask `GET /healthz`, which answers 200 while the exporter serves, and 503 while it starts or stops. With `readOnlyRootFilesystem: true` they need the `/tmp` mount above. Plex being unreachable never fails them. A liveness probe that must ignore readiness can use a `tcpSocket` probe on port 9594 instead.
 
 ```yaml
     livenessProbe:
       httpGet:
-        path: /api/health
+        path: /healthz
         port: 9594
       initialDelaySeconds: 0
       periodSeconds: 30
@@ -35,7 +35,7 @@ These probes are a starting point. Both read `/api/health`, so with `readOnlyRoo
       failureThreshold: 3
     readinessProbe:
       httpGet:
-        path: /api/health
+        path: /healthz
         port: 9594
       initialDelaySeconds: 0
       periodSeconds: 30
@@ -45,7 +45,7 @@ These probes are a starting point. Both read `/api/health`, so with `readOnlyRoo
 
 ## Running as a sidecar
 
-You can run the exporter as a sidecar in the Plex pod, with `PLEX_URL` set to `http://localhost:32400`. It needs the `/tmp` mount only when an HTTP probe on `/api/health` is configured. With no probe, it logs one warning at start and runs.
+You can run the exporter as a sidecar in the Plex pod, with `PLEX_URL` set to `http://localhost:32400`. It needs the `/tmp` mount only when an HTTP probe on `/healthz` is configured. With no probe, it logs one warning at start and runs.
 
 ## Labels the Prometheus Operator adds
 

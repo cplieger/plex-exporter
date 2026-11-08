@@ -260,8 +260,8 @@ func TestRun_starts_degraded_on_plex_refusal(t *testing.T) {
 				"PLEX_URL": plexURL, "PLEX_TOKEN": "test-token", "LISTEN_ADDR": freeAddr(t),
 			})
 			p.waitMetrics(t, "plex_http_reachable 0 with a refresh error", plexDown)
-			if status, _, ok := p.get("/api/health"); !ok || status != http.StatusOK {
-				t.Errorf("/api/health = %d (answered %t), want 200 while serving", status, ok)
+			if status, _, ok := p.get(healthzPath); !ok || status != http.StatusOK {
+				t.Errorf("%s = %d (answered %t), want 200 while serving", healthzPath, status, ok)
 			}
 			if fake != nil {
 				fake.good.Store(true)

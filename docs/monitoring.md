@@ -7,7 +7,7 @@ This page lists every metric and label plex-exporter serves, how to get the matc
 | Endpoint | Method | Description |
 | --- | --- | --- |
 | `/metrics` | GET | Prometheus metrics, listed below |
-| `/api/health` | GET | `{"status":"OK"}` when ready, 503 while starting or stopping |
+| `/healthz` | `GET`, `HEAD` | `200 {"status":"ok"}` while the exporter serves, or `503 {"status":"unhealthy","reasons":[...]}` while it starts or stops, or cannot write its marker in `/tmp`. No login. Plex being unreachable never makes it unhealthy |
 
 Both answer on port 9594 by default. [How plex-exporter works](how-it-works.md#when-each-metric-appears) explains when each series appears.
 

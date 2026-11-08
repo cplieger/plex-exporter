@@ -25,7 +25,7 @@ The exporter records that it is ready by writing an empty marker file, `/tmp/.he
       - "/tmp:size=1m,mode=1777,noexec,nosuid,nodev"
 ```
 
-Without that mount the marker is never written. The image's Docker healthcheck still reports healthy after one warning at start, so a missing mount does not restart a working container. `/api/health`, however, answers 503 for as long as the exporter runs, so any probe on that endpoint fails. [Running on Kubernetes](kubernetes.md#a-writable-tmp) has the Kubernetes form.
+Without that mount the marker is never written, so `/healthz` answers 503 for as long as the exporter runs. The image's Docker healthcheck asks `/healthz`, so Docker marks the container unhealthy, and any other probe on that endpoint fails too. Docker does not restart an unhealthy container on its own, so the exporter keeps serving `/metrics`. [Running on Kubernetes](kubernetes.md#a-writable-tmp) has the Kubernetes form.
 
 ## What the image contains
 
