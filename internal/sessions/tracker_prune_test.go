@@ -1,6 +1,8 @@
 package sessions
 
 import (
+	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -202,5 +204,46 @@ func TestPruneTimeouts_match_documented_contract(t *testing.T) {
 	}
 	if staleSessionTimeout != 5*time.Minute {
 		t.Errorf("staleSessionTimeout = %v, want 5m0s (documented 5-minute stale-session timeout)", staleSessionTimeout)
+	}
+}
+
+// A full map is one standing state: one WARN when it starts refusing
+// sessions, one INFO with the episode's drop count when a slot frees, while
+// the counter still counts every refused session.
+func TestTracker_logs_a_full_map_once(t *testing.T) {
+	logs := capture.Default(t)
+	tracker := NewTracker()
+	tracker.mu.Lock()
+	tracker.Sessions["ended"] = Session{State: StateStopped, LastUpdate: time.Now().Add(-2 * sessionTimeout)}
+	for i := range maxTrackedSessions - 1 {
+		tracker.Sessions[fmt.Sprintf("s%d", i)] = Session{State: StatePlaying, LastUpdate: time.Now()}
+	}
+	tracker.mu.Unlock()
+
+	for i := range 5 {
+		tracker.Update(fmt.Sprintf("new%d", i), StatePlaying, nil, nil)
+	}
+	if got := logs.CountLevel(slog.LevelWarn, "session map full"); got != 1 {
+		t.Errorf("WARN session map full logged %d times for 5 drops, want 1", got)
+	}
+	if _, dropped := tracker.Counts(); dropped != 5 {
+		t.Errorf("dropped = %d, want 5", dropped)
+	}
+	if !logs.HasAttr("session map full", "tracked", "256") || !logs.HasAttr("session map full", "cap", "256") {
+		t.Errorf("session map full lacks tracked=256 and cap=256: %v", logs.Records())
+	}
+
+	tracker.prune()
+	if got := logs.CountLevel(slog.LevelInfo, "session map has room again"); got != 1 {
+		t.Errorf("INFO session map has room again logged %d times, want 1", got)
+	}
+	if !logs.HasAttr("session map has room again", "dropped", "5") {
+		t.Errorf("session map has room again lacks dropped=5: %v", logs.Records())
+	}
+
+	tracker.Update("fits", StatePlaying, nil, nil)
+	tracker.Update("refused", StatePlaying, nil, nil)
+	if got := logs.CountLevel(slog.LevelWarn, "session map full"); got != 2 {
+		t.Errorf("WARN session map full logged %d times after the map filled again, want 2", got)
 	}
 }

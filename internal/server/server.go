@@ -41,6 +41,7 @@ type Server struct {
 	Version           string
 	Platform          string
 	walks             walkState
+	outage            refreshOutage
 	Libraries         []library.Library
 	background        backgroundState
 	HostMem           float64
@@ -173,40 +174,71 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 	return nil
 }
 
+// refreshOutage is a standing refresh failure, so the log says when it
+// starts, when its error changes and when it ends, not on every tick.
+// Only the refresh loop touches it once the loop has started.
+type refreshOutage struct {
+	since   time.Time
+	lastErr string
+}
+
+func (o *refreshOutage) failed(now time.Time, err error) {
+	if o.since.IsZero() {
+		o.since = now
+	} else if err.Error() == o.lastErr {
+		return
+	}
+	o.lastErr = err.Error()
+	slog.Warn("refresh failed", "error", err)
+}
+
+func (o *refreshOutage) recovered(now time.Time) {
+	if o.since.IsZero() {
+		return
+	}
+	slog.Info("refresh recovered", "failed_for", now.Sub(o.since))
+	*o = refreshOutage{}
+}
+
+// StartDegraded records a failed first Refresh, which the caller has
+// logged, so RunRefreshLoop logs only its recovery or a different error.
+// Call it before RunRefreshLoop starts.
+func (s *Server) StartDegraded(err error) {
+	s.RecordError("refresh")
+	s.SetHTTPReachable(false)
+	s.outage = refreshOutage{since: time.Now(), lastErr: err.Error()}
+}
+
 // RunRefreshLoop invokes Refresh on a 5-second ticker until ctx is
 // cancelled, skipping a tick if the previous Refresh is still in-flight.
 func (s *Server) RunRefreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	// Seed from startup's reachability state so a recovery after a degraded
-	// start logs "refresh recovered" without a spurious line on tick one.
-	s.mu.Lock()
-	prevFailed := !s.HTTPReachable
-	s.mu.Unlock()
 	for {
 		select {
 		case <-ticker.C:
-			if !s.refreshing.CompareAndSwap(false, true) {
-				continue // previous Refresh still running, skip this tick
-			}
-			if err := s.Refresh(ctx); err != nil {
-				s.SetHTTPReachable(false)
-				s.RecordError("refresh")
-				slog.Warn("refresh failed", "error", err)
-				prevFailed = true
-				s.refreshing.Store(false)
-				continue
-			}
-			s.SetHTTPReachable(true)
-			if prevFailed {
-				slog.Info("refresh recovered")
-				prevFailed = false
-			}
-			s.refreshing.Store(false)
+			s.refreshTick(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+// refreshTick runs one Refresh and records its outcome. Every failure
+// counts in plex_exporter_errors_total; the log follows refreshOutage.
+func (s *Server) refreshTick(ctx context.Context) {
+	if !s.refreshing.CompareAndSwap(false, true) {
+		return
+	}
+	defer s.refreshing.Store(false)
+	if err := s.Refresh(ctx); err != nil {
+		s.SetHTTPReachable(false)
+		s.RecordError("refresh")
+		s.outage.failed(time.Now(), err)
+		return
+	}
+	s.SetHTTPReachable(true)
+	s.outage.recovered(time.Now())
 }
 
 // SetHTTPReachable sets the HTTPReachable flag under lock.

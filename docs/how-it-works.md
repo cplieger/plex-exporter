@@ -33,7 +33,7 @@ For each stream, the exporter reads the item's library metadata once and keeps i
 
 The session tracker turns each poll into metric updates. A stream gets its series once the exporter has seen it playing, so a stream that was already paused when the exporter started appears once it resumes.
 
-When a stream ends, its series stay for 1 to 2 minutes and then go. A session that gets no update for 5 minutes is removed as stale. The tracker holds 256 sessions at most. Past that, it logs `session map full, dropping new session` and leaves the new stream out, which the `PlexExporterSessionMapFull` alert rule catches.
+When a stream ends, its series stay for 1 to 2 minutes and then go. A session that gets no update for 5 minutes is removed as stale. The tracker holds 256 sessions at most. Past that, it leaves each new stream out and counts it in `plex_sessions_dropped_total`, which the `PlexExporterSessionMapFull` alert rule reads. The log says `session map full, dropping new sessions` once when the tracker starts refusing streams, and `session map has room again`, with the number it dropped, once a slot frees.
 
 ## When each metric appears
 

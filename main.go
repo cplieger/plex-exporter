@@ -82,15 +82,14 @@ func run() int {
 			return 0
 		}
 		// Every Plex failure starts degraded: plex_http_reachable 0 and the
-		// refresh error count carry it, and RunRefreshLoop clears both once
-		// Plex answers. The level tells the reader whether to act.
+		// refresh error count carry it until RunRefreshLoop reaches Plex.
+		// The level tells the reader whether to act.
 		if operatorFixable(refreshErr) {
 			slog.Error("cannot connect to plex server", "error", refreshErr)
 		} else {
 			slog.Warn("initial plex connection failed; starting in degraded state", "error", refreshErr)
 		}
-		ps.RecordError("refresh")
-		ps.SetHTTPReachable(false)
+		ps.StartDegraded(refreshErr)
 	} else {
 		ps.SetHTTPReachable(true)
 		ps.SetSessionsReachable(true)

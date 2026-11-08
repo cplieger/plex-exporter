@@ -1,6 +1,5 @@
-# plex-exporter alert rules, the PromQL half, for a Prometheus or Mimir ruler.
-# The three LogQL rules live in alerts/logql.yaml. Load each file into its own
-# ruler, because neither ruler parses the other's expressions.
+# plex-exporter alert rules, for a Prometheus, Mimir or vmalert ruler. They are
+# the only rules plex-exporter ships, and need no log collector.
 #
 # Scrape /metrics, port 9594 by default. Thresholds, "for" windows and severity
 # labels are starting points. The scrape "job" label is yours to set, so the

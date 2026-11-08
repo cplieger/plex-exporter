@@ -94,7 +94,10 @@ type Session struct {
 type Tracker struct {
 	Sessions map[string]Session
 	dropped  uint64
-	mu       sync.Mutex
+	// fullDrops counts the sessions refused since the map last filled, and
+	// is non-zero exactly while the map is logged as full.
+	fullDrops uint64
+	mu        sync.Mutex
 }
 
 // NewTracker returns an empty session tracker ready for use.
@@ -175,8 +178,11 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ite
 	// to update. RunPruneLoop handles reclaiming stopped sessions.
 	if _, existing := t.Sessions[id]; !existing && len(t.Sessions) >= maxTrackedSessions {
 		t.dropped++
-		slog.Warn("session map full, dropping new session",
-			"id", id, "tracked", len(t.Sessions), "cap", maxTrackedSessions)
+		if t.fullDrops == 0 {
+			slog.Warn("session map full, dropping new sessions",
+				"tracked", len(t.Sessions), "cap", maxTrackedSessions)
+		}
+		t.fullDrops++
 		return
 	}
 
@@ -261,6 +267,10 @@ func (t *Tracker) prune() {
 	if pruned > 0 || stale > 0 {
 		slog.Debug("pruned expired sessions",
 			"stopped", pruned, "stale", stale, "remaining", len(t.Sessions))
+	}
+	if t.fullDrops > 0 && len(t.Sessions) < maxTrackedSessions {
+		slog.Info("session map has room again", "dropped", t.fullDrops)
+		t.fullDrops = 0
 	}
 }
 
