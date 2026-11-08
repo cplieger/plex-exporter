@@ -858,15 +858,13 @@ func TestDashboard_row_headers_fold_at_least_two_panels(t *testing.T) {
 // removed rule fails here instead of leaving the description pointing nowhere.
 func TestDashboard_attention_tiles_name_existing_alert_rules(t *testing.T) {
 	ruleName := regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`)
+	raw, err := os.ReadFile("alerts/promql.yaml")
+	if err != nil {
+		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
+	}
 	var rules []string
-	for _, f := range []string{"alerts/promql.yaml", "alerts/logql.yaml"} {
-		raw, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatalf("Setup: read %s: %v", f, err)
-		}
-		for _, m := range regexp.MustCompile(`(?m)^\s*- alert: (\S+)$`).FindAllStringSubmatch(string(raw), -1) {
-			rules = append(rules, m[1])
-		}
+	for _, m := range regexp.MustCompile(`(?m)^\s*- alert: (\S+)$`).FindAllStringSubmatch(string(raw), -1) {
+		rules = append(rules, m[1])
 	}
 	_, panels := loadDashboard(t)
 	for _, it := range attentionTiles(t) {

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -27,6 +28,7 @@ type Server struct {
 	LastItemsRefresh     time.Time
 	LastProvidersRefresh time.Time
 	ErrorCounts          map[string]float64
+	deadlineMisses       map[string]float64
 	Client               *plex.Client
 	Sessions             *sessions.Tracker
 	// History and Pace may be nil, which turns off watch figures and pacing.
@@ -235,6 +237,7 @@ type snapshot struct {
 	walks             map[string]libWalk
 	activities        map[activityKey]float64
 	ErrorCounts       map[string]float64
+	deadlineMisses    map[string]float64
 	PlatformVersion   string
 	Name              string
 	ID                string
@@ -254,6 +257,8 @@ type snapshot struct {
 	HTTPReachable     float64
 	SessionsReachable float64
 	Retries           float64
+	sessionsDropped   float64
+	sessionsTracked   int
 	ResourcesRead     bool
 	BandwidthRead     bool
 	passDone          bool
@@ -283,6 +288,11 @@ func (s *Server) snapshot() snapshot {
 	}
 	copy(snap.Libraries, s.Libraries)
 	maps.Copy(snap.ErrorCounts, s.ErrorCounts)
+	snap.deadlineMisses = maps.Clone(s.deadlineMisses)
+	if s.Sessions != nil {
+		tracked, dropped := s.Sessions.Counts()
+		snap.sessionsTracked, snap.sessionsDropped = tracked, float64(dropped)
+	}
 	snap.walks = make(map[string]libWalk, len(s.walks.libs))
 	for id, w := range s.walks.libs {
 		snap.walks[id] = *w
@@ -417,10 +427,25 @@ func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType in
 	return count, true
 }
 
+// recordDeadlineMiss counts a Plex Pass fetch that failed because the
+// refresh deadline ran out, and not because Plex answered or shut down.
+func (s *Server) recordDeadlineMiss(ctx context.Context, fetch string) {
+	if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deadlineMisses == nil {
+		s.deadlineMisses = make(map[string]float64, len(metrics.RefreshFetches))
+	}
+	s.deadlineMisses[fetch]++
+}
+
 func (s *Server) refreshResources(ctx context.Context) {
 	stats, err := s.Client.StatisticsResources(ctx, 6)
 	if err != nil {
 		if ctx.Err() != nil {
+			s.recordDeadlineMiss(ctx, "resources")
 			slog.Warn("resources fetch skipped, context deadline exceeded", "error", err)
 		} else {
 			slog.Debug("resources unavailable", "error", err)
@@ -442,6 +467,7 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 	samples, err := s.Client.StatisticsBandwidth(ctx, 6)
 	if err != nil {
 		if ctx.Err() != nil {
+			s.recordDeadlineMiss(ctx, "bandwidth")
 			slog.Warn("bandwidth fetch skipped, context deadline exceeded", "error", err)
 		} else {
 			slog.Debug("bandwidth unavailable", "error", err)

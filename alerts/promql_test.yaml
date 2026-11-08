@@ -1,0 +1,314 @@
+# promtool test rules alerts/promql_test.yaml
+# Fixtures for every rule in alerts/promql.yaml.
+rule_files:
+  - promql.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: the target rules fire on a failed or missing scrape
+    interval: 1m
+    input_series:
+      - series: 'up{job="plex-exporter", instance="exporter:9594"}'
+        values: '0x20'
+      - series: 'up{job="other", instance="other:9100"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: PlexExporterTargetDown
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: PlexExporterTargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+            exp_annotations:
+              summary: "plex-exporter is not being scraped successfully"
+              description: >
+                No successful scrape of plex-exporter for 15m, so every Plex metric
+                is stale and the other rules are blind. Check the container, its
+                port and your scrape config.
+      - eval_time: 16m
+        alertname: PlexExporterTargetAbsent
+        exp_alerts: []
+
+  - name: the absent rule fires when no plex-exporter target exists
+    interval: 1m
+    input_series:
+      - series: 'up{job="other", instance="other:9100"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: PlexExporterTargetAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+            exp_annotations:
+              summary: "plex-exporter has no scrape target at all"
+              description: >
+                No up{job="plex-exporter"} series exists, so the exporter is no
+                longer a configured scrape target. Every other rule is blind. Check
+                service discovery and your scrape config.
+
+  - name: the Plex API and session poll rules follow the reachability gauges
+    interval: 1m
+    input_series:
+      - series: 'plex_http_reachable{job="plex-exporter", instance="exporter:9594"}'
+        values: '0x12 1x20'
+      - series: 'plex_session_poll_reachable{job="plex-exporter", instance="exporter:9594"}'
+        values: '0x32'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: PlexExporterAPIUnreachable
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: PlexExporterAPIUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+            exp_annotations:
+              summary: "Plex API unreachable to its exporter at exporter:9594"
+              description: >
+                plex-exporter is running but its authenticated poll of the Plex API
+                has returned plex_http_reachable=0 for 10m. The usual cause is a
+                revoked or invalid PLEX_TOKEN. Metrics are stale until it recovers.
+      - eval_time: 14m
+        alertname: PlexExporterAPIUnreachable
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: PlexExporterSessionPollFailing
+        exp_alerts: []
+      - eval_time: 24m
+        alertname: PlexExporterSessionPollFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+            exp_annotations:
+              summary: "Plex session poll failing at exporter:9594"
+              description: >
+                The /status/sessions poll has failed for 10m while the rest of the
+                Plex API answers, so every session metric is absent or stale. If it
+                fails only during playback, look for a decode error in the log.
+
+  - name: collection errors fire per type after 30m of errors
+    interval: 1m
+    input_series:
+      - series: 'plex_exporter_errors_total{job="plex-exporter", instance="exporter:9594", type="sessions_fetch"}'
+        values: '0+1x60'
+      - series: 'plex_exporter_errors_total{job="plex-exporter", instance="exporter:9594", type="refresh"}'
+        values: '0x60'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PlexExporterCollectionErrors
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: PlexExporterCollectionErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              type: sessions_fetch
+            exp_annotations:
+              summary: "Plex exporter erroring on 'sessions_fetch' collection"
+              description: >
+                plex-exporter has counted 'sessions_fetch' errors in every 15m
+                window for 30m, so Plex metrics of that type are incomplete. The
+                usual causes are a Plex API change after a server upgrade or an
+                auth issue.
+
+  - name: dropped sessions fire the session map rule until 15m pass without a drop
+    interval: 1m
+    input_series:
+      - series: 'plex_sessions_dropped_total{job="plex-exporter", instance="exporter:9594"}'
+        values: '0x5 1 2 3 3x30'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PlexExporterSessionMapFull
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: PlexExporterSessionMapFull
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+            exp_annotations:
+              summary: "plex-exporter is dropping Plex sessions from its tracker"
+              description: >
+                The session tracker is at its cap of 256, so new Plex sessions
+                publish no series and count(plex_plays_active) undercounts. Check
+                plex_sessions_tracked, the concurrent stream count and how fast
+                Plex mints session keys.
+      - eval_time: 30m
+        alertname: PlexExporterSessionMapFull
+        exp_alerts: []
+
+  - name: more than three refresh deadline misses in 15m fire the refresh rule
+    interval: 1m
+    input_series:
+      - series: 'plex_refresh_deadline_exceeded_total{job="plex-exporter", instance="exporter:9594", fetch="resources"}'
+        values: '0x5 1 2 2x30'
+      - series: 'plex_refresh_deadline_exceeded_total{job="plex-exporter", instance="exporter:9594", fetch="bandwidth"}'
+        values: '0x6 1 2 2x30'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PlexExporterRefreshIncomplete
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: PlexExporterRefreshIncomplete
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+            exp_annotations:
+              summary: "plex-exporter is running out of time on its Plex refresh"
+              description: >
+                Refresh cycles hit their deadline before the Plex Pass fetches ran,
+                so the plex_host_* gauges and plex_transmit_bytes_total serve old
+                values. plex_http_reachable still reads 1. Check the Plex server's
+                own load.
+      - eval_time: 30m
+        alertname: PlexExporterRefreshIncomplete
+        exp_alerts: []
+
+  - name: three refresh deadline misses in 15m stay quiet
+    interval: 1m
+    input_series:
+      - series: 'plex_refresh_deadline_exceeded_total{job="plex-exporter", instance="exporter:9594", fetch="resources"}'
+        values: '0x5 1 2 3 3x30'
+      - series: 'plex_refresh_deadline_exceeded_total{job="plex-exporter", instance="exporter:9594", fetch="bandwidth"}'
+        values: '0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PlexExporterRefreshIncomplete
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PlexExporterRefreshIncomplete
+        exp_alerts: []
+
+  - name: a library that loses most of its items fires after 30m
+    interval: 1m
+    input_series:
+      - series: 'plex_library_items{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="movie", library="Movies", library_id="1", content_type="movies"}'
+        values: '100x180 10x120'
+      - series: 'plex_library_items{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="show", library="TV", library_id="2", content_type="shows"}'
+        values: '100x300'
+    alert_rule_test:
+      - eval_time: 205m
+        alertname: PlexExporterLibraryItemsCollapsed
+        exp_alerts: []
+      - eval_time: 215m
+        alertname: PlexExporterLibraryItemsCollapsed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+              server: Plex
+              server_id: id1
+              library_type: movie
+              library: Movies
+              library_id: "1"
+              content_type: movies
+            exp_annotations:
+              summary: "Plex library 'Movies' lost >50% of its items"
+              description: >
+                Plex library 'Movies' has held less than half its
+                item count of 1 to 2 hours ago for 30m. Likely a partly lost media
+                mount or a bulk delete. Check the media mount and the library in
+                Plex.
+
+  - name: a library never read, or read too long ago, fires once the exporter is 6h old
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="plex-exporter", instance="exporter:9594"}'
+        values: '0x400'
+      - series: 'plex_library_walk_pass_duration_seconds{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1"}'
+        values: '60x400'
+      - series: 'plex_library_walkable{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="movie", library_id="1"}'
+        values: '1x400'
+      - series: 'plex_library_walk_last_success_timestamp_seconds{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="movie", library_id="1"}'
+        values: '0x400'
+      - series: 'plex_library_walkable{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="show", library_id="2"}'
+        values: '1x400'
+      - series: 'plex_library_walkable{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="show", library_id="3"}'
+        values: '1x400'
+      - series: 'plex_library_walk_last_success_timestamp_seconds{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="show", library_id="3"}'
+        values: '0+60x400'
+    alert_rule_test:
+      - eval_time: 385m
+        alertname: PlexExporterLibraryWalkStale
+        exp_alerts: []
+      - eval_time: 395m
+        alertname: PlexExporterLibraryWalkStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+              server: Plex
+              server_id: id1
+              library_type: movie
+              library_id: "1"
+            exp_annotations:
+              summary: "Plex library 1 has not been read item by item"
+              description: >
+                plex-exporter has not completed a read of library
+                1 for over 4h plus twice its last pass time.
+                The largest-items, storage and watch figures for it are out of
+                date. Check the exporter log for "library walk failed".
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+              server: Plex
+              server_id: id1
+              library_type: show
+              library_id: "2"
+            exp_annotations:
+              summary: "Plex library 2 has not been read item by item"
+              description: >
+                plex-exporter has not completed a read of library
+                2 for over 4h plus twice its last pass time.
+                The largest-items, storage and watch figures for it are out of
+                date. Check the exporter log for "library walk failed".
+
+  - name: a library Plex has not scanned in two intervals plus an hour fires after 15m
+    interval: 1m
+    input_series:
+      - series: 'plex_server_scheduled_scan_interval_seconds{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1"}'
+        values: '3600x220'
+      - series: 'plex_library_last_scan_timestamp_seconds{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="movie", library_id="1"}'
+        values: '0x220'
+      - series: 'plex_library_last_scan_timestamp_seconds{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", library_type="show", library_id="2"}'
+        values: '0+60x220'
+    alert_rule_test:
+      - eval_time: 190m
+        alertname: PlexExporterLibraryScanOverdue
+        exp_alerts: []
+      - eval_time: 200m
+        alertname: PlexExporterLibraryScanOverdue
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: plex-exporter
+              instance: exporter:9594
+              server: Plex
+              server_id: id1
+              library_type: movie
+              library_id: "1"
+            exp_annotations:
+              summary: "Plex has not scanned library 1 on its schedule"
+              description: >
+                Plex last scanned library 1 more than twice
+                its library scan interval plus an hour ago, while Scan my library
+                periodically is on. A scan that keeps failing usually means
+                the library's media folder is missing or unreadable, so check the
+                mount and the Plex Media Server log.

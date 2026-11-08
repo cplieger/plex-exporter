@@ -93,6 +93,7 @@ type Session struct {
 // access the mutex directly.
 type Tracker struct {
 	Sessions map[string]Session
+	dropped  uint64
 	mu       sync.Mutex
 }
 
@@ -121,6 +122,14 @@ func (t *Tracker) UpdateLibraryLabels(id string, fn func(*Session)) {
 		fn(&ss)
 		t.Sessions[id] = ss
 	}
+}
+
+// Counts returns how many sessions the tracker holds and how many new
+// sessions it has refused at its cap since it was created.
+func (t *Tracker) Counts() (tracked int, dropped uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.Sessions), t.dropped
 }
 
 // SnapshotSessions returns a copy of the sessions map under the tracker's lock.
@@ -165,6 +174,7 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ite
 	// Reject new sessions once the map is full; existing sessions continue
 	// to update. RunPruneLoop handles reclaiming stopped sessions.
 	if _, existing := t.Sessions[id]; !existing && len(t.Sessions) >= maxTrackedSessions {
+		t.dropped++
 		slog.Warn("session map full, dropping new session",
 			"id", id, "tracked", len(t.Sessions), "cap", maxTrackedSessions)
 		return

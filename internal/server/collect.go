@@ -33,11 +33,16 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPReachable, prometheus.GaugeValue, snap.HTTPReachable)
 	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable)
 	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPRetries, prometheus.CounterValue, snap.Retries)
-	// Emit one sample per known error type so rate()/increase() return zero
-	// rather than stale values.
+	// Emit one sample per known error type and fetch so rate()/increase()
+	// return zero rather than stale values.
 	for _, typ := range metrics.ErrorTypes {
 		ch <- prometheus.MustNewConstMetric(metrics.DescErrors, prometheus.CounterValue, snap.ErrorCounts[typ], typ)
 	}
+	for _, fetch := range metrics.RefreshFetches {
+		ch <- prometheus.MustNewConstMetric(metrics.DescRefreshDeadlineExceeded, prometheus.CounterValue, snap.deadlineMisses[fetch], fetch)
+	}
+	ch <- prometheus.MustNewConstMetric(metrics.DescSessionsTracked, prometheus.GaugeValue, float64(snap.sessionsTracked))
+	ch <- prometheus.MustNewConstMetric(metrics.DescSessionsDropped, prometheus.CounterValue, snap.sessionsDropped)
 
 	// Prometheus drops an empty label value, so a server-scoped sample emitted
 	// before Plex has answered lands on a different series than the healthy one.

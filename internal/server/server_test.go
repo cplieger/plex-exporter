@@ -800,3 +800,64 @@ func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
 		t.Error("items refresh should NOT be triggered when lastItemsRefresh < 15 minutes ago")
 	}
 }
+
+// A Plex Pass fetch counts as a deadline miss only when the refresh deadline
+// ran out under it, the case where its gauges keep serving old values.
+func TestRefreshPlexPass_counts_deadline_misses(t *testing.T) {
+	cases := []struct {
+		name          string
+		slowPath      string
+		status        int
+		cancel        bool
+		wantResources float64
+		wantBandwidth float64
+	}{
+		{name: "resources past the deadline", slowPath: "/statistics/resources", wantResources: 1, wantBandwidth: 1},
+		{name: "bandwidth past the deadline", slowPath: "/statistics/bandwidth", wantBandwidth: 1},
+		{name: "no Plex Pass", status: http.StatusNotFound},
+		{name: "a server error", status: http.StatusInternalServerError},
+		{name: "a shutdown is no deadline miss", slowPath: "/statistics/resources", cancel: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == tc.slowPath {
+					<-r.Context().Done()
+					return
+				}
+				if tc.status != 0 {
+					w.WriteHeader(tc.status)
+					return
+				}
+				switch r.URL.Path {
+				case "/statistics/resources":
+					fmt.Fprint(w, `{"MediaContainer":{"StatisticsResources":[]}}`)
+				case "/statistics/bandwidth":
+					fmt.Fprint(w, `{"MediaContainer":{"StatisticsBandwidth":[]}}`)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer ts.Close()
+			srv := New(newTestClient(t, ts))
+
+			ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+			defer cancel()
+			if tc.cancel {
+				cancel()
+			}
+			srv.refreshResources(ctx)
+			srv.refreshBandwidth(ctx)
+
+			for fetch, want := range map[string]float64{"resources": tc.wantResources, "bandwidth": tc.wantBandwidth} {
+				got, ok := valueOf(t, srv, metrics.DescRefreshDeadlineExceeded, map[string]string{"fetch": fetch})
+				if !ok {
+					t.Errorf("no plex_refresh_deadline_exceeded_total{fetch=%q} sample", fetch)
+				}
+				if got != want {
+					t.Errorf("plex_refresh_deadline_exceeded_total{fetch=%q} = %v, want %v", fetch, got, want)
+				}
+			}
+		})
+	}
+}

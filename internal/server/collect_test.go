@@ -489,8 +489,9 @@ func TestCollectServerMetrics(t *testing.T) {
 	// active_transcodes, cpu + mem (ResourcesRead), transmit (BandwidthRead)
 	// + len(metrics.ErrorTypes) error counters.
 	// Plus: 2x lib_duration, 2x lib_storage, 1x lib_items (only Movies has a count that was read)
-	// + walk_skipped and walk_complete + 1x walkable per video library.
-	want := 8 + len(metrics.ErrorTypes) + 5 + 2 + 2
+	// + walk_skipped and walk_complete + 1x walkable per video library
+	// + the tracker's two series and one deadline counter per fetch.
+	want := 8 + len(metrics.ErrorTypes) + 5 + 2 + 2 + 2 + len(metrics.RefreshFetches)
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 		for i, m := range ms {
@@ -515,8 +516,9 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 	// Base: http_reachable, session_poll_reachable, http_retries, server_info,
 	// active_transcodes + len(metrics.ErrorTypes) error counters. The statistics
 	// endpoints were never read, so cpu, mem and transmit are absent.
-	// + walk_skipped and walk_complete.
-	want := 5 + len(metrics.ErrorTypes) + 2
+	// + walk_skipped and walk_complete + the tracker's two series and one
+	// deadline counter per fetch.
+	want := 5 + len(metrics.ErrorTypes) + 2 + 2 + len(metrics.RefreshFetches)
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 	}
@@ -580,8 +582,9 @@ func TestCollectWithActiveSessions(t *testing.T) {
 	ms := drainMetrics(ch)
 	// Base 8 (+ metrics.ErrorTypes) + 1 lib_duration + 1 lib_storage
 	// + 1 lib_items + play_count + play_seconds + session_bandwidth + session_bitrate
-	// + walk_skipped, walk_complete and 1 walkable.
-	want := 8 + len(metrics.ErrorTypes) + 3 + 4 + 3
+	// + walk_skipped, walk_complete and 1 walkable + the tracker's two
+	// series and one deadline counter per fetch.
+	want := 8 + len(metrics.ErrorTypes) + 3 + 4 + 3 + 2 + len(metrics.RefreshFetches)
 	if len(ms) != want {
 		t.Errorf("Collect with sessions produced %d metrics, want %d", len(ms), want)
 	}
@@ -607,8 +610,9 @@ func TestCollectMultipleLibraries(t *testing.T) {
 	ms := drainMetrics(ch)
 	// Base 5 (no host or bandwidth read) (+ metrics.ErrorTypes) + 3x lib_duration,
 	// 3x lib_storage, 3x lib_items + walk_skipped, walk_complete and a walkable
-	// series for each of the two video libraries.
-	want := 5 + len(metrics.ErrorTypes) + 9 + 4
+	// series for each of the two video libraries + the tracker's two series
+	// and one deadline counter per fetch.
+	want := 5 + len(metrics.ErrorTypes) + 9 + 4 + 2 + len(metrics.RefreshFetches)
 	if len(ms) != want {
 		t.Errorf("Collect multi-lib produced %d metrics, want %d", len(ms), want)
 	}
@@ -729,7 +733,7 @@ func TestSessionIndex(t *testing.T) {
 
 func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	// A transient failure on the first Refresh starts the exporter degraded:
-	// it has never learned who the server is, so it publishes its own four
+	// it has never learned who the server is, so it publishes only its own
 	// metrics and no server-scoped series (which would carry an empty
 	// identity and land on a series no alert or dashboard matches).
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -749,9 +753,10 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	close(ch)
 	ms := drainMetrics(ch)
 
-	// Three single-sample exporter metrics plus one error counter per type.
-	// Fails without the identity gate: plex_server_info alone adds one.
-	if want := 3 + len(metrics.ErrorTypes); len(ms) != want {
+	// Five single-sample exporter metrics, one error counter per type and
+	// one deadline counter per Plex Pass fetch. Fails without the identity
+	// gate: plex_server_info alone adds one.
+	if want := 5 + len(metrics.ErrorTypes) + len(metrics.RefreshFetches); len(ms) != want {
 		t.Errorf("Collect produced %d metrics while blind, want %d", len(ms), want)
 		for i, m := range ms {
 			t.Logf("  [%d] %s", i, m.Desc().String())
@@ -796,6 +801,23 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	}
 	if refreshErrors != 1 {
 		t.Errorf("plex_exporter_errors_total{type=refresh} = %v, want 1", refreshErrors)
+	}
+}
+
+func TestCollect_session_tracker_fill_and_drops(t *testing.T) {
+	srv := New(nil)
+	for i := range 256 {
+		srv.Sessions.Update(fmt.Sprintf("s%d", i), sessions.StatePlaying, nil, nil)
+	}
+	for i := range 3 {
+		srv.Sessions.Update(fmt.Sprintf("new%d", i), sessions.StatePlaying, nil, nil)
+	}
+
+	if got, ok := valueOf(t, srv, metrics.DescSessionsTracked, nil); !ok || got != 256 {
+		t.Errorf("plex_sessions_tracked = %v (present %t), want 256", got, ok)
+	}
+	if got, ok := valueOf(t, srv, metrics.DescSessionsDropped, nil); !ok || got != 3 {
+		t.Errorf("plex_sessions_dropped_total = %v (present %t), want 3", got, ok)
 	}
 }
 

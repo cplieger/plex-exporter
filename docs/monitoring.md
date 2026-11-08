@@ -13,7 +13,7 @@ Both answer on port 9594 by default. [How plex-exporter works](how-it-works.md#w
 
 ## Exporter metrics
 
-These four carry no server labels and appear from the first scrape.
+These seven carry no server labels and appear from the first scrape.
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
@@ -21,6 +21,9 @@ These four carry no server labels and appear from the first scrape.
 | `plex_session_poll_reachable` | Gauge | _none_ | `1` when the last `/status/sessions` poll succeeded, `0` when it failed |
 | `plex_http_retries_total` | Counter | _none_ | HTTP retries the exporter's Plex client made, across all requests |
 | `plex_exporter_errors_total` | Counter | `type` | Exporter errors by type: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`, `library_walk`, `history_fetch`, `activities_fetch`, `sections_fetch`, `updater_fetch` or `prefs_fetch` |
+| `plex_sessions_tracked` | Gauge | _none_ | Plex sessions the exporter tracks, at most 256 |
+| `plex_sessions_dropped_total` | Counter | _none_ | New Plex sessions the exporter refused because it already tracked 256. A session refused on several polls counts on each |
+| `plex_refresh_deadline_exceeded_total` | Counter | `fetch` | Plex Pass reads skipped because the refresh ran out of its 45-second deadline, by `fetch`: `resources` (host CPU and memory) or `bandwidth` (`plex_transmit_bytes_total`). A read Plex answers with 404, as it does without Plex Pass, does not count |
 
 ## Server metrics
 
@@ -191,7 +194,7 @@ The two target rules need each other. `PlexExporterTargetDown` catches a target 
 
 The log rules need no parser stage. The exporter writes Go slog logfmt to stderr, which Docker captures, so `level=ERROR` and the message text are plain substrings. Go renders the level in uppercase, so match `level=ERROR` and never `level=error`. There is no log-level setting. The level is fixed at INFO, so every WARN and ERROR line these rules match is always written, and a DEBUG line never is.
 
-The metric rules need nothing beyond the scrape. The four exporter series are published from the first scrape, and no setting can turn one off. `plex_library_items`, which `PlexExporterLibraryItemsCollapsed` reads, appears once the exporter has learned the server identity and read a library count.
+The metric rules need nothing beyond the scrape. The seven exporter series are published from the first scrape, and no setting can turn one off. `plex_library_items`, which `PlexExporterLibraryItemsCollapsed` reads, appears once the exporter has learned the server identity and read a library count.
 
 ### Notes on each rule
 

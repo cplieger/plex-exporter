@@ -116,7 +116,26 @@ var (
 		"Exporter errors by type",
 		[]string{"type"}, nil,
 	)
+	DescSessionsTracked = prometheus.NewDesc(
+		"plex_sessions_tracked",
+		"Plex sessions the exporter tracks, at most 256",
+		nil, nil,
+	)
+	DescSessionsDropped = prometheus.NewDesc(
+		"plex_sessions_dropped_total",
+		"New Plex sessions refused because the exporter already tracked 256",
+		nil, nil,
+	)
+	DescRefreshDeadlineExceeded = prometheus.NewDesc(
+		"plex_refresh_deadline_exceeded_total",
+		"Plex Pass fetches skipped because the refresh ran out of its 45s deadline",
+		[]string{"fetch"}, nil,
+	)
 )
+
+// RefreshFetches is the closed set of `fetch` label values emitted on
+// DescRefreshDeadlineExceeded.
+var RefreshFetches = []string{"resources", "bandwidth"}
 
 // libIDLabels identify a library without its free-text name, which the
 // dashboard joins from plex_library_storage_bytes.
@@ -221,6 +240,7 @@ var AllDescs = []*prometheus.Desc{
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
 	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors,
+	DescSessionsTracked, DescSessionsDropped, DescRefreshDeadlineExceeded,
 	DescTopItemBytes, DescTopItemLastPlayed, DescRecentItemAdded,
 	DescWatchAgeBytes, DescWatchAgeItems, DescResolutionBytes, DescCodecBytes,
 	DescMultiVersionItems, DescExtraVersionBytes, DescNewestItemAdded, DescAddedItems,

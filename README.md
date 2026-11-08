@@ -129,7 +129,7 @@ At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `
 
 ## Monitoring
 
-plex-exporter serves 45 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Eight PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+plex-exporter serves 48 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Eight PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
 
 ## Documentation
 
