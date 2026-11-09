@@ -239,7 +239,7 @@ func TestWalkPass_unmatched_history_rows_hide_watch_completeness(t *testing.T) {
 	}
 	for _, d := range []*metrics.Desc{metrics.DescWatchAgeBytes, metrics.DescWatchAgeItems} {
 		if got := series(t, srv, d); len(got) != 0 {
-			t.Errorf("%s with unmatched rows = %v, want none", d, got)
+			t.Errorf("%s with unmatched rows = %v, want none", d.Name, got)
 		}
 	}
 	if _, ok := valueOf(t, srv, metrics.DescTopItemBytes, libMatch("1", "rating_key", "10")); !ok {

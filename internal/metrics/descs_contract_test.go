@@ -14,9 +14,9 @@ import (
 const familiesGolden = "testdata/families.golden"
 
 // Every family keeps the name, type, HELP and label names it was released
-// with, because a change breaks the queries, dashboards and rules built on
-// it. Regenerate the golden only for a breaking release:
-// UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract
+// with. A changed or removed line breaks the queries, dashboards and rules
+// built on it, so it is a breaking release; an added line is a new family.
+// Regenerate with UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract
 func TestAllDescs_keep_their_released_contract(t *testing.T) {
 	var b strings.Builder
 	for _, d := range metrics.AllDescs {
@@ -33,7 +33,7 @@ func TestAllDescs_keep_their_released_contract(t *testing.T) {
 		t.Fatalf("read %s: %v; regenerate with UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract", familiesGolden, err)
 	}
 	if !bytes.Equal([]byte(b.String()), want) {
-		t.Errorf("AllDescs differ from %s; a change here is a breaking release. Regenerate with UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract\ngot:\n%s", familiesGolden, b.String())
+		t.Errorf("AllDescs differ from %s; a changed or removed family is a breaking release, an added one a new family. Regenerate with UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract\ngot:\n%s", familiesGolden, b.String())
 	}
 }
 

@@ -602,7 +602,7 @@ func TestCollect_host_metrics_values(t *testing.T) {
 	if len(cpuMetrics) != 1 {
 		t.Fatalf("expected 1 cpu metric, got %d", len(cpuMetrics))
 	}
-	_, cpuVal := cpuMetrics[0].labels, cpuMetrics[0].value
+	cpuVal := cpuMetrics[0].value
 	if cpuVal != 0.42 {
 		t.Errorf("host_cpu = %v, want 0.42", cpuVal)
 	}
@@ -611,7 +611,7 @@ func TestCollect_host_metrics_values(t *testing.T) {
 	if len(memMetrics) != 1 {
 		t.Fatalf("expected 1 mem metric, got %d", len(memMetrics))
 	}
-	_, memVal := memMetrics[0].labels, memMetrics[0].value
+	memVal := memMetrics[0].value
 	if memVal != 0.65 {
 		t.Errorf("host_mem = %v, want 0.65", memVal)
 	}
@@ -732,7 +732,7 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	}
 
 	for _, m := range ms {
-		labels, _ := m.labels, m.value
+		labels := m.labels
 		for _, name := range []string{metrics.LabelServer, metrics.LabelServerID} {
 			if v, ok := labels[name]; ok {
 				t.Errorf("%s carries %s=%q while blind, want no identity label", m.family, name, v)
@@ -744,7 +744,7 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	if len(reach) != 1 {
 		t.Fatalf("Collect emitted %d plex_http_reachable samples, want 1", len(reach))
 	}
-	if _, v := reach[0].labels, reach[0].value; v != 0 {
+	if v := reach[0].value; v != 0 {
 		t.Errorf("plex_http_reachable = %v while blind, want 0", v)
 	}
 
@@ -819,14 +819,14 @@ func TestCollect_plex_pass_gauges_absent_until_read(t *testing.T) {
 	if len(cpu) != 1 {
 		t.Fatalf("Collect emitted %d plex_host_cpu_utilization_ratio samples after a read, want 1", len(cpu))
 	}
-	if _, v := cpu[0].labels, cpu[0].value; v != 0.42 {
+	if v := cpu[0].value; v != 0.42 {
 		t.Errorf("plex_host_cpu_utilization_ratio = %v, want 0.42", v)
 	}
 	mem := byDesc[metrics.DescHostMem.Name]
 	if len(mem) != 1 {
 		t.Fatalf("Collect emitted %d plex_host_memory_utilization_ratio samples after a read, want 1", len(mem))
 	}
-	if _, v := mem[0].labels, mem[0].value; v != 0.65 {
+	if v := mem[0].value; v != 0.65 {
 		t.Errorf("plex_host_memory_utilization_ratio = %v, want 0.65", v)
 	}
 	if got := byDesc[metrics.DescTransmitBytes.Name]; len(got) != 0 {
@@ -894,7 +894,7 @@ func TestCollect_identity_persists_across_failed_refresh(t *testing.T) {
 	if len(info) != 1 {
 		t.Fatalf("Collect emitted %d plex_server_info samples after a failed refresh, want 1", len(info))
 	}
-	labels, _ := info[0].labels, info[0].value
+	labels := info[0].labels
 	if labels[metrics.LabelServer] != "TestPlex" || labels[metrics.LabelServerID] != "abc123" {
 		t.Errorf("plex_server_info labels = server=%q server_id=%q, want TestPlex abc123",
 			labels[metrics.LabelServer], labels[metrics.LabelServerID])

@@ -224,7 +224,7 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 		t.Fatalf("expected 1 play_count metric, got %d", len(playMetrics))
 	}
 
-	labels, _ := playMetrics[0].labels, playMetrics[0].value
+	labels := playMetrics[0].labels
 
 	if labels["stream_type"] != "transcode" {
 		t.Errorf("stream_type = %q, want transcode", labels["stream_type"])
@@ -259,7 +259,7 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 	if len(bitrateMetrics) != 1 {
 		t.Fatalf("expected 1 session_bitrate metric, got %d", len(bitrateMetrics))
 	}
-	_, brVal := bitrateMetrics[0].labels, bitrateMetrics[0].value
+	brVal := bitrateMetrics[0].value
 	if brVal != 20000 {
 		t.Errorf("session_bitrate value = %v, want 20000", brVal)
 	}
@@ -293,7 +293,7 @@ func TestCollectSessions_no_media_uses_defaults(t *testing.T) {
 		t.Fatalf("expected 1 play_count metric, got %d", len(playMetrics))
 	}
 
-	labels, _ := playMetrics[0].labels, playMetrics[0].value
+	labels := playMetrics[0].labels
 
 	if labels["stream_type"] != metrics.ValUnknown {
 		t.Errorf("stream_type = %q, want %q (no media)", labels["stream_type"], metrics.ValUnknown)
@@ -338,7 +338,7 @@ func TestCollectSessions_local_true_label(t *testing.T) {
 		t.Fatalf("expected 1 play_count metric, got %d", len(playMetrics))
 	}
 
-	labels, _ := playMetrics[0].labels, playMetrics[0].value
+	labels := playMetrics[0].labels
 	if labels["local"] != metrics.ValTrue {
 		t.Errorf("local = %q, want true", labels["local"])
 	}
@@ -381,7 +381,7 @@ func TestCollectSessions_library_lookup_sets_labels(t *testing.T) {
 
 	// Find each session's metric by the session label
 	for _, m := range playMetrics {
-		labels, _ := m.labels, m.value
+		labels := m.labels
 		switch labels["session"] {
 		case "s1":
 			if labels["library"] != "PresetLib" {
@@ -452,7 +452,7 @@ func TestCollectSessions_play_seconds_stopped_uses_prev(t *testing.T) {
 		t.Fatalf("expected 1 play_seconds metric, got %d", len(secMetrics))
 	}
 
-	_, val := secMetrics[0].labels, secMetrics[0].value
+	val := secMetrics[0].value
 	// Should be ~5 seconds (prevPlayedTime), NOT ~1000 seconds
 	if val > 10 {
 		t.Errorf("play_seconds = %v, want ~5 (stopped session should use prevPlayedTime only)", val)

@@ -124,7 +124,7 @@ At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
 - Host CPU, memory and `plex_transmit_bytes_total` are missing. They need Plex Pass, and appear once Plex has answered for them.
-- With `read_only: true` in your compose file, `/healthz` answers 503, Docker marks the container unhealthy and the log shows a failed `/healthz` request every 30 seconds. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
+- With `read_only: true` in your compose file, `/healthz` reports unhealthy, Docker marks the container unhealthy and the log shows a failed `/healthz` request every 30 seconds. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
 - A library's item count lags after a large scan, because counts are read every 15 minutes.
 
 ## Monitoring
