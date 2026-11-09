@@ -110,21 +110,20 @@ func run() int {
 	// Chain is outermost-first: Logging records the final status (even a
 	// recovered panic), Recoverer converts a panic to its 500 before
 	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
-	// machine-scraped, non-browser. ProbeLogLevel keeps a healthy probe at
+	// machine-scraped, non-browser. WithProbeLogLevel keeps a healthy probe at
 	// Debug and surfaces a failing one at Warn/Error with status + request id.
 	handler := httpserver.Chain(mux,
-		httpserver.Logging(httpserver.ProbeLogLevel("/metrics", "/api/health")),
+		httpserver.Logging(httpserver.WithProbeLogLevel("/metrics", "/api/health")),
 		httpserver.Recoverer(),
 		httpserver.SecurityHeaders(),
 	)
 
-	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; NewServer
+	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; New
 	// leaves them unset by default.
-	srv := httpserver.New(handler,
-		httpserver.WithReadHeaderTimeout(5*time.Second),
-		httpserver.WithReadTimeout(5*time.Second),
-		httpserver.WithWriteTimeout(10*time.Second),
-	)
+	srv := httpserver.New(handler)
+	srv.ReadHeaderTimeout = 5 * time.Second
+	srv.ReadTimeout = 5 * time.Second
+	srv.WriteTimeout = 10 * time.Second
 
 	// Bind the listener before marking healthy so a port-in-use failure is
 	// reported before Docker's healthcheck can observe a stale-true state.
@@ -152,7 +151,7 @@ func run() int {
 		marker.Set(false)
 		slog.Info("shutting down", "cause", context.Cause(ctx))
 	})
-	if srvErr := httpserver.Run(ctx, srv, listener, nil, httpserver.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
+	if srvErr := httpserver.Run(ctx, srv, listener, httpserver.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
 		slog.Error("metrics server failed", "error", srvErr)
 		ps.RecordError("metrics_server")
 		return 1
