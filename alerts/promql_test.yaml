@@ -96,6 +96,16 @@ tests:
                 The /status/sessions poll has failed for 10m while the rest of the
                 Plex API answers, so every session metric is absent or stale. If it
                 fails only during playback, look for a decode error in the log.
+    # The Plex server tile on the bundled dashboard shows while the alert fires and clears after it resolves.
+    promql_expr_test:
+      - expr: '(0 * max(ALERTS{alertname="PlexExporterAPIUnreachable", alertstate="firing"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname="PlexExporterAPIUnreachable"}[12m])))'
+        eval_time: 11m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: '(0 * max(ALERTS{alertname="PlexExporterAPIUnreachable", alertstate="firing"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname="PlexExporterAPIUnreachable"}[12m])))'
+        eval_time: 14m
+        exp_samples: []
 
   - name: collection errors fire per type after 30m of errors
     interval: 1m
@@ -148,6 +158,16 @@ tests:
       - eval_time: 30m
         alertname: PlexExporterSessionMapFull
         exp_alerts: []
+    # The Session tracker full tile on the bundled dashboard shows while the alert fires and clears after it resolves.
+    promql_expr_test:
+      - expr: '(0 * max(ALERTS{alertname="PlexExporterSessionMapFull", alertstate="firing"})) or ((0 * max((increase(plex_sessions_dropped_total[15m]) > 0) and (count_over_time((increase(plex_sessions_dropped_total[15m]) > 0)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname="PlexExporterSessionMapFull"}[2m])))'
+        eval_time: 7m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: '(0 * max(ALERTS{alertname="PlexExporterSessionMapFull", alertstate="firing"})) or ((0 * max((increase(plex_sessions_dropped_total[15m]) > 0) and (count_over_time((increase(plex_sessions_dropped_total[15m]) > 0)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname="PlexExporterSessionMapFull"}[2m])))'
+        eval_time: 30m
+        exp_samples: []
 
   - name: more than three refresh deadline misses in 15m fire the refresh rule
     interval: 1m
@@ -177,6 +197,16 @@ tests:
       - eval_time: 30m
         alertname: PlexExporterRefreshIncomplete
         exp_alerts: []
+    # The Plex Pass data stale tile on the bundled dashboard shows while the alert fires and clears after it resolves.
+    promql_expr_test:
+      - expr: '(0 * max(ALERTS{alertname="PlexExporterRefreshIncomplete", alertstate="firing"})) or ((0 * max((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3) and (count_over_time((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname="PlexExporterRefreshIncomplete"}[2m])))'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: '(0 * max(ALERTS{alertname="PlexExporterRefreshIncomplete", alertstate="firing"})) or ((0 * max((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3) and (count_over_time((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname="PlexExporterRefreshIncomplete"}[2m])))'
+        eval_time: 30m
+        exp_samples: []
 
   - name: three refresh deadline misses in 15m stay quiet
     interval: 1m
