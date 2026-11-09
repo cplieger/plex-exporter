@@ -50,7 +50,7 @@ The library content series appear after a library's first complete item-by-item 
 ## Why it is built this way
 
 - It polls `/status/sessions` every 5 seconds. Plex embeds each stream's transcode decisions in that answer, so a timer is all the exporter needs.
-- It is one Go binary. Its direct dependencies are `prometheus/client_golang` and a few small helper libraries, listed in [Security](hardening.md#what-the-image-contains), and the rest is the Go standard library.
+- It is one Go binary. Its direct dependencies are a few small libraries, listed in [Security](hardening.md#what-the-image-contains), and the rest is the Go standard library.
 - It runs on `gcr.io/distroless/static-debian13` as the non-root user 65532, with no shell or package manager.
 - It serves a standard `/metrics` endpoint, so any Prometheus-compatible scraper and any Grafana dashboard can read it. It has no charts of its own.
 - Each stream's bitrate is its own `plex_session_bitrate_kbps` series rather than a label on the play metrics. Plex changes the bitrate during adaptive streaming, and a label would start a new series each time.

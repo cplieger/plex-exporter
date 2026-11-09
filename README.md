@@ -117,7 +117,7 @@ The exporter only connects out, to the Plex server you configure. It sends the t
 
 ## Troubleshooting
 
-The image's healthcheck runs `/plex-exporter health`, which asks `GET /healthz` on the exporter's own port. `/healthz` reads a marker file the exporter writes in `/tmp` once its metrics server is listening, and answers 503 while the exporter starts or stops. Plex being unreachable never makes it unhealthy: that shows as `plex_http_reachable` at `0`.
+The image's healthcheck runs `/plex-exporter health`, which asks `GET /healthz` on the exporter's own port. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told. Plex being unreachable never makes it unhealthy: that shows as `plex_http_reachable` at `0`.
 
 At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `PLEX_URL` is not an http or https address, `PLEX_CA_CERT_PATH` cannot be read or holds no certificate, or the listen port cannot be bound, and Docker restarts it. Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running with `plex_http_reachable` at `0`, and it retries every 5 seconds.
 
@@ -129,7 +129,7 @@ At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `
 
 ## Monitoring
 
-plex-exporter serves 48 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Ten PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+plex-exporter serves 48 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. The page also carries the Go runtime and process metrics under the names Go's official Prometheus client uses. Ten PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them. The image has a Docker healthcheck; [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
 
 ## Documentation
 
@@ -142,7 +142,7 @@ plex-exporter serves 48 metrics on `/metrics`, for the exporter itself, the serv
 
 - The metric and label names follow [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) by [@jsclayton](https://github.com/jsclayton), the Grafana Hackathon 2022 exporter this project builds on.
 - The `plex_library_items` metric with its `content_type` label, and the `transcode_type` and `subtitle_action` labels, follow the [@timothystewart6 fork](https://github.com/timothystewart6/prometheus-plex-exporter) of that exporter.
-- It reads the [Plex Media Server API](https://developer.plex.tv/pms/) and serves its metrics with [prometheus/client_golang](https://github.com/prometheus/client_golang), the Go client library for Prometheus.
+- It reads the [Plex Media Server API](https://developer.plex.tv/pms/) and serves its metrics with [measure](https://github.com/cplieger/go/tree/main/measure), a Prometheus metrics library with no dependencies.
 
 ## Contributing
 

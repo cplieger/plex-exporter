@@ -37,11 +37,10 @@ The image is one static Go binary on `gcr.io/distroless/static-debian13:nonroot`
 | --- | --- |
 | golang | [Go](https://hub.docker.com/_/golang) |
 | gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
-| github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_model) |
 | github.com/cplieger/plexapi/v3 | [GitHub](https://github.com/cplieger/plexapi) |
 | github.com/cplieger/go/httpserver | [GitHub](https://github.com/cplieger/go/tree/main/httpserver) |
 | github.com/cplieger/go/health | [GitHub](https://github.com/cplieger/go/tree/main/health) |
+| github.com/cplieger/go/measure | [GitHub](https://github.com/cplieger/go/tree/main/measure) |
 | github.com/cplieger/go/envx | [GitHub](https://github.com/cplieger/go/tree/main/envx) |
 | github.com/cplieger/go/slogx | [GitHub](https://github.com/cplieger/go/tree/main/slogx) |
 | github.com/cplieger/go/textsafe | [GitHub](https://github.com/cplieger/go/tree/main/textsafe) |

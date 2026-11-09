@@ -22,7 +22,7 @@ Without it, `/healthz` answers 503 for as long as the exporter runs, so an HTTP 
 
 ## Probes
 
-These probes are a starting point. Both ask `GET /healthz`, which answers 200 while the exporter serves, and 503 while it starts or stops. With `readOnlyRootFilesystem: true` they need the `/tmp` mount above. Plex being unreachable never fails them. A liveness probe that must ignore readiness can use a `tcpSocket` probe on port 9594 instead.
+These probes are a starting point. Both ask `GET /healthz`, which passes while the exporter serves and fails while it starts or stops, as [Knowing the app is alive](monitoring.md#knowing-the-app-is-alive) explains. With `readOnlyRootFilesystem: true` they need the `/tmp` mount above. Plex being unreachable never fails them. A liveness probe that must ignore readiness can use a `tcpSocket` probe on port 9594 instead.
 
 ```yaml
     livenessProbe:

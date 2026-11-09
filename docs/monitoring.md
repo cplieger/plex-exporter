@@ -1,17 +1,21 @@
 # Monitoring and alerts
 
-This page lists every metric and label plex-exporter serves, how to get the matching Grafana dashboard, and the alert rules that ship with it. It is for readers who build their own panels or load the rules into a ruler.
+plex-exporter serves a metrics page and ships metric alert rules and a Grafana dashboard for it. Every alert needs a metric store such as Prometheus, and no rule reads the log. This page lists every metric and label, the alert rules and the dashboard downloads, for readers who build their own panels or load the rules into a ruler.
 
-## Endpoints
+## What you get
 
-| Endpoint | Method | Description |
+| You run | You get | You set up |
 | --- | --- | --- |
-| `/metrics` | GET | Prometheus metrics, listed below |
-| `/healthz` | `GET`, `HEAD` | `200 {"status":"ok"}` while the exporter serves, or `503 {"status":"unhealthy","reasons":[...]}` while it starts or stops, or cannot write its marker in `/tmp`. No login. Plex being unreachable never makes it unhealthy |
+| Prometheus, Mimir or VictoriaMetrics, with Alertmanager (the monitoring guide's starting stack) | the ten alerts, the `up` series, and with Grafana the bundled dashboard | a scrape job named `plex-exporter` on port 9594, and [`alerts/promql.yaml`](../alerts/promql.yaml) |
+| Loki and Alertmanager, no metric store | no alerts: plex-exporter needs a metric store | Prometheus or another metric store, as the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md) sets up |
+| Grafana-managed alerting only | the rules imported into Grafana | a Prometheus data source and the rules of `alerts/promql.yaml` |
+| Docker or Unraid only | the Docker healthcheck, which notifies nobody | an uptime prober on `/healthz`, or something that watches Docker health |
 
-Both answer on port 9594 by default. [How plex-exporter works](how-it-works.md#when-each-metric-appears) explains when each series appears.
+## Metrics
 
-## Exporter metrics
+The page is always on, at `/metrics` on port 9594, which `LISTEN_ADDR` changes. It has no login, so keep the port on your own network: its labels carry Plex user names, device names and the titles being played. [How plex-exporter works](how-it-works.md#when-each-metric-appears) explains when each series appears.
+
+### Exporter metrics
 
 These seven carry no server labels and appear from the first scrape.
 
@@ -25,7 +29,7 @@ These seven carry no server labels and appear from the first scrape.
 | `plex_sessions_dropped_total` | Counter | _none_ | New Plex sessions the exporter refused because it already tracked 256. A session refused on several polls counts on each |
 | `plex_refresh_deadline_exceeded_total` | Counter | `fetch` | Plex Pass reads skipped because the refresh ran out of its 45-second deadline, by `fetch`: `resources` (host CPU and memory) or `bandwidth` (`plex_transmit_bytes_total`). A read Plex answers with 404, as it does without Plex Pass, does not count |
 
-## Server metrics
+### Server metrics
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
@@ -39,7 +43,7 @@ These seven carry no server labels and appear from the first scrape.
 | `plex_server_update_checked_timestamp_seconds` | Gauge | `server`, `server_id` | When Plex last checked for an update, as a Unix time |
 | `plex_server_scheduled_scan_interval_seconds` | Gauge | `server`, `server_id` | How often Plex scans every library on its own, Plex's Library scan interval setting. Present only while Scan my library periodically is on and Plex's settings were read in the last 45 minutes |
 
-## Library metrics
+### Library metrics
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
@@ -47,7 +51,7 @@ These seven carry no server labels and appear from the first scrape.
 | `plex_library_storage_bytes` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id` | Disk space the library uses, in bytes |
 | `plex_library_items` | Gauge | `server`, `server_id`, `library_type`, `library`, `library_id`, `content_type` | Items in the library, read every 15 minutes. `content_type` is `movies`, `episodes`, `tracks`, `photos` or `items` |
 
-## Library content metrics
+### Library content metrics
 
 The exporter reads every movie, show and home-video library item by item once an hour, up to 32 libraries. These series appear after a library's first complete read. Music and photo libraries are not read this way. The base labels are `server`, `server_id`, `library_type` and `library_id`. They carry no `library` name, so join it from `plex_library_storage_bytes` on `server`, `server_id` and `library_id`.
 
@@ -83,7 +87,7 @@ Server-level read state:
 | `plex_history_unmatched_rows` | Gauge | `server`, `server_id` | History rows with a non-numeric item key, or an item key but no play time, since the last full read, counted up to 250,000 |
 | `plex_history_deleted_item_rows` | Gauge | `server`, `server_id` | History rows for items no longer in Plex since the last full read, counted up to 250,000 |
 
-### Watch figures
+#### Watch figures
 
 "No recorded play" means no account on the server has a play of the item in Plex's watch history, and the token owner has not marked it watched with a play count. History deleted in Plex still counts as no recorded play, and so does an item another account marked as watched without playing it. The dashboard calls this Never played.
 
@@ -93,7 +97,7 @@ Plex keeps the plays of items you delete and sends them without an item. Those r
 
 The exporter reads the whole history when it starts, then the plays since its last read every 5 minutes, and the last 30 days once a day for plays a client reported late. A failed read keeps the figures for up to an hour. A failed full read is retried after 5 minutes, doubling to 6 hours.
 
-### Fixed limits
+#### Fixed limits
 
 | Limit | Value |
 | --- | --- |
@@ -109,7 +113,7 @@ The exporter reads the whole history when it starts, then the plays since its la
 
 Item titles stay in Prometheus for as long as it keeps data, including titles that later leave the top 10. At most about 3,800 series exist at once on a server at the limits, and about 340 on a typical server.
 
-## Session metrics
+### Session metrics
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
@@ -121,7 +125,7 @@ Item titles stay in Prometheus for as long as it keeps data, including titles th
 
 The play labels are `library`, `library_id`, `library_type`, `media_type`, `title`, `child_title`, `grandchild_title`, `grandchild_index`, `stream_type`, `stream_resolution`, `stream_file_resolution`, `device`, `device_type`, `user`, `session`, `transcode_type`, `subtitle_action`, `location` and `local`.
 
-## Session labels
+### Session labels
 
 | Label | Values | Description |
 | --- | --- | --- |
@@ -140,33 +144,13 @@ On `plex_session_video_transcode`, a half of the transcode is `hardware` when Pl
 
 Both labels report what Plex says about the session. Plex can keep reporting hardware for a session it has restarted on the CPU, so a `hardware` label beside high CPU load points at Plex.
 
-## Dashboard
+### Go runtime and process metrics
 
-[`grafana-dashboard.json`](../grafana-dashboard.json) imports as the Plex Exporter dashboard and needs Grafana 13.2 or newer. It has six tabs:
+The page also carries the Go runtime and process families (`go_*`, `process_*`) under the names Go's official Prometheus client uses, so stock Go dashboards work. `process_start_time_seconds`, which `PlexExporterLibraryWalkStale` reads, is one of them. `process_gc_pause_seconds_total` and `process_uptime_seconds` have no counterpart in that client. On Linux, the CPU, memory, file descriptor and network families appear when the exporter can read them from `/proc`.
 
-- Overview shows the Plex version, the streams and transcodes running now and the items added in the selected range. Below them, a Needs attention row appears only while something needs you, with a tile for each problem: the exporter is not scraped, Plex or its session poll is unreachable, a library lost most of its items, has not been read or is overdue for a Plex scan, reads kept failing at some point in the selected range, watch history is stale or its figures are hidden, libraries are skipped, items have no size, or a Plex update is out. A tile with a matching alert rule below shows exactly while that alert fires, because it reads the rule's `ALERTS` series, which Prometheus and the Mimir ruler both store beside your metrics. Failed reads shows when `PlexExporterCollectionErrors` fired at any point in the selected range and counts every failed read in that range. While no `ALERTS` series exists for a rule, as on a Prometheus that does not run these rules, the tile checks the rule's condition itself and shows a minute or two after the alert would have fired. The plex-exporter tile then finds the exporters by the metrics they sent, so it needs no `job` name. The tab also shows the active streams with how each video transcode runs and their bandwidth beside the bitrate of the media they play. A server with Plex Pass also gets the host's CPU and memory.
-- Libraries shows the library totals and, below them, a tile for each item type you have, each library's size, averages and how long ago it last gained an item, was scanned and was read, and the scans, analysis and metadata tasks Plex is running now. It shows the storage and items each library added in the selected range, also as a share of its size, then two charts of that change over the range, one band per library stacked on the others, and the 10 newest items. It also shows storage by resolution and codec.
-- Storage cleanup shows the space held by items nobody has played and by extra versions. It shows each library's space by when it was last watched, and a bar links to that library's unplayed items in Plex Web. Plex lists what your own account has not played there, so the list can be longer than the never-played figure, which counts every account. It also shows the 10 largest items in each library with when anyone last played them.
-- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched shows, films and tracks, each show counted whole. It also shows the hours watched by delivery method and by home or remote network, in bars an hour long at 24 hours and a day long at 30 days, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
-- Transcoding shows the hours of video transcoding over the range by where Plex decoded and encoded the video, the share encoded on hardware, and the transcode hours by player, codec and resolution.
-- Exporter health shows how long the last full library pass took, the Plex request retries in the range, any failed reads by type, the libraries with items of unknown size and each library's last read, so you can see what plex-exporter could read. A broken read state shows as a tile on Overview.
+## Logs
 
-A title over the selected range names its length, such as Items added in 7 days, and says the range instead while the data source cannot answer.
-
-The Library variable filters the Libraries and Storage cleanup tabs by library. Plex numbers libraries per server, so with several servers selected one choice shows that library number on each of them. With several servers selected, every per-library row and bar names its server before the library. Two libraries with the same name on one server show their library number after the name, such as `Movies (id 2)`. Two servers that report the same name are selected together by the Server variable, and each shows the first eight characters of its server ID after the name, such as `home (id 3f2a9c1e)`.
-
-The dashboard is versioned with the app. The `grafana-dashboard.json` of release `<tag>` matches the metrics that image serves. The file sets `metadata.name` to `plex-exporter`, which Grafana uses as the dashboard UID. Because the name stays the same from release to release, a re-import over the existing one, or a file provider reading the newer file, updates it in place. Pin it the way you pin the image, with the tag of the image you run.
-
-On Grafana 13.1 or older, use the `grafana-dashboard.json` of release [v4.1.3](https://github.com/cplieger/plex-exporter/releases/tag/v4.1.3), the last one in the older dashboard format. That file gets no further changes, so you maintain it yourself.
-
-Each release attaches the file and its checksum:
-
-- `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json`, which works as the Grafana Helm chart's `dashboards.<provider>.<name>.url` with `curlOptions: "-sLf"`, because the release URL redirects, or as a Terraform `http` data source.
-- `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json.sha256` beside it.
-
-Renovate can keep the URL current with its `github-releases` datasource. The same file is also the OCI artifact `ghcr.io/cplieger/plex-exporter/dashboard:<tag>`, with the artifact type `application/vnd.grafana.dashboard.v2+json`. [Running on Kubernetes](kubernetes.md#delivering-the-dashboard) shows how to load the file with grafana-operator and with Terraform.
-
-The tiles that show the current state ask for an instant value rather than a range. So when a label splits a series, such as a new `version` after a Plex upgrade, each tile still shows one row.
+The exporter logs `key=value` text to stderr at the info level. No alert rule reads the log. While Plex is unreachable it logs `refresh failed` once, and again when the error changes, then `refresh recovered` with `failed_for` once Plex answers. A full session tracker logs `session map full, dropping new sessions` once, and `session map has room again` with the number it dropped once a slot frees.
 
 ## Alerting
 
@@ -203,4 +187,53 @@ The metric rules need nothing beyond the scrape. The seven exporter series are p
 - `PlexExporterLibraryScanOverdue`. Plex counts its scan schedule from when the server started, so a restart just before a scan can push the next one almost two intervals out, and the extra hour covers a long scan. The rule reads `plex_server_scheduled_scan_interval_seconds`, which exists only while Scan my library periodically is on, so it never fires while Plex scans only when files change or when you ask. Reading Plex's settings needs the server owner's token, as the rest of plex-exporter does.
 - `PlexExporterLibraryItemsCollapsed`. A fall to zero is covered too. The exporter publishes `plex_library_items=0` once it reads a library as empty, so the drop is a full 100%. A library whose count cannot be read is a different condition and does not fire here. The series holds its last value and the failed fetch raises `plex_exporter_errors_total{type="library_items"}`, which `PlexExporterCollectionErrors` alerts on.
 
-Thresholds, the `for:` windows and the `severity` labels are starting points. If you run more than one instance, add your scrape `job` label to the metric selectors, and route by whatever labels your Alertmanager uses.
+Thresholds, the `for:` windows and the `severity` labels are starting points. If you run more than one instance, add your scrape `job` label to the metric selectors.
+
+## Dashboard
+
+[`grafana-dashboard.json`](../grafana-dashboard.json) imports as the Plex Exporter dashboard and needs Grafana 13.2 or newer. It has six tabs:
+
+- Overview shows the Plex version, the streams and transcodes running now and the items added in the selected range. Below them, a Needs attention row appears only while something needs you, with a tile for each problem: the exporter is not scraped, Plex or its session poll is unreachable, a library lost most of its items, has not been read or is overdue for a Plex scan, reads kept failing at some point in the selected range, watch history is stale or its figures are hidden, libraries are skipped, items have no size, or a Plex update is out. A tile with a matching alert rule below shows exactly while that alert fires, because it reads the rule's `ALERTS` series, which Prometheus and the Mimir ruler both store beside your metrics. Failed reads shows when `PlexExporterCollectionErrors` fired at any point in the selected range and counts every failed read in that range. While no `ALERTS` series exists for a rule, as on a Prometheus that does not run these rules, the tile checks the rule's condition itself and shows a minute or two after the alert would have fired. The plex-exporter tile then finds the exporters by the metrics they sent, so it needs no `job` name. The tab also shows the active streams with how each video transcode runs and their bandwidth beside the bitrate of the media they play. A server with Plex Pass also gets the host's CPU and memory.
+- Libraries shows the library totals and, below them, a tile for each item type you have, each library's size, averages and how long ago it last gained an item, was scanned and was read, and the scans, analysis and metadata tasks Plex is running now. It shows the storage and items each library added in the selected range, also as a share of its size, then two charts of that change over the range, one band per library stacked on the others, and the 10 newest items. It also shows storage by resolution and codec.
+- Storage cleanup shows the space held by items nobody has played and by extra versions. It shows each library's space by when it was last watched, and a bar links to that library's unplayed items in Plex Web. Plex lists what your own account has not played there, so the list can be longer than the never-played figure, which counts every account. It also shows the 10 largest items in each library with when anyone last played them.
+- Streaming history shows the watch time in the selected range by user and by library, and the 20 most watched shows, films and tracks, each show counted whole. It also shows the hours watched by delivery method and by home or remote network, in bars an hour long at 24 hours and a day long at 30 days, and the bandwidth by network. Watch time is an estimate from the 5-second session check and goes back only as far as your Prometheus keeps metrics.
+- Transcoding shows the hours of video transcoding over the range by where Plex decoded and encoded the video, the share encoded on hardware, and the transcode hours by player, codec and resolution.
+- Exporter health shows how long the last full library pass took, the Plex request retries in the range, any failed reads by type, the libraries with items of unknown size and each library's last read, so you can see what plex-exporter could read. A broken read state shows as a tile on Overview.
+
+A title over the selected range names its length, such as Items added in 7 days, and says the range instead while the data source cannot answer.
+
+The Library variable filters the Libraries and Storage cleanup tabs by library. Plex numbers libraries per server, so with several servers selected one choice shows that library number on each of them. With several servers selected, every per-library row and bar names its server before the library. Two libraries with the same name on one server show their library number after the name, such as `Movies (id 2)`. Two servers that report the same name are selected together by the Server variable, and each shows the first eight characters of its server ID after the name, such as `home (id 3f2a9c1e)`.
+
+The dashboard is versioned with the app. The `grafana-dashboard.json` of release `<tag>` matches the metrics that image serves. The file sets `metadata.name` to `plex-exporter`, which Grafana uses as the dashboard UID. Because the name stays the same from release to release, a re-import over the existing one, or a file provider reading the newer file, updates it in place. Pin it the way you pin the image, with the tag of the image you run.
+
+On Grafana 13.1 or older, use the `grafana-dashboard.json` of release [v4.1.3](https://github.com/cplieger/plex-exporter/releases/tag/v4.1.3), the last one in the older dashboard format. That file gets no further changes, so you maintain it yourself.
+
+Each release attaches the file and its checksum:
+
+- `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json`, which works as the Grafana Helm chart's `dashboards.<provider>.<name>.url` with `curlOptions: "-sLf"`, because the release URL redirects, or as a Terraform `http` data source.
+- `https://github.com/cplieger/plex-exporter/releases/download/<tag>/grafana-dashboard.json.sha256` beside it.
+
+Renovate can keep the URL current with its `github-releases` datasource. The same file is also the OCI artifact `ghcr.io/cplieger/plex-exporter/dashboard:<tag>`, with the artifact type `application/vnd.grafana.dashboard.v2+json`. [Running on Kubernetes](kubernetes.md#delivering-the-dashboard) shows how to load the file with grafana-operator and with Terraform.
+
+The tiles that show the current state ask for an instant value rather than a range. So when a label splits a series, such as a new `version` after a Plex upgrade, each tile still shows one row.
+
+## Knowing the app is alive
+
+| Route | Method | Port | Login | Answers |
+| --- | --- | --- | --- | --- |
+| `/healthz` | `GET`, `HEAD` | 9594, or the port in `LISTEN_ADDR` | none | `200 {"status":"ok"}`, or `503 {"status":"unhealthy","reasons":[...]}` |
+| `/metrics` | `GET` | the same port | none; keep the port on your network | Prometheus text format, gzipped when the scraper asks for it |
+
+**What healthy means.** `/healthz` is healthy from the moment the exporter's metrics server listens until it starts to shut down. It reads a marker file the exporter writes in `/tmp`, so it stays unhealthy when `/tmp` is not writable, as [Security](hardening.md#read-only-root-filesystem) explains. Plex being unreachable, a rejected token included, never makes it unhealthy: that shows on `/metrics` as `plex_http_reachable` at `0` and in the log.
+
+**Docker health.** The image checks itself every 30 seconds with `/plex-exporter health`, which asks `/healthz` on the container's loopback. Docker marks the container unhealthy after 3 failures, and allows 15 seconds after a start. Docker's health status notifies nobody on its own, and Docker does not restart an unhealthy container.
+
+**Who is told.**
+
+| You run | A dead app | A wedged app |
+| --- | --- | --- |
+| Prometheus with this app's rules | `PlexExporterTargetDown`, or `PlexExporterTargetAbsent` once the target is gone | `PlexExporterTargetDown` when the page stops answering, `PlexExporterLibraryWalkStale` when the library reads stop |
+| Loki only | an uptime prober on `/healthz` | the same |
+| Docker or Unraid only | an uptime prober on `/healthz`, or something that watches Docker health | the same |
+
+**Probing from outside.** Check `GET http://<host>:9594/healthz` and pass on status 200 only; do not match the body. Use a 5-second timeout, check every 60 seconds, alert after 3 failures, and wait 15 seconds after a first start. A Kubernetes liveness probe that must ignore readiness uses a `tcpSocket` probe on the port, as [Running on Kubernetes](kubernetes.md#probes) shows.
