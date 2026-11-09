@@ -21,8 +21,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Server is the Plex orchestrator. Fields are exported so Describe/Collect
-// and tests can read and mutate them under mu without accessor methods.
+// Server is the Plex orchestrator. Fields are exported so the collector and
+// tests can read and mutate them under mu without accessor methods.
 type Server struct {
 	LastItemsRefresh     time.Time
 	LastProvidersRefresh time.Time
@@ -292,7 +292,7 @@ type snapshot struct {
 }
 
 // snapshot returns a consistent point-in-time copy of the server's
-// metric-visible state, so Collect never holds s.mu across a channel send.
+// metric-visible state, so a scrape never holds s.mu while it emits.
 func (s *Server) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()

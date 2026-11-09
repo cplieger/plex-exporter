@@ -307,3 +307,105 @@ func TestRun_exits_on_settings_the_user_must_fix(t *testing.T) {
 		}
 	})
 }
+
+var pageMeta = regexp.MustCompile(`(?m)^# (TYPE|HELP) (\S+) (.*)$`)
+
+// pageFamilies returns each family's TYPE and HELP as the page states them.
+func pageFamilies(body string) (types, helps map[string]string) {
+	types, helps = map[string]string{}, map[string]string{}
+	for _, m := range pageMeta.FindAllStringSubmatch(body, -1) {
+		if m[1] == "TYPE" {
+			types[m[2]] = m[3]
+		} else {
+			helps[m[2]] = m[3]
+		}
+	}
+	return types, helps
+}
+
+// readLines returns the non-empty lines of a testdata file split on sep.
+func readLines(t *testing.T, path, sep string) [][]string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("Setup: read %s: %v", path, err)
+	}
+	var out [][]string
+	for line := range strings.Lines(string(raw)) {
+		if line = strings.TrimSuffix(line, "\n"); line != "" {
+			out = append(out, strings.Split(line, sep))
+		}
+	}
+	return out
+}
+
+// The page a running exporter serves keeps, by name and type, every Go
+// runtime and process family the official Go client's default registry
+// served (testdata lists client_golang v1.25.0's), so stock Go dashboards
+// keep working. It serves none of that client's own handler families, and
+// each exporter family it carries keeps its released TYPE and HELP.
+func TestRun_metrics_page_families(t *testing.T) {
+	f := &fakeStartPlex{}
+	f.good.Store(true)
+	ts := httptest.NewServer(f)
+	t.Cleanup(ts.Close)
+	p := startExporter(t, map[string]string{
+		"PLEX_URL": ts.URL, "PLEX_TOKEN": "test-token", "LISTEN_ADDR": freeAddr(t),
+	})
+	types, helps := pageFamilies(p.waitMetrics(t, "plex_http_reachable 1", plexUp))
+
+	t.Run("go_and_process_families", func(t *testing.T) {
+		for _, fam := range readLines(t, "testdata/client_golang_default_families.txt", " ") {
+			if got := types[fam[0]]; got != fam[1] {
+				t.Errorf("%s TYPE = %q, want %q", fam[0], got, fam[1])
+			}
+		}
+	})
+	t.Run("no_handler_families", func(t *testing.T) {
+		for name := range types {
+			if strings.HasPrefix(name, "promhttp_") {
+				t.Errorf("page serves %s, want no promhttp_* family", name)
+			}
+		}
+	})
+	t.Run("compressed_on_request", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+p.addr+"/metrics", http.NoBody)
+		if err != nil {
+			t.Fatalf("Setup: request: %v", err)
+		}
+		req.Header.Set("Accept-Encoding", "gzip")
+		c := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{DisableCompression: true}}
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatalf("GET /metrics: %v", err)
+		}
+		defer resp.Body.Close()
+		if got := resp.Header.Get("Content-Encoding"); got != "gzip" {
+			t.Errorf("Content-Encoding = %q, want gzip for a scraper that accepts it", got)
+		}
+	})
+	t.Run("exporter_families", func(t *testing.T) {
+		released := map[string][]string{}
+		for _, fam := range readLines(t, "internal/metrics/testdata/families.golden", "\t") {
+			released[fam[0]] = fam
+		}
+		seen := 0
+		for name, typ := range types {
+			if !strings.HasPrefix(name, "plex_") {
+				continue
+			}
+			seen++
+			want, ok := released[name]
+			if !ok {
+				t.Errorf("page serves %s, which internal/metrics/testdata/families.golden does not list", name)
+				continue
+			}
+			if typ != want[1] || helps[name] != want[3] {
+				t.Errorf("%s = TYPE %q HELP %q, want TYPE %q HELP %q", name, typ, helps[name], want[1], want[3])
+			}
+		}
+		if seen == 0 {
+			t.Error("page serves no plex_* family")
+		}
+	})
+}

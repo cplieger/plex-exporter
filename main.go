@@ -19,12 +19,11 @@ import (
 	"github.com/cplieger/go/health"
 	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/measure"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"
 	"github.com/cplieger/plexapi/v3"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // healthzPath is the health route; the image's healthcheck and the
@@ -47,6 +46,19 @@ func main() {
 
 func listenAddr() string {
 	return cmp.Or(envx.String("LISTEN_ADDR"), ":9594")
+}
+
+// newRegistry builds the /metrics registry: the exporter's families, and the
+// Go runtime and process families every measure registry serves.
+func newRegistry(ps *server.Server) *measure.Registry {
+	reg := measure.NewRegistry("")
+	reg.MustRegister(ps.Collector())
+	return reg
+}
+
+// metricsHandler serves reg's page, gzipped for a scraper that asks.
+func metricsHandler(reg *measure.Registry) http.Handler {
+	return httpserver.Gzip(httpserver.WithGzipTypes("text/plain"))(reg.Handler())
 }
 
 // routes serves /metrics and GET /healthz, which reports serving.
@@ -131,10 +143,9 @@ func run() int {
 			"libraries", len(ps.Libraries))
 	}
 
-	prometheus.MustRegister(ps)
 	go ps.RunRefreshLoop(ctx)
 
-	handler := routes(promhttp.Handler(), marker)
+	handler := routes(metricsHandler(newRegistry(ps)), marker)
 
 	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; New
 	// leaves them unset by default.

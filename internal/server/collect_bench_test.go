@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/measure"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-// These benchmarks feed the weekly benchmark tracker. Collect's cost scales
+// These benchmarks feed the weekly benchmark tracker. A scrape's cost scales
 // with playing-session count; truncLabel runs once per label value on the
 // same path.
 //
@@ -77,29 +77,22 @@ func benchServer(tb testing.TB, n int) *Server {
 // BenchmarkCollect measures one scrape across session counts. The counts are
 // spread so a per-session cost that turns super-linear shows as a widening
 // gap between them rather than a uniform slowdown that reads as runner noise.
+// Gather also reads the Go runtime and process families, a cost that is the
+// same at every count.
 func BenchmarkCollect(b *testing.B) {
 	for _, n := range []int{0, 5, 20} {
 		srv := benchServer(b, n)
-
-		// Channel sized from a real Collect: Collect sends synchronously, so
-		// an undersized buffer deadlocks the benchmark instead of failing it.
-		probe := make(chan prometheus.Metric, 4096)
-		srv.Collect(probe)
-		emitted := len(probe)
-		for len(probe) > 0 {
-			<-probe
+		if len(gatherSamples(b, srv.collect)) == 0 {
+			b.Fatalf("benchServer(%d): collect emitted 0 samples, want more than 0", n)
 		}
-		if emitted == 0 {
-			b.Fatalf("benchServer(%d): Collect emitted 0 metrics, want more than 0", n)
-		}
+		reg := measure.NewRegistry("")
+		reg.MustRegister(srv.Collector())
 
 		b.Run(fmt.Sprintf("sessions_%d", n), func(b *testing.B) {
-			ch := make(chan prometheus.Metric, emitted)
 			b.ReportAllocs()
 			for b.Loop() {
-				srv.Collect(ch)
-				for len(ch) > 0 {
-					<-ch
+				if _, err := reg.Gather(b.Context()); err != nil {
+					b.Fatalf("Gather() error = %v", err)
 				}
 			}
 		})

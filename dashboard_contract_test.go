@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/cplieger/plex-exporter/internal/metrics"
 )
 
 type dashPanel struct {
@@ -112,7 +110,6 @@ func exprs(p *dashPanel) []string {
 
 var (
 	metricName = regexp.MustCompile(`\bplex_[a-z_]+`)
-	descName   = regexp.MustCompile(`fqName: "([^"]+)"`)
 	byClause   = regexp.MustCompile(`\bby \(([^)]*)\)`)
 	// onRight captures the labels of an on (...) match and the grouping of
 	// the aggregation that forms its right operand.
@@ -131,10 +128,8 @@ func labelSet(s string) []string {
 
 func TestDashboard_queries_name_served_metrics(t *testing.T) {
 	served := map[string]bool{}
-	for _, d := range metrics.AllDescs {
-		if m := descName.FindStringSubmatch(d.String()); m != nil {
-			served[m[1]] = true
-		}
+	for _, name := range publishedFamilies(t) {
+		served[name] = true
 	}
 	_, panels := loadDashboard(t)
 	for name, p := range panels {

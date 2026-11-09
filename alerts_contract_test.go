@@ -8,9 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/cplieger/plex-exporter/internal/plex"
+	"github.com/cplieger/plex-exporter/internal/server"
 )
 
 // releasedAlerts maps every alert name a release has shipped to "" while
@@ -96,27 +95,21 @@ func TestAlerts_released_names_are_kept_or_removed_on_purpose(t *testing.T) {
 	}
 }
 
-// publishedFamilies returns every family name the exporter's /metrics page
-// can carry: the collector's descriptors and the default registry's process
-// and Go collectors, which main serves beside it.
+// publishedFamilies returns every family the exporter's /metrics page can
+// carry, read from the registry run serves.
 func publishedFamilies(t *testing.T) []string {
 	t.Helper()
-	var names []string
-	for _, d := range metrics.AllDescs {
-		m := regexp.MustCompile(`fqName: "([^"]+)"`).FindStringSubmatch(d.String())
-		if m == nil {
-			t.Fatalf("Setup: cannot parse descriptor %s", d.String())
-		}
-		names = append(names, m[1])
+	client, err := plex.NewClient(plex.Options{ServerURL: "http://192.0.2.1:32400", Token: "test-token"})
+	if err != nil {
+		t.Fatalf("Setup: plex client: %v", err)
 	}
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}), collectors.NewGoCollector())
-	mfs, err := reg.Gather()
+	fams, err := newRegistry(server.New(client)).Gather(t.Context())
 	if err != nil {
 		t.Fatalf("Setup: gather: %v", err)
 	}
-	for _, mf := range mfs {
-		names = append(names, mf.GetName())
+	names := make([]string, 0, len(fams))
+	for _, f := range fams {
+		names = append(names, f.Name)
 	}
 	return names
 }

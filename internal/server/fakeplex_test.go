@@ -16,7 +16,7 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/history"
 	"github.com/cplieger/plex-exporter/internal/library"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/cplieger/plex-exporter/internal/metrics"
 )
 
 // fakePlex serves the paged catalog, watch history and background
@@ -195,26 +195,13 @@ func bootstrap(t *testing.T, srv *Server, want history.Status) {
 	}
 }
 
-type sample struct {
-	labels map[string]string
-	value  float64
-}
-
 // series collects srv once and returns the samples of d.
-func series(t *testing.T, srv *Server, d *prometheus.Desc) []sample {
+func series(t *testing.T, srv *Server, d *metrics.Desc) []sample {
 	t.Helper()
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	var out []sample
-	for _, m := range collectByDesc(ch)[descKey(d)] {
-		l, v := metricSnapshot(t, m)
-		out = append(out, sample{l, v})
-	}
-	return out
+	return byFamily(gatherSamples(t, srv.collect))[d.Name]
 }
 
-func valueOf(t *testing.T, srv *Server, d *prometheus.Desc, match map[string]string) (float64, bool) {
+func valueOf(t *testing.T, srv *Server, d *metrics.Desc, match map[string]string) (float64, bool) {
 	t.Helper()
 	for _, s := range series(t, srv, d) {
 		ok := true

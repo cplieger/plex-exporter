@@ -1,10 +1,10 @@
 package metrics_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // The exporter's own metrics describe its link to the one configured server,
@@ -13,22 +13,18 @@ import (
 func TestExporterDescs_take_only_their_own_labels(t *testing.T) {
 	tests := []struct {
 		name   string
-		desc   *prometheus.Desc
+		desc   *metrics.Desc
 		labels []string
 	}{
 		{"http_reachable", metrics.DescHTTPReachable, nil},
 		{"session_poll_reachable", metrics.DescSessionPollReachable, nil},
 		{"http_retries", metrics.DescHTTPRetries, nil},
-		{"errors", metrics.DescErrors, []string{"refresh"}},
+		{"errors", metrics.DescErrors, []string{"type"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := prometheus.NewConstMetric(tt.desc, prometheus.GaugeValue, 1, tt.labels...); err != nil {
-				t.Errorf("NewConstMetric(%s, %d labels) error = %v, want nil", tt.name, len(tt.labels), err)
-			}
-			withIdentity := append([]string{"srv", "id"}, tt.labels...)
-			if _, err := prometheus.NewConstMetric(tt.desc, prometheus.GaugeValue, 1, withIdentity...); err == nil {
-				t.Errorf("NewConstMetric(%s, %d labels) error = nil, want a label-count mismatch", tt.name, len(withIdentity))
+			if !slices.Equal(tt.desc.Labels, tt.labels) {
+				t.Errorf("%s labels = %v, want %v", tt.desc.Name, tt.desc.Labels, tt.labels)
 			}
 		})
 	}

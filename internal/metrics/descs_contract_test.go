@@ -1,27 +1,40 @@
 package metrics_test
 
 import (
-	"regexp"
+	"bytes"
+	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-var descParts = regexp.MustCompile(`fqName: "([^"]+)".*variableLabels: \{([^}]*)\}`)
+const familiesGolden = "testdata/families.golden"
 
-func descLabels(t *testing.T, d *prometheus.Desc) (name string, labels []string) {
-	t.Helper()
-	m := descParts.FindStringSubmatch(d.String())
-	if m == nil {
-		t.Fatalf("cannot parse descriptor %s", d.String())
+// Every family keeps the name, type, HELP and label names it was released
+// with, because a change breaks the queries, dashboards and rules built on
+// it. Regenerate the golden only for a breaking release:
+// UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract
+func TestAllDescs_keep_their_released_contract(t *testing.T) {
+	var b strings.Builder
+	for _, d := range metrics.AllDescs {
+		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\n", d.Name, d.Type, strings.Join(d.Labels, ","), d.Help)
 	}
-	if m[2] != "" {
-		labels = strings.Split(m[2], ",")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(familiesGolden, []byte(b.String()), 0o600); err != nil {
+			t.Fatalf("write %s: %v", familiesGolden, err)
+		}
+		return
 	}
-	return m[1], labels
+	want, err := os.ReadFile(familiesGolden)
+	if err != nil {
+		t.Fatalf("read %s: %v; regenerate with UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract", familiesGolden, err)
+	}
+	if !bytes.Equal([]byte(b.String()), want) {
+		t.Errorf("AllDescs differ from %s; a change here is a breaking release. Regenerate with UPDATE_GOLDEN=1 go test ./internal/metrics/ -run TestAllDescs_keep_their_released_contract\ngot:\n%s", familiesGolden, b.String())
+	}
 }
 
 // The families that existed before the catalog walk keep their label sets
@@ -32,9 +45,8 @@ func TestAllDescs_existing_families_keep_their_labels(t *testing.T) {
 		"plex_plays_active": 21, "plex_play_seconds_total": 21, "plex_exporter_errors_total": 1,
 	}
 	for _, d := range metrics.AllDescs {
-		name, labels := descLabels(t, d)
-		if n, ok := want[name]; ok && len(labels) != n {
-			t.Errorf("%s has %d labels %v, want %d", name, len(labels), labels, n)
+		if n, ok := want[d.Name]; ok && len(d.Labels) != n {
+			t.Errorf("%s has %d labels %v, want %d", d.Name, len(d.Labels), d.Labels, n)
 		}
 	}
 }
@@ -53,7 +65,7 @@ func TestAllDescs_identity_labels_only_on_top_n_families(t *testing.T) {
 	}
 	seen := 0
 	for _, d := range metrics.AllDescs {
-		name, labels := descLabels(t, d)
+		name, labels := d.Name, d.Labels
 		if slices.Contains(topN, name) {
 			seen++
 			for _, l := range []string{"rating_key", "title", "server_id", "library_id"} {

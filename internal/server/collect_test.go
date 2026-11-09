@@ -11,12 +11,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/cplieger/go/measure"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
 	"github.com/cplieger/plexapi/v3"
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"pgregory.net/rapid"
 )
 
@@ -35,41 +34,48 @@ func testMeta(tb testing.TB, jsonStr string) plexapi.Item {
 	return m
 }
 
-func drainMetrics(ch <-chan prometheus.Metric) []prometheus.Metric {
-	var result []prometheus.Metric
-	for m := range ch {
-		result = append(result, m)
-	}
-	return result
+// sample is one exporter series as Registry.Gather reads it.
+type sample struct {
+	labels map[string]string
+	family string
+	value  float64
 }
 
-func collectByDesc(ch <-chan prometheus.Metric) map[string][]prometheus.Metric {
-	result := make(map[string][]prometheus.Metric)
-	for m := range ch {
-		desc := m.Desc().String()
-		result[desc] = append(result[desc], m)
+// gatherSamples runs collect once through a registry, failing on any sample
+// the collector dropped, and returns every plex_* sample in page order.
+func gatherSamples(tb testing.TB, collect func(*emitter)) []sample {
+	tb.Helper()
+	reg := measure.NewRegistry("")
+	if err := reg.Register(newCollector(collect)); err != nil {
+		tb.Fatalf("Setup: register: %v", err)
 	}
-	return result
+	fams, err := reg.Gather(tb.Context())
+	if err != nil {
+		tb.Fatalf("Gather() error = %v", err)
+	}
+	var out []sample
+	for _, f := range fams {
+		if !strings.HasPrefix(f.Name, "plex_") {
+			continue
+		}
+		for _, smp := range f.Samples {
+			labels := make(map[string]string, len(smp.Labels))
+			for _, l := range smp.Labels {
+				labels[l.Name] = l.Value
+			}
+			out = append(out, sample{labels: labels, family: f.Name, value: smp.Value})
+		}
+	}
+	return out
 }
 
-func descKey(d *prometheus.Desc) string { return d.String() }
-
-func metricSnapshot(t *testing.T, m prometheus.Metric) (labels map[string]string, value float64) {
-	t.Helper()
-	d := &dto.Metric{}
-	if err := m.Write(d); err != nil {
-		t.Fatalf("metricSnapshot: %v", err)
+// byFamily groups samples by family name.
+func byFamily(ss []sample) map[string][]sample {
+	out := make(map[string][]sample)
+	for _, s := range ss {
+		out[s.family] = append(out[s.family], s)
 	}
-	labels = make(map[string]string, len(d.GetLabel()))
-	for _, lp := range d.GetLabel() {
-		labels[lp.GetName()] = lp.GetValue()
-	}
-	if g := d.GetGauge(); g != nil {
-		value = g.GetValue()
-	} else if c := d.GetCounter(); c != nil {
-		value = c.GetValue()
-	}
-	return labels, value
+	return out
 }
 
 // --- Tests: sessionLabels ---
@@ -439,26 +445,6 @@ func TestNormalizeLabel_with_known_allowlists(t *testing.T) {
 	}
 }
 
-func TestDescribe(t *testing.T) {
-	srv := &Server{Sessions: sessions.NewTracker()}
-	ch := make(chan *prometheus.Desc, len(metrics.AllDescs)*2)
-	srv.Describe(ch)
-	close(ch)
-
-	got := make(map[*prometheus.Desc]bool)
-	for d := range ch {
-		got[d] = true
-	}
-	for _, want := range metrics.AllDescs {
-		if !got[want] {
-			t.Errorf("Describe missing %s", want.String())
-		}
-	}
-	if len(got) != len(metrics.AllDescs) {
-		t.Errorf("Describe sent %d unique descriptors, want %d", len(got), len(metrics.AllDescs))
-	}
-}
-
 func TestCollectServerMetrics(t *testing.T) {
 	srv := &Server{
 		Name:             "TestServer",
@@ -480,11 +466,7 @@ func TestCollectServerMetrics(t *testing.T) {
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, srv.collect)
 	// Base: http_reachable, session_poll_reachable, http_retries, server_info,
 	// active_transcodes, cpu + mem (ResourcesRead), transmit (BandwidthRead)
 	// + len(metrics.ErrorTypes) error counters.
@@ -495,7 +477,7 @@ func TestCollectServerMetrics(t *testing.T) {
 	if len(ms) != want {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 		for i, m := range ms {
-			t.Logf("  [%d] %s", i, m.Desc().String())
+			t.Logf("  [%d] %s", i, m.family)
 		}
 	}
 }
@@ -508,11 +490,7 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, srv.collect)
 	// Base: http_reachable, session_poll_reachable, http_retries, server_info,
 	// active_transcodes + len(metrics.ErrorTypes) error counters. The statistics
 	// endpoints were never read, so cpu, mem and transmit are absent.
@@ -523,13 +501,10 @@ func TestCollectWithPlexPassFalse(t *testing.T) {
 		t.Errorf("Collect produced %d metrics, want %d", len(ms), want)
 	}
 
-	ch = make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	byDesc := collectByDesc(ch)
-	for _, d := range []*prometheus.Desc{metrics.DescHostCPU, metrics.DescHostMem, metrics.DescTransmitBytes} {
-		if got := byDesc[descKey(d)]; len(got) != 0 {
-			t.Errorf("Collect emitted %d %s samples, want 0 while the Plex Pass endpoint was never read", len(got), d.String())
+	byDesc := byFamily(gatherSamples(t, srv.collect))
+	for _, d := range []*metrics.Desc{metrics.DescHostCPU, metrics.DescHostMem, metrics.DescTransmitBytes} {
+		if got := byDesc[d.Name]; len(got) != 0 {
+			t.Errorf("Collect emitted %d %s samples, want 0 while the Plex Pass endpoint was never read", len(got), d.Name)
 		}
 	}
 }
@@ -575,11 +550,7 @@ func TestCollectWithActiveSessions(t *testing.T) {
 		Sessions: tracker,
 	}
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, srv.collect)
 	// Base 8 (+ metrics.ErrorTypes) + 1 lib_duration + 1 lib_storage
 	// + 1 lib_items + play_count + play_seconds + session_bandwidth + session_bitrate
 	// + walk_skipped, walk_complete and 1 walkable + the tracker's two
@@ -603,11 +574,7 @@ func TestCollectMultipleLibraries(t *testing.T) {
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, srv.collect)
 	// Base 5 (no host or bandwidth read) (+ metrics.ErrorTypes) + 3x lib_duration,
 	// 3x lib_storage, 3x lib_items + walk_skipped, walk_complete and a walkable
 	// series for each of the two video libraries + the tracker's two series
@@ -629,26 +596,22 @@ func TestCollect_host_metrics_values(t *testing.T) {
 		Sessions:      sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
+	byDesc := byFamily(gatherSamples(t, srv.collect))
 
-	byDesc := collectByDesc(ch)
-
-	cpuMetrics := byDesc[descKey(metrics.DescHostCPU)]
+	cpuMetrics := byDesc[metrics.DescHostCPU.Name]
 	if len(cpuMetrics) != 1 {
 		t.Fatalf("expected 1 cpu metric, got %d", len(cpuMetrics))
 	}
-	_, cpuVal := metricSnapshot(t, cpuMetrics[0])
+	_, cpuVal := cpuMetrics[0].labels, cpuMetrics[0].value
 	if cpuVal != 0.42 {
 		t.Errorf("host_cpu = %v, want 0.42", cpuVal)
 	}
 
-	memMetrics := byDesc[descKey(metrics.DescHostMem)]
+	memMetrics := byDesc[metrics.DescHostMem.Name]
 	if len(memMetrics) != 1 {
 		t.Fatalf("expected 1 mem metric, got %d", len(memMetrics))
 	}
-	_, memVal := metricSnapshot(t, memMetrics[0])
+	_, memVal := memMetrics[0].labels, memMetrics[0].value
 	if memVal != 0.65 {
 		t.Errorf("host_mem = %v, want 0.65", memVal)
 	}
@@ -670,12 +633,8 @@ func TestCollect_library_items_published_for_a_known_count_including_zero(t *tes
 		Sessions: sessions.NewTracker(),
 	}
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	itemMetrics := byDesc[descKey(metrics.DescLibItems)]
+	byDesc := byFamily(gatherSamples(t, srv.collect))
+	itemMetrics := byDesc[metrics.DescLibItems.Name]
 	if len(itemMetrics) != 2 {
 		t.Fatalf("expected 2 lib_items metrics (Movies and the emptied TV), got %d", len(itemMetrics))
 	}
@@ -683,7 +642,7 @@ func TestCollect_library_items_published_for_a_known_count_including_zero(t *tes
 	byLibrary := make(map[string]float64, len(itemMetrics))
 	contentTypes := make(map[string]string, len(itemMetrics))
 	for _, m := range itemMetrics {
-		labels, val := metricSnapshot(t, m)
+		labels, val := m.labels, m.value
 		byLibrary[labels["library"]] = val
 		contentTypes[labels["library"]] = labels["content_type"]
 	}
@@ -748,10 +707,7 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	srv.RecordError("refresh")
 	srv.SetHTTPReachable(false)
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, srv.collect)
 
 	// Five single-sample exporter metrics, one error counter per type and
 	// one deadline counter per Plex Pass fetch. Fails without the identity
@@ -759,42 +715,42 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	if want := 5 + len(metrics.ErrorTypes) + len(metrics.RefreshFetches); len(ms) != want {
 		t.Errorf("Collect produced %d metrics while blind, want %d", len(ms), want)
 		for i, m := range ms {
-			t.Logf("  [%d] %s", i, m.Desc().String())
+			t.Logf("  [%d] %s", i, m.family)
 		}
 	}
 
-	byDesc := make(map[string][]prometheus.Metric)
+	byDesc := make(map[string][]sample)
 	for _, m := range ms {
-		byDesc[descKey(m.Desc())] = append(byDesc[descKey(m.Desc())], m)
+		byDesc[m.family] = append(byDesc[m.family], m)
 	}
-	for _, d := range []*prometheus.Desc{
+	for _, d := range []*metrics.Desc{
 		metrics.DescServerInfo, metrics.DescHostCPU, metrics.DescActiveTranscodes, metrics.DescLibDuration,
 	} {
-		if got := byDesc[descKey(d)]; len(got) != 0 {
-			t.Errorf("Collect emitted %d %s samples while blind, want 0", len(got), d.String())
+		if got := byDesc[d.Name]; len(got) != 0 {
+			t.Errorf("Collect emitted %d %s samples while blind, want 0", len(got), d.Name)
 		}
 	}
 
 	for _, m := range ms {
-		labels, _ := metricSnapshot(t, m)
+		labels, _ := m.labels, m.value
 		for _, name := range []string{metrics.LabelServer, metrics.LabelServerID} {
 			if v, ok := labels[name]; ok {
-				t.Errorf("%s carries %s=%q while blind, want no identity label", m.Desc().String(), name, v)
+				t.Errorf("%s carries %s=%q while blind, want no identity label", m.family, name, v)
 			}
 		}
 	}
 
-	reach := byDesc[descKey(metrics.DescHTTPReachable)]
+	reach := byDesc[metrics.DescHTTPReachable.Name]
 	if len(reach) != 1 {
 		t.Fatalf("Collect emitted %d plex_http_reachable samples, want 1", len(reach))
 	}
-	if _, v := metricSnapshot(t, reach[0]); v != 0 {
+	if _, v := reach[0].labels, reach[0].value; v != 0 {
 		t.Errorf("plex_http_reachable = %v while blind, want 0", v)
 	}
 
 	var refreshErrors float64
-	for _, m := range byDesc[descKey(metrics.DescErrors)] {
-		labels, v := metricSnapshot(t, m)
+	for _, m := range byDesc[metrics.DescErrors.Name] {
+		labels, v := m.labels, m.value
 		if labels["type"] == "refresh" {
 			refreshErrors = v
 		}
@@ -841,45 +797,39 @@ func TestCollect_plex_pass_gauges_absent_until_read(t *testing.T) {
 	srv.ID = "id1"
 	srv.Name = "Srv"
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	byDesc := collectByDesc(ch)
+	byDesc := byFamily(gatherSamples(t, srv.collect))
 
-	if got := byDesc[descKey(metrics.DescServerInfo)]; len(got) != 1 {
+	if got := byDesc[metrics.DescServerInfo.Name]; len(got) != 1 {
 		t.Errorf("Collect emitted %d plex_server_info samples with identity known, want 1", len(got))
 	}
 	// Fails without the ResourcesRead and BandwidthRead gates: each would
 	// publish a 0 before its endpoint was ever read.
-	for _, d := range []*prometheus.Desc{metrics.DescHostCPU, metrics.DescHostMem, metrics.DescTransmitBytes} {
-		if got := byDesc[descKey(d)]; len(got) != 0 {
-			t.Errorf("Collect emitted %d %s samples before the endpoint was read, want 0", len(got), d.String())
+	for _, d := range []*metrics.Desc{metrics.DescHostCPU, metrics.DescHostMem, metrics.DescTransmitBytes} {
+		if got := byDesc[d.Name]; len(got) != 0 {
+			t.Errorf("Collect emitted %d %s samples before the endpoint was read, want 0", len(got), d.Name)
 		}
 	}
 
 	srv.refreshResources(t.Context())
 
-	ch = make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	byDesc = collectByDesc(ch)
+	byDesc = byFamily(gatherSamples(t, srv.collect))
 
 	// Fails if refreshResources forgets to set ResourcesRead.
-	cpu := byDesc[descKey(metrics.DescHostCPU)]
+	cpu := byDesc[metrics.DescHostCPU.Name]
 	if len(cpu) != 1 {
 		t.Fatalf("Collect emitted %d plex_host_cpu_utilization_ratio samples after a read, want 1", len(cpu))
 	}
-	if _, v := metricSnapshot(t, cpu[0]); v != 0.42 {
+	if _, v := cpu[0].labels, cpu[0].value; v != 0.42 {
 		t.Errorf("plex_host_cpu_utilization_ratio = %v, want 0.42", v)
 	}
-	mem := byDesc[descKey(metrics.DescHostMem)]
+	mem := byDesc[metrics.DescHostMem.Name]
 	if len(mem) != 1 {
 		t.Fatalf("Collect emitted %d plex_host_memory_utilization_ratio samples after a read, want 1", len(mem))
 	}
-	if _, v := metricSnapshot(t, mem[0]); v != 0.65 {
+	if _, v := mem[0].labels, mem[0].value; v != 0.65 {
 		t.Errorf("plex_host_memory_utilization_ratio = %v, want 0.65", v)
 	}
-	if got := byDesc[descKey(metrics.DescTransmitBytes)]; len(got) != 0 {
+	if got := byDesc[metrics.DescTransmitBytes.Name]; len(got) != 0 {
 		t.Errorf("Collect emitted %d plex_transmit_bytes_total samples while bandwidth 404s, want 0", len(got))
 	}
 }
@@ -936,28 +886,25 @@ func TestCollect_identity_persists_across_failed_refresh(t *testing.T) {
 	}
 	srv.SetHTTPReachable(false)
 
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	byDesc := collectByDesc(ch)
+	byDesc := byFamily(gatherSamples(t, srv.collect))
 
 	// Fails if identity were cleared on error, and fails if the gate were
 	// widened to "identity known AND reachable".
-	info := byDesc[descKey(metrics.DescServerInfo)]
+	info := byDesc[metrics.DescServerInfo.Name]
 	if len(info) != 1 {
 		t.Fatalf("Collect emitted %d plex_server_info samples after a failed refresh, want 1", len(info))
 	}
-	labels, _ := metricSnapshot(t, info[0])
+	labels, _ := info[0].labels, info[0].value
 	if labels[metrics.LabelServer] != "TestPlex" || labels[metrics.LabelServerID] != "abc123" {
 		t.Errorf("plex_server_info labels = server=%q server_id=%q, want TestPlex abc123",
 			labels[metrics.LabelServer], labels[metrics.LabelServerID])
 	}
 
-	reach := byDesc[descKey(metrics.DescHTTPReachable)]
+	reach := byDesc[metrics.DescHTTPReachable.Name]
 	if len(reach) != 1 {
 		t.Fatalf("Collect emitted %d plex_http_reachable samples, want 1", len(reach))
 	}
-	labels, v := metricSnapshot(t, reach[0])
+	labels, v := reach[0].labels, reach[0].value
 	if v != 0 {
 		t.Errorf("plex_http_reachable = %v after a failed refresh, want 0", v)
 	}
