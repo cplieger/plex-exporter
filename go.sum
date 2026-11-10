@@ -6,8 +6,8 @@ github.com/cplieger/go/envx v1.0.0 h1:L9JL05FV8MkK6Bo4o9fnWCkhRfgKhOoycglAtY34hb
 github.com/cplieger/go/envx v1.0.0/go.mod h1:O0Nxq8Qfg/b1xqduFZYqi7Qm/FczL9fSYpjWq0/nvik=
 github.com/cplieger/go/health v1.0.0 h1:MK3skKEoRhmsrt64O/OSbpbL9Dib0drAeWLQLLhjmPU=
 github.com/cplieger/go/health v1.0.0/go.mod h1:Qo0xx+JK05tjEi+oAjPT0zcRrhZkcKFEO32SRkjZd7I=
-github.com/cplieger/go/httpclient v1.1.0-dev.1 h1:UIU9dimhFtx/ru3O7AqhqsznJoRIje91FGa9YLCf5Fc=
-github.com/cplieger/go/httpclient v1.1.0-dev.1/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
+github.com/cplieger/go/httpclient v1.1.0-dev.2 h1:UQIynDV7270GoBBlqE72yDyJI8EbdXCQFFkyfeHaN/o=
+github.com/cplieger/go/httpclient v1.1.0-dev.2/go.mod h1:zXZyXwYWXVujBH7qoNR16WYGHOGCo8hbJb0Gy8gNgBQ=
 github.com/cplieger/go/httpserver v1.1.0-dev.1 h1:3ourAEJNrs4SduR/NyRRSzwKEbObVc+mbZJgh3pmEq0=
 github.com/cplieger/go/httpserver v1.1.0-dev.1/go.mod h1:JEmYTXf41gzCh9IsslcEaAX8WMcHJBuqEiLEJCvoPUo=
 github.com/cplieger/go/pathinside v1.0.0 h1:6AkF/TcxRRaYX11jd3sqwcsPuRBVUcML53bogUQ4YGk=
@@ -18,8 +18,8 @@ github.com/cplieger/go/textsafe v1.0.0 h1:cQhZdSsiwSI9VpRjGoib5N59K9uC7fLzqIg8Dr
 github.com/cplieger/go/textsafe v1.0.0/go.mod h1:5IH0ZWTC+U864nzWGtcwGkp+PtA5hrlcfY2zLY/TexM=
 github.com/cplieger/go/xmlx v1.0.0 h1:a/Nkx3BifSykDOCDz7sdCXjgQHq53XieMp+jMB0pk6s=
 github.com/cplieger/go/xmlx v1.0.0/go.mod h1:trImI1H9TuogwyGZHYJt1f1fskANBuZSR3A+LPdEdVY=
-github.com/cplieger/plexapi/v3 v3.0.0-dev.11 h1:HiaCNTvo5H86rXTd80BuAx4+4MVOEJaFR/ZmLxwTBRA=
-github.com/cplieger/plexapi/v3 v3.0.0-dev.11/go.mod h1:I6RdirJuf0fkxSEeEBbKP7eM4oZHwAwjv6IYDjjRlkg=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.13 h1:Hxk2GXkaTj6z5iHQZVRkyzQWQDnA2xF743nJXC2lpo8=
+github.com/cplieger/plexapi/v3 v3.0.0-dev.13/go.mod h1:hhNq1Ll1KTFL+6PztmrB4EI7PzDZYJeoLfhbT1bB+QY=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/klauspost/compress v1.20.1 h1:T7kKElXUMXrUJ2E9QhQhxFtcK5rPyLdsGZvdbLMPdiQ=
