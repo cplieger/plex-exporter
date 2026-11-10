@@ -9,7 +9,7 @@ require (
 	github.com/cplieger/go/httpserver v1.1.0
 	github.com/cplieger/go/slogx v1.0.0
 	github.com/cplieger/go/textsafe v1.0.0
-	github.com/cplieger/plexapi/v3 v3.0.0-dev.13
+	github.com/cplieger/plexapi/v3 v3.0.0-dev.14
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	golang.org/x/sync v0.25.0
