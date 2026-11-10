@@ -93,7 +93,11 @@ type Session struct {
 // access the mutex directly.
 type Tracker struct {
 	Sessions map[string]Session
-	mu       sync.Mutex
+	dropped  uint64
+	// fullDrops counts the refusals since the map last filled, and
+	// is non-zero exactly while the map is logged as full.
+	fullDrops uint64
+	mu        sync.Mutex
 }
 
 // NewTracker returns an empty session tracker ready for use.
@@ -121,6 +125,14 @@ func (t *Tracker) UpdateLibraryLabels(id string, fn func(*Session)) {
 		fn(&ss)
 		t.Sessions[id] = ss
 	}
+}
+
+// Counts returns how many sessions the tracker holds and how many times it
+// has refused a new session at its cap since it was created.
+func (t *Tracker) Counts() (tracked int, dropped uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.Sessions), t.dropped
 }
 
 // SnapshotSessions returns a copy of the sessions map under the tracker's lock.
@@ -165,8 +177,12 @@ func (t *Tracker) Update(id string, newState State, meta, mediaMeta *plexapi.Ite
 	// Reject new sessions once the map is full; existing sessions continue
 	// to update. RunPruneLoop handles reclaiming stopped sessions.
 	if _, existing := t.Sessions[id]; !existing && len(t.Sessions) >= maxTrackedSessions {
-		slog.Warn("session map full, dropping new session",
-			"id", id, "tracked", len(t.Sessions), "cap", maxTrackedSessions)
+		t.dropped++
+		if t.fullDrops == 0 {
+			slog.Warn("session map full, dropping new sessions",
+				"tracked", len(t.Sessions), "cap", maxTrackedSessions)
+		}
+		t.fullDrops++
 		return
 	}
 
@@ -251,6 +267,10 @@ func (t *Tracker) prune() {
 	if pruned > 0 || stale > 0 {
 		slog.Debug("pruned expired sessions",
 			"stopped", pruned, "stale", stale, "remaining", len(t.Sessions))
+	}
+	if t.fullDrops > 0 && len(t.Sessions) < maxTrackedSessions {
+		slog.Info("session map has room again", "dropped", t.fullDrops)
+		t.fullDrops = 0
 	}
 }
 

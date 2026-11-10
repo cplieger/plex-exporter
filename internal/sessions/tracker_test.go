@@ -219,6 +219,30 @@ func TestSessionTrackerUpdate_rejects_new_when_full(t *testing.T) {
 	}
 }
 
+func TestTrackerCounts_counts_each_dropped_session(t *testing.T) {
+	tracker := NewTracker()
+	for i := range maxTrackedSessions {
+		tracker.Update(fmt.Sprintf("s%d", i), StatePlaying, nil, nil)
+	}
+	if tracked, dropped := tracker.Counts(); tracked != maxTrackedSessions || dropped != 0 {
+		t.Fatalf("Setup: Counts() = %d, %d at the cap, want %d, 0", tracked, dropped, maxTrackedSessions)
+	}
+
+	for i := range 5 {
+		tracker.Update(fmt.Sprintf("new%d", i), StatePlaying, nil, nil)
+	}
+	tracker.Update("new0", StatePlaying, nil, nil)
+	tracker.Update("s0", StatePaused, nil, nil)
+
+	tracked, dropped := tracker.Counts()
+	if tracked != maxTrackedSessions {
+		t.Errorf("tracked = %d, want %d", tracked, maxTrackedSessions)
+	}
+	if dropped != 6 {
+		t.Errorf("dropped = %d, want 6: five new sessions, one refused twice, and no drop for a tracked one", dropped)
+	}
+}
+
 func TestSessionTrackerUpdate_existing_session_updates_when_full(t *testing.T) {
 	tracker := NewTracker()
 

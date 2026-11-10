@@ -33,11 +33,11 @@ For each stream, the exporter reads the item's library metadata once and keeps i
 
 The session tracker turns each poll into metric updates. A stream gets its series once the exporter has seen it playing, so a stream that was already paused when the exporter started appears once it resumes.
 
-When a stream ends, its series stay for 1 to 2 minutes and then go. A session that gets no update for 5 minutes is removed as stale. The tracker holds 256 sessions at most. Past that, it logs `session map full, dropping new session` and leaves the new stream out, which the `PlexExporterSessionMapFull` alert rule catches.
+When a stream ends, its series stay for 1 to 2 minutes and then go. A session that gets no update for 5 minutes is removed as stale. The tracker holds 256 sessions at most. Past that, it leaves each new stream out and counts it in `plex_sessions_dropped_total`, which the `PlexExporterSessionMapFull` alert rule reads. The log says `session map full, dropping new sessions` once when the tracker starts refusing streams, and `session map has room again`, with the number it dropped, once a slot frees.
 
 ## When each metric appears
 
-The four exporter metrics, `plex_http_reachable`, `plex_session_poll_reachable`, `plex_http_retries_total` and `plex_exporter_errors_total`, carry no server labels. They appear from the first scrape, before Plex has answered, and each keeps one series from then on.
+The seven exporter metrics, `plex_http_reachable`, `plex_session_poll_reachable`, `plex_http_retries_total`, `plex_exporter_errors_total`, `plex_sessions_tracked`, `plex_sessions_dropped_total` and `plex_refresh_deadline_exceeded_total`, carry no server labels. They appear from the first scrape, before Plex has answered, and each keeps its series from then on.
 
 Every other metric carries the `server` and `server_id` labels of the server it describes. It appears once the exporter has read the server's identity from Plex. So `absent(plex_server_info)` means the exporter has never reached Plex since it started.
 
@@ -50,7 +50,7 @@ The library content series appear after a library's first complete item-by-item 
 ## Why it is built this way
 
 - It polls `/status/sessions` every 5 seconds. Plex embeds each stream's transcode decisions in that answer, so a timer is all the exporter needs.
-- It is one Go binary. Its direct dependencies are `prometheus/client_golang` and a few small helper libraries, listed in [Security](hardening.md#what-the-image-contains), and the rest is the Go standard library.
+- It is one Go binary. Its direct dependencies are a few small libraries, listed in [Security](hardening.md#what-the-image-contains), and the rest is the Go standard library.
 - It runs on `gcr.io/distroless/static-debian13` as the non-root user 65532, with no shell or package manager.
 - It serves a standard `/metrics` endpoint, so any Prometheus-compatible scraper and any Grafana dashboard can read it. It has no charts of its own.
 - Each stream's bitrate is its own `plex_session_bitrate_kbps` series rather than a label on the play metrics. Plex changes the bitrate during adaptive streaming, and a label would start a new series each time.

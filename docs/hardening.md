@@ -25,7 +25,7 @@ The exporter records that it is ready by writing an empty marker file, `/tmp/.he
       - "/tmp:size=1m,mode=1777,noexec,nosuid,nodev"
 ```
 
-Without that mount the marker is never written. The image's Docker healthcheck still reports healthy after one warning at start, so a missing mount does not restart a working container. `/api/health`, however, answers 503 for as long as the exporter runs, so any probe on that endpoint fails. [Running on Kubernetes](kubernetes.md#a-writable-tmp) has the Kubernetes form.
+Without that mount the marker is never written, so `/healthz` reports unhealthy for as long as the exporter runs. The image's Docker healthcheck asks `/healthz`, so Docker marks the container unhealthy, and any other probe on that endpoint fails too. Docker does not restart an unhealthy container on its own, so the exporter keeps serving `/metrics`, and its log shows a failed `/healthz` request every 30 seconds until `/tmp` is mounted. [Running on Kubernetes](kubernetes.md#a-writable-tmp) has the Kubernetes form.
 
 ## What the image contains
 
@@ -37,11 +37,10 @@ The image is one static Go binary on `gcr.io/distroless/static-debian13:nonroot`
 | --- | --- |
 | golang | [Go](https://hub.docker.com/_/golang) |
 | gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
-| github.com/prometheus/client_golang | [GitHub](https://github.com/prometheus/client_golang) |
-| github.com/prometheus/client_model | [GitHub](https://github.com/prometheus/client_model) |
 | github.com/cplieger/plexapi/v3 | [GitHub](https://github.com/cplieger/plexapi) |
 | github.com/cplieger/go/httpserver | [GitHub](https://github.com/cplieger/go/tree/main/httpserver) |
 | github.com/cplieger/go/health | [GitHub](https://github.com/cplieger/go/tree/main/health) |
+| github.com/cplieger/go/measure | [GitHub](https://github.com/cplieger/go/tree/main/measure) |
 | github.com/cplieger/go/envx | [GitHub](https://github.com/cplieger/go/tree/main/envx) |
 | github.com/cplieger/go/slogx | [GitHub](https://github.com/cplieger/go/tree/main/slogx) |
 | github.com/cplieger/go/textsafe | [GitHub](https://github.com/cplieger/go/tree/main/textsafe) |
