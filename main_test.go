@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -28,6 +29,9 @@ func TestIsFatalStartupError(t *testing.T) {
 		{"not found is fatal", fmt.Errorf("fetching providers: %w", plex.ErrNotFound), true},
 		{"unknown CA is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: x509.UnknownAuthorityError{}}), true},
 		{"cert verification error is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: &tls.CertificateVerificationError{Err: errors.New("x509: certificate has expired or is not yet valid")}}), true},
+		{"hostname mismatch is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: x509.HostnameError{Certificate: &x509.Certificate{}, Host: "plex"}}), true},
+		{"expired certificate is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: x509.CertificateInvalidError{Cert: &x509.Certificate{}, Reason: x509.Expired}}), true},
+		{"plain HTTP answer to https is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: http.ErrSchemeMismatch}), true},
 		{"connection refused is transient", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "http://127.0.0.1:1/", Err: errors.New("connect: connection refused")}), false},
 		{"dns failure is transient", errors.New("fetching providers: dial tcp: lookup plex: no such host"), false},
 		{"wrapped 401 is fatal", fmt.Errorf("fetching providers: %w", &plexapi.StatusError{Code: 401, Status: "401 Unauthorized", Path: "/media/providers"}), true},
