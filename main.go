@@ -6,8 +6,6 @@ package main
 import (
 	"cmp"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"log/slog"
 	"net"
@@ -19,6 +17,7 @@ import (
 
 	"github.com/cplieger/go/envx"
 	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/plex-exporter/internal/plex"
@@ -160,8 +159,9 @@ func run() int {
 }
 
 // isFatalStartupError reports whether an initial Plex Refresh error will
-// not resolve without operator action (bad token/URL, a 404, or a
-// TLS/certificate error) versus a transient connectivity failure that
+// not resolve without operator action (bad token/URL, a 404, or a TLS
+// failure httpclient.CauseOf names: a certificate, a fatal alert or a
+// plain-HTTP answer) versus a transient connectivity failure that
 // RunRefreshLoop can recover from (dial/DNS/timeout, or a 5xx).
 func isFatalStartupError(err error) bool {
 	if plexapi.IsConfigError(err) {
@@ -170,11 +170,5 @@ func isFatalStartupError(err error) bool {
 	if errors.Is(err, plex.ErrNotFound) {
 		return true
 	}
-	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
-		return true
-	}
-	if _, ok := errors.AsType[x509.UnknownAuthorityError](err); ok {
-		return true
-	}
-	return false
+	return httpclient.CauseOf(err) == httpclient.CauseTLS
 }

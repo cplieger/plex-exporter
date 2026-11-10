@@ -5,7 +5,10 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"net/url"
+	"syscall"
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/plex"
@@ -28,8 +31,11 @@ func TestIsFatalStartupError(t *testing.T) {
 		{"not found is fatal", fmt.Errorf("fetching providers: %w", plex.ErrNotFound), true},
 		{"unknown CA is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: x509.UnknownAuthorityError{}}), true},
 		{"cert verification error is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: &tls.CertificateVerificationError{Err: errors.New("x509: certificate has expired or is not yet valid")}}), true},
-		{"connection refused is transient", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "http://127.0.0.1:1/", Err: errors.New("connect: connection refused")}), false},
-		{"dns failure is transient", errors.New("fetching providers: dial tcp: lookup plex: no such host"), false},
+		{"a peer that does not speak TLS is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: tls.RecordHeaderError{Msg: "first record does not look like a TLS handshake"}}), true},
+		{"a fatal TLS alert is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: &net.OpError{Op: "remote error", Err: errors.New("tls: certificate required")}}), true},
+		{"plain HTTP answer to https is fatal", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: http.ErrSchemeMismatch}), true},
+		{"connection refused is transient", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "http://127.0.0.1:1/", Err: &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}}), false},
+		{"dns failure is transient", fmt.Errorf("plex GET /: %w", &url.Error{Op: "Get", URL: "https://plex:32400/", Err: &net.DNSError{Err: "no such host", Name: "plex", IsNotFound: true}}), false},
 		{"wrapped 401 is fatal", fmt.Errorf("fetching providers: %w", &plexapi.StatusError{Code: 401, Status: "401 Unauthorized", Path: "/media/providers"}), true},
 	}
 	for _, tt := range tests {
