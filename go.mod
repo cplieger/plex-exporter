@@ -1,6 +1,6 @@
 module github.com/cplieger/plex-exporter
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/cplieger/go/envx v1.0.0
