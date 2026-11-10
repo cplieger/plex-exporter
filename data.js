@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793745607499,
-  "repoUrl": "https://github.com/cplieger/plex-exporter",
+  "lastUpdate": 1794349759742,
+  "repoUrl": "https://github.com/cplieger/ci",
   "entries": {
     "Benchmark": [
       {
@@ -1522,6 +1522,133 @@ window.BENCHMARK_DATA = {
             "name": "BenchmarkTruncLabel/short",
             "value": 1.8705,
             "range": "± 0.0035",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Christopher Plieger",
+            "username": "cplieger",
+            "email": "917744+cplieger@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f40d4941f84982c89b2289176113db1edfb4bffe",
+          "message": "feat: publish each bundled Grafana dashboard, not only the first (#1032)\n\n## Release note\n\nA repository can now ship more than one Grafana dashboard. Beside `grafana-dashboard.json`, each root `grafana-dashboard-<suffix>.json` is checked on every pull request and published with the release as `ghcr.io/<owner>/<repo>/dashboard-<suffix>:<version>`. The suffix is lowercase letters and digits joined by single hyphens, and any other `grafana-dashboard-*.json` fails the check and the release with an error naming the file. A repository with one dashboard sees no change.",
+          "timestamp": "2026-11-10T21:51:58Z",
+          "url": "https://github.com/cplieger/ci/commit/f40d4941f84982c89b2289176113db1edfb4bffe"
+        },
+        "date": 1794349759513,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkCollect/sessions_0 - B/op",
+            "value": 87893,
+            "range": "± 12.5",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_0 - allocs/op",
+            "value": 205,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_0",
+            "value": 154034.5,
+            "range": "± 2709",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_20 - B/op",
+            "value": 196359,
+            "range": "± 16",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_20 - allocs/op",
+            "value": 520,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_20",
+            "value": 244984,
+            "range": "± 2176.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_5 - B/op",
+            "value": 113288,
+            "range": "± 9",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_5 - allocs/op",
+            "value": 288,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCollect/sessions_5",
+            "value": 174570,
+            "range": "± 914",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/long - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/long - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/long",
+            "value": 1.643,
+            "range": "± 0.1325",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/short - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/short - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkTruncLabel/short",
+            "value": 0.9375,
+            "range": "± 0.084",
             "unit": "ns/op",
             "extra": "10 samples, median"
           }
