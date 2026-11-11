@@ -73,8 +73,7 @@ func routes(metrics http.Handler, serving health.Signal) http.Handler {
 	// Chain is outermost-first: Logging records the final status (even a
 	// recovered panic), Recoverer converts a panic to its 500 before
 	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
-	// machine-scraped, non-browser. WithProbeLogLevel logs both paths at Debug
-	// whatever the status; the health Status logs each change of verdict.
+	// machine-scraped, non-browser.
 	return httpserver.Chain(mux,
 		httpserver.Logging(httpserver.WithProbeLogLevel("/metrics", healthzPath)),
 		httpserver.Recoverer(),
