@@ -45,8 +45,14 @@ type sample struct {
 // the collector dropped, and returns every plex_* sample in page order.
 func gatherSamples(tb testing.TB, collect func(*emitter)) []sample {
 	tb.Helper()
+	return gatherCollector(tb, newCollector(collect))
+}
+
+// gatherCollector is gatherSamples for a whole collector.
+func gatherCollector(tb testing.TB, c *measure.Collector) []sample {
+	tb.Helper()
 	reg := measure.NewRegistry("")
-	if err := reg.Register(newCollector(collect)); err != nil {
+	if err := reg.Register(c); err != nil {
 		tb.Fatalf("Setup: register: %v", err)
 	}
 	fams, err := reg.Gather(tb.Context())
@@ -757,6 +763,23 @@ func TestCollect_blind_start_emits_only_exporter_metrics(t *testing.T) {
 	}
 	if refreshErrors != 1 {
 		t.Errorf("plex_exporter_errors_total{type=refresh} = %v, want 1", refreshErrors)
+	}
+}
+
+// Before Plex has answered, the page already carries the build the exporter
+// runs, so a query can join any of its series on it.
+func TestCollector_serves_build_info_before_plex_answers(t *testing.T) {
+	reg := measure.NewRegistry("")
+	reg.MustRegister(New(nil).Collector("v1.4.0"))
+	rec := httptest.NewRecorder()
+	reg.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", http.NoBody))
+	page := rec.Body.String()
+
+	if want := `plex_exporter_build_info{version="v1.4.0"} 1` + "\n"; !strings.Contains(page, want) {
+		t.Errorf("page lacks %q:\n%s", want, page)
+	}
+	if n := strings.Count(page, "\nplex_exporter_build_info{"); n != 1 {
+		t.Errorf("page carries %d plex_exporter_build_info samples, want 1", n)
 	}
 }
 

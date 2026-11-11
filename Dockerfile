@@ -8,9 +8,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 COPY *.go ./
 COPY internal/ internal/
+ARG BUILD_VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /plex-exporter .
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${BUILD_VERSION}" -o /plex-exporter .
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md ./
 COPY scripts/collect-licenses.sh scripts/
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -21,6 +22,7 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266
 COPY --chmod=755 --from=builder /plex-exporter /plex-exporter
 COPY --from=builder /out/usr/share/licenses /usr/share/licenses
 USER nonroot:nonroot
+EXPOSE 9594
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
     CMD ["/plex-exporter", "health"]
 ENTRYPOINT ["/plex-exporter"]

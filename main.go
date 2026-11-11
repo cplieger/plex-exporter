@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/cplieger/go/envx"
-	"github.com/cplieger/go/health"
+	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/httpserver"
 	"github.com/cplieger/go/measure"
@@ -30,12 +30,15 @@ import (
 // documented probes ask it.
 const healthzPath = "/healthz"
 
-// notServingReason is what /healthz reports while the marker is absent.
-const notServingReason = "plex-exporter is not serving: it is starting or shutting down, or cannot write its health marker in /tmp"
+const notServingReason = "plex-exporter is starting or shutting down"
 
 // healthProbeTimeout sits inside the Dockerfile's 5s HEALTHCHECK --timeout, so
 // a hung listener fails the check with a written reason instead of a kill.
 const healthProbeTimeout = 4 * time.Second
+
+// version is the release this binary was built as, set with
+// -ldflags "-X main.version=<tag>"; a build without it reports "dev".
+var version = "dev"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "health" {
@@ -52,7 +55,7 @@ func listenAddr() string {
 // Go runtime and process families every measure registry serves.
 func newRegistry(ps *server.Server) *measure.Registry {
 	reg := measure.NewRegistry("")
-	reg.MustRegister(ps.Collector())
+	reg.MustRegister(ps.Collector(version))
 	return reg
 }
 
@@ -70,8 +73,7 @@ func routes(metrics http.Handler, serving health.Signal) http.Handler {
 	// Chain is outermost-first: Logging records the final status (even a
 	// recovered panic), Recoverer converts a panic to its 500 before
 	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
-	// machine-scraped, non-browser. WithProbeLogLevel keeps a healthy probe at
-	// Debug and surfaces a failing one at Warn/Error with status + request id.
+	// machine-scraped, non-browser.
 	return httpserver.Chain(mux,
 		httpserver.Logging(httpserver.WithProbeLogLevel("/metrics", healthzPath)),
 		httpserver.Recoverer(),
@@ -84,12 +86,6 @@ func run() int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	// Clear a marker a crashed run left, so /healthz reports serving only
-	// once this run has bound its listener.
-	marker := health.NewMarker(health.DefaultPath)
-	marker.Set(false)
-	defer marker.Cleanup()
 
 	plexURL, err := envx.Require("PLEX_URL")
 	if err != nil {
@@ -106,7 +102,7 @@ func run() int {
 	listenAddr := listenAddr()
 
 	caCertPath := envx.String("PLEX_CA_CERT_PATH")
-	slog.Info("starting plex-exporter",
+	slog.Info("starting plex-exporter", "version", version,
 		"server", plexURL, "listen", listenAddr,
 		"ca_cert_path", caCertPath)
 
@@ -145,7 +141,8 @@ func run() int {
 
 	go ps.RunRefreshLoop(ctx)
 
-	handler := routes(metricsHandler(newRegistry(ps)), marker)
+	st := health.NewStatus()
+	handler := routes(metricsHandler(newRegistry(ps)), st)
 
 	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; New
 	// leaves them unset by default.
@@ -161,7 +158,7 @@ func run() int {
 		return 1
 	}
 
-	marker.Set(true)
+	st.Set(true)
 
 	go ps.Sessions.RunPruneLoop(ctx)
 	go ps.RunSessionPollLoop(ctx)
@@ -170,10 +167,9 @@ func run() int {
 
 	slog.Info("starting metrics server", "addr", listener.Addr().String())
 	// WithPreDrain marks the app unhealthy before httpserver.Run drains, so a
-	// probe answered during the drain reads 503. On a serve-error exit Run
-	// skips it; the deferred marker.Cleanup covers that path.
+	// probe answered during the drain reads 503.
 	preDrain := httpserver.WithPreDrain(func(context.Context) {
-		marker.Set(false)
+		st.BeginDrain()
 		slog.Info("shutting down", "cause", context.Cause(ctx))
 	})
 	if srvErr := httpserver.Run(ctx, srv, listener, httpserver.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {

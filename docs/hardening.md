@@ -17,15 +17,16 @@ Current code-scanning and vulnerability results are on the repository's Security
 
 ## Read-only root filesystem
 
-The exporter records that it is ready by writing an empty marker file, `/tmp/.healthy`. A read-only root filesystem therefore needs a writable `/tmp`, and a small in-memory mount is enough:
+Add these lines to the `plex-exporter` service to run it with a read-only root filesystem, no Linux capabilities and no privilege escalation. The exporter writes no file: its health verdict lives in memory. So it needs no `tmpfs` or volume, and `/healthz` never depends on a writable folder.
 
 ```yaml
     read_only: true
-    tmpfs:
-      - "/tmp:size=1m,mode=1777,noexec,nosuid,nodev"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
 ```
 
-Without that mount the marker is never written, so `/healthz` reports unhealthy for as long as the exporter runs. The image's Docker healthcheck asks `/healthz`, so Docker marks the container unhealthy, and any other probe on that endpoint fails too. Docker does not restart an unhealthy container on its own, so the exporter keeps serving `/metrics`, and its log shows a failed `/healthz` request every 30 seconds until `/tmp` is mounted. [Running on Kubernetes](kubernetes.md#a-writable-tmp) has the Kubernetes form.
+On Kubernetes, `securityContext.readOnlyRootFilesystem: true` likewise needs no volume.
 
 ## What the image contains
 
@@ -39,7 +40,7 @@ The image is one static Go binary on `gcr.io/distroless/static-debian13:nonroot`
 | gcr.io/distroless/static | [Distroless](https://github.com/GoogleContainerTools/distroless) |
 | github.com/cplieger/plexapi/v3 | [GitHub](https://github.com/cplieger/plexapi) |
 | github.com/cplieger/go/httpserver | [GitHub](https://github.com/cplieger/go/tree/main/httpserver) |
-| github.com/cplieger/go/health | [GitHub](https://github.com/cplieger/go/tree/main/health) |
+| github.com/cplieger/go/health/v2 | [GitHub](https://github.com/cplieger/go/tree/main/health) |
 | github.com/cplieger/go/measure | [GitHub](https://github.com/cplieger/go/tree/main/measure) |
 | github.com/cplieger/go/envx | [GitHub](https://github.com/cplieger/go/tree/main/envx) |
 | github.com/cplieger/go/slogx | [GitHub](https://github.com/cplieger/go/tree/main/slogx) |

@@ -141,6 +141,11 @@ var (
 		"Exporter errors by type",
 		[]string{"type"},
 	)
+	DescBuildInfo = gaugeDesc(
+		"plex_exporter_build_info",
+		"Always 1, labelled with the plex-exporter release this process runs",
+		[]string{"version"},
+	)
 	DescSessionsTracked = gaugeDesc(
 		"plex_sessions_tracked",
 		"Plex sessions the exporter tracks, at most 256",
@@ -263,7 +268,7 @@ var AllDescs = []*Desc{
 	DescTransmitBytes, DescActiveTranscodes,
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
-	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors,
+	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors, DescBuildInfo,
 	DescSessionsTracked, DescSessionsDropped, DescRefreshDeadlineExceeded,
 	DescTopItemBytes, DescTopItemLastPlayed, DescRecentItemAdded,
 	DescWatchAgeBytes, DescWatchAgeItems, DescResolutionBytes, DescCodecBytes,

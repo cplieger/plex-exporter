@@ -86,7 +86,7 @@ func BenchmarkCollect(b *testing.B) {
 			b.Fatalf("benchServer(%d): collect emitted 0 samples, want more than 0", n)
 		}
 		reg := measure.NewRegistry("")
-		reg.MustRegister(srv.Collector())
+		reg.MustRegister(srv.Collector("dev"))
 
 		b.Run(fmt.Sprintf("sessions_%d", n), func(b *testing.B) {
 			b.ReportAllocs()

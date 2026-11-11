@@ -24,7 +24,7 @@ func TestRoutes_healthz(t *testing.T) {
 		wantJSON    string
 	}{
 		{name: "GET while serving", method: http.MethodGet, path: "/healthz", serving: true, wantStatus: http.StatusOK, wantJSON: "ok"},
-		{name: "GET while not serving", method: http.MethodGet, path: "/healthz", wantStatus: http.StatusServiceUnavailable, wantJSON: "unhealthy", wantReasons: []string{notServingReason}},
+		{name: "GET while not serving", method: http.MethodGet, path: "/healthz", wantStatus: http.StatusServiceUnavailable, wantJSON: "unhealthy", wantReasons: []string{"plex-exporter is starting or shutting down"}},
 		{name: "HEAD while serving", method: http.MethodHead, path: "/healthz", serving: true, wantStatus: http.StatusOK},
 		{name: "POST is refused", method: http.MethodPost, path: "/healthz", serving: true, wantStatus: http.StatusMethodNotAllowed},
 		{name: "the old path is gone", method: http.MethodGet, path: "/api/health", serving: true, wantStatus: http.StatusNotFound},
