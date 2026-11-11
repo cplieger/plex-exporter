@@ -225,9 +225,9 @@ The tiles that show the current state ask for an instant value rather than a ran
 | `/healthz` | `GET`, `HEAD` | 9594, or the port in `LISTEN_ADDR` | none | `200 {"status":"ok"}`, or `503 {"status":"unhealthy","reasons":[...]}` |
 | `/metrics` | `GET` | the same port | none; keep the port on your network | Prometheus text format, gzipped when the scraper asks for it |
 
-**What healthy means.** `/healthz` is healthy from the moment the exporter's metrics server listens until it starts to shut down. It reads a marker file the exporter writes in `/tmp`, so it stays unhealthy when `/tmp` is not writable, as [Security](hardening.md#read-only-root-filesystem) explains. Plex being unreachable, a rejected token included, never makes it unhealthy: that shows on `/metrics` as `plex_http_reachable` at `0` and in the log.
+**What healthy means.** `/healthz` is healthy from the moment the exporter's metrics server listens until it starts to shut down. The exporter keeps this verdict in memory, so a read-only root filesystem never makes it unhealthy. Plex being unreachable, a rejected token included, never makes it unhealthy: that shows on `/metrics` as `plex_http_reachable` at `0` and in the log.
 
-**Docker health.** The image checks itself every 30 seconds with `/plex-exporter health`, which asks `/healthz` on the container's loopback. Docker marks the container unhealthy after 3 failures, and allows 15 seconds after a start. Docker's health status notifies nobody on its own, and Docker does not restart an unhealthy container.
+**Docker health.** The image checks itself every 30 seconds with `/plex-exporter health`, which asks `/healthz` on the container's loopback, or on the address `LISTEN_ADDR` names. Docker marks the container unhealthy after 3 failures, and allows 15 seconds after a start. Docker's health status notifies nobody on its own, and Docker does not restart an unhealthy container.
 
 **Who is told.**
 

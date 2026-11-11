@@ -124,7 +124,6 @@ At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
 - Host CPU, memory and `plex_transmit_bytes_total` are missing. They need Plex Pass, and appear once Plex has answered for them.
-- With `read_only: true` in your compose file, `/healthz` reports unhealthy, Docker marks the container unhealthy and the log shows a failed `/healthz` request every 30 seconds. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
 - A library's item count lags after a large scan, because counts are read every 15 minutes.
 
 ## Monitoring
@@ -136,7 +135,7 @@ plex-exporter serves 49 metrics on `/metrics`, for the exporter itself, the serv
 - [How plex-exporter works](docs/how-it-works.md) explains how often it reads Plex and when each metric appears.
 - [Monitoring and alerts](docs/monitoring.md) lists every metric and label, the dashboard downloads and the alert rules.
 - [Security](docs/hardening.md) covers the read-only compose settings, the exporter's limits and what the image contains.
-- [Running on Kubernetes](docs/kubernetes.md) covers the `/tmp` mount, probes, a sidecar setup and Prometheus Operator labels.
+- [Running on Kubernetes](docs/kubernetes.md) covers probes, a sidecar setup, Prometheus Operator labels and dashboard delivery.
 
 ## Credits
 
