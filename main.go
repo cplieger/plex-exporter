@@ -36,6 +36,10 @@ const notServingReason = "plex-exporter is starting or shutting down"
 // a hung listener fails the check with a written reason instead of a kill.
 const healthProbeTimeout = 4 * time.Second
 
+// version is the release this binary was built as, set with
+// -ldflags "-X main.version=<tag>"; a build without it reports "dev".
+var version = "dev"
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "health" {
 		os.Exit(probeHealth(os.Stderr, listenAddr(), healthProbeTimeout))
@@ -99,7 +103,7 @@ func run() int {
 	listenAddr := listenAddr()
 
 	caCertPath := envx.String("PLEX_CA_CERT_PATH")
-	slog.Info("starting plex-exporter",
+	slog.Info("starting plex-exporter", "version", version,
 		"server", plexURL, "listen", listenAddr,
 		"ca_cert_path", caCertPath)
 
