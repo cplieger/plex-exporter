@@ -10,7 +10,7 @@ require (
 	github.com/cplieger/go/measure v1.2.0
 	github.com/cplieger/go/slogx v1.1.0
 	github.com/cplieger/go/textsafe v1.1.0
-	github.com/cplieger/plexapi/v3 v3.0.0-dev.16
+	github.com/cplieger/plexapi/v3 v3.0.0-dev.17
 	golang.org/x/sync v0.25.0
 	pgregory.net/rapid v1.3.0
 )
