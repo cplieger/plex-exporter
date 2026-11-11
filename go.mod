@@ -1,6 +1,6 @@
 module github.com/cplieger/plex-exporter
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/cplieger/envx/v2 v2.1.0
@@ -11,7 +11,7 @@ require (
 	github.com/cplieger/webhttp/v3 v3.0.3
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	pgregory.net/rapid v1.3.0
 )
 
@@ -25,6 +25,6 @@ require (
 	github.com/pandatix/go-abnf v0.5.5 // indirect
 	github.com/prometheus/common v0.73.1 // indirect
 	github.com/prometheus/procfs v0.23.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
