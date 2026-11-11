@@ -25,8 +25,8 @@ import (
 )
 
 // runMainEnv makes the test binary run the exporter's run() instead of the
-// tests, so each start below gets a fresh process with no registry or
-// marker left from another start.
+// tests, so each start below gets a fresh process with no registry left
+// from another start.
 const runMainEnv = "PLEX_EXPORTER_TEST_RUN_MAIN"
 
 func TestMain(m *testing.M) {

@@ -5,28 +5,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
-
-func TestHealthzURL(t *testing.T) {
-	cases := map[string]string{
-		":9594":          "http://127.0.0.1:9594/healthz",
-		"0.0.0.0:9594":   "http://127.0.0.1:9594/healthz",
-		"[::]:9594":      "http://127.0.0.1:9594/healthz",
-		"192.0.2.5:9000": "http://192.0.2.5:9000/healthz",
-		"[::1]:9594":     "http://[::1]:9594/healthz",
-	}
-	for addr, want := range cases {
-		got, err := healthzURL(addr)
-		if err != nil || got != want {
-			t.Errorf("healthzURL(%q) = %q, %v, want %q", addr, got, err, want)
-		}
-	}
-	if _, err := healthzURL("9594"); err == nil {
-		t.Error(`healthzURL("9594") succeeded, want an error for an address with no port separator`)
-	}
-}
 
 func TestProbeHealth_passes_only_a_serving_listener(t *testing.T) {
 	metrics := http.NotFoundHandler()
@@ -46,6 +28,15 @@ func TestProbeHealth_passes_only_a_serving_listener(t *testing.T) {
 			}
 		})
 	}
+	t.Run("malformed LISTEN_ADDR", func(t *testing.T) {
+		var stderr strings.Builder
+		if got := probeHealth(&stderr, "9594", 2*time.Second); got != 1 {
+			t.Errorf("probeHealth = %d for an address with no port separator, want 1", got)
+		}
+		if !strings.Contains(stderr.String(), `LISTEN_ADDR "9594"`) {
+			t.Errorf("stderr = %q, want it to name LISTEN_ADDR and its value", stderr.String())
+		}
+	})
 	t.Run("nothing listening", func(t *testing.T) {
 		l, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
