@@ -18,9 +18,13 @@ import (
 // strings.
 const maxLabelLen = 128
 
-// Collector returns a new collector that reads s at every scrape.
-func (s *Server) Collector() *measure.Collector {
-	return newCollector(s.collect)
+// Collector returns a new collector that reads s at every scrape and serves
+// version as plex_exporter_build_info.
+func (s *Server) Collector(version string) *measure.Collector {
+	return newCollector(func(em *emitter) {
+		em.emit(metrics.DescBuildInfo, 1, version)
+		s.collect(em)
+	})
 }
 
 // newCollector declares every family in metrics.AllDescs for one collector

@@ -17,7 +17,7 @@ The page is always on, at `/metrics` on port 9594, which `LISTEN_ADDR` changes. 
 
 ### Exporter metrics
 
-These seven carry no server labels and appear from the first scrape.
+These eight carry no server labels and appear from the first scrape.
 
 | Metric | Type | Labels | Description |
 | --- | --- | --- | --- |
@@ -25,6 +25,7 @@ These seven carry no server labels and appear from the first scrape.
 | `plex_session_poll_reachable` | Gauge | _none_ | `1` when the last `/status/sessions` poll succeeded, `0` when it failed |
 | `plex_http_retries_total` | Counter | _none_ | HTTP retries the exporter's Plex client made, across all requests |
 | `plex_exporter_errors_total` | Counter | `type` | Exporter errors by type: `refresh`, `sessions_fetch`, `metadata_fetch`, `invalid_rating_key`, `metrics_server`, `library_items`, `library_walk`, `history_fetch`, `activities_fetch`, `sections_fetch`, `updater_fetch` or `prefs_fetch` |
+| `plex_exporter_build_info` | Gauge | `version` | Always `1`. `version` is the plex-exporter release the process runs, `dev` for a build without a release tag. A query joins it `on (job, instance)` to scope a Go or process metric to the exporter |
 | `plex_sessions_tracked` | Gauge | _none_ | Plex sessions the exporter tracks, at most 256 |
 | `plex_sessions_dropped_total` | Counter | _none_ | New Plex sessions the exporter refused because it already tracked 256. A session refused on several polls counts on each |
 | `plex_refresh_deadline_exceeded_total` | Counter | `fetch` | Plex Pass reads skipped because the refresh ran out of its 45-second deadline, by `fetch`: `resources` (host CPU and memory) or `bandwidth` (`plex_transmit_bytes_total`). A read Plex answers with 404, as it does without Plex Pass, does not count |
@@ -175,7 +176,7 @@ Every rule except the two target rules reads a series the exporter publishes, so
 
 The two target rules need each other. `PlexExporterTargetDown` catches a target that is configured and failing, and keeps its labels so the alert names the instance. `PlexExporterTargetAbsent` catches a target that no longer exists, such as a deleted Kubernetes pod or ServiceMonitor, a dropped scrape target or a removed scrape config. In that case `up` has no series at all, so `up == 0` can never match.
 
-The metric rules need nothing beyond the scrape. The seven exporter series are published from the first scrape, and no setting can turn one off. `plex_library_items`, which `PlexExporterLibraryItemsCollapsed` reads, appears once the exporter has learned the server identity and read a library count.
+The metric rules need nothing beyond the scrape. The eight exporter series are published from the first scrape, and no setting can turn one off. `plex_library_items`, which `PlexExporterLibraryItemsCollapsed` reads, appears once the exporter has learned the server identity and read a library count.
 
 ### Notes on each rule
 

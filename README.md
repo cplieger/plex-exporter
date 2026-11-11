@@ -129,7 +129,7 @@ At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `
 
 ## Monitoring
 
-plex-exporter serves 48 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. The page also carries the Go runtime and process metrics under the names Go's official Prometheus client uses. Ten PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them. The image has a Docker healthcheck; [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
+plex-exporter serves 49 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. The page also carries the Go runtime and process metrics under the names Go's official Prometheus client uses. Ten PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them. The image has a Docker healthcheck; [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
 
 ## Documentation
 

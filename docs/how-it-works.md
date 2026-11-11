@@ -37,7 +37,7 @@ When a stream ends, its series stay for 1 to 2 minutes and then go. A session th
 
 ## When each metric appears
 
-The seven exporter metrics, `plex_http_reachable`, `plex_session_poll_reachable`, `plex_http_retries_total`, `plex_exporter_errors_total`, `plex_sessions_tracked`, `plex_sessions_dropped_total` and `plex_refresh_deadline_exceeded_total`, carry no server labels. They appear from the first scrape, before Plex has answered, and each keeps its series from then on.
+The eight exporter metrics, `plex_http_reachable`, `plex_session_poll_reachable`, `plex_http_retries_total`, `plex_exporter_errors_total`, `plex_exporter_build_info`, `plex_sessions_tracked`, `plex_sessions_dropped_total` and `plex_refresh_deadline_exceeded_total`, carry no server labels. They appear from the first scrape, before Plex has answered, and each keeps its series from then on.
 
 Every other metric carries the `server` and `server_id` labels of the server it describes. It appears once the exporter has read the server's identity from Plex. So `absent(plex_server_info)` means the exporter has never reached Plex since it started.
 

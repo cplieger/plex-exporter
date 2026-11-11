@@ -443,7 +443,7 @@ func TestCollect_every_emitted_family_is_described(t *testing.T) {
 		ss.VideoTranscoding, ss.VideoDecode, ss.VideoEncode = true, "hardware", "hardware"
 	})
 
-	families := byFamily(gatherSamples(t, srv.collect))
+	families := byFamily(gatherCollector(t, srv.Collector("v1")))
 	for _, d := range metrics.AllDescs {
 		if len(families[d.Name]) == 0 {
 			t.Errorf("%s has no sample, want the fixture to emit every family", d.Name)

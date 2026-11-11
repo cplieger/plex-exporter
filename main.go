@@ -55,7 +55,7 @@ func listenAddr() string {
 // Go runtime and process families every measure registry serves.
 func newRegistry(ps *server.Server) *measure.Registry {
 	reg := measure.NewRegistry("")
-	reg.MustRegister(ps.Collector())
+	reg.MustRegister(ps.Collector(version))
 	return reg
 }
 

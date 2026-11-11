@@ -352,7 +352,14 @@ func TestRun_metrics_page_families(t *testing.T) {
 	p := startExporter(t, map[string]string{
 		"PLEX_URL": ts.URL, "PLEX_TOKEN": "test-token", "LISTEN_ADDR": freeAddr(t),
 	})
-	types, helps := pageFamilies(p.waitMetrics(t, "plex_http_reachable 1", plexUp))
+	page := p.waitMetrics(t, "plex_http_reachable 1", plexUp)
+	types, helps := pageFamilies(page)
+
+	t.Run("build_info", func(t *testing.T) {
+		if want := `plex_exporter_build_info{version="dev"} 1` + "\n"; !strings.Contains(page, want) {
+			t.Errorf("page lacks %q from an unstamped build", want)
+		}
+	})
 
 	t.Run("go_and_process_families", func(t *testing.T) {
 		for _, fam := range readLines(t, "testdata/client_golang_default_families.txt", " ") {

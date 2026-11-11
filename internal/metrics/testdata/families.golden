@@ -14,6 +14,7 @@ plex_http_reachable	gauge		Whether the exporter's last poll of the configured Pl
 plex_session_poll_reachable	gauge		Whether the exporter's last /status/sessions poll succeeded (1) or failed (0)
 plex_http_retries_total	counter		HTTP retries the exporter's Plex client performed across all requests
 plex_exporter_errors_total	counter	type	Exporter errors by type
+plex_exporter_build_info	gauge	version	Always 1, labelled with the plex-exporter release this process runs
 plex_sessions_tracked	gauge		Plex sessions the exporter tracks, at most 256
 plex_sessions_dropped_total	counter		Times a new Plex session was refused because the exporter already tracked 256, counted on each poll
 plex_refresh_deadline_exceeded_total	counter	fetch	Plex Pass fetches skipped because the refresh ran out of its 45s deadline
