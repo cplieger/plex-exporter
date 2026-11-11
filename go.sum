@@ -1,5 +1,5 @@
-github.com/cplieger/go/envx v1.1.0-dev.3 h1:HOOsI4hnb2Oim1N8c83y/tqcwQCZjBoh9rJv2At7EKI=
-github.com/cplieger/go/envx v1.1.0-dev.3/go.mod h1:USzzGAzdJGsU8ZYRmVaMGvKzgEGDDhXvUUsckSv4VfM=
+github.com/cplieger/go/envx v1.1.0 h1:AfJm5r7oR3zHmpplYwpNQL6yB7b50bmNAaOAijeG9aM=
+github.com/cplieger/go/envx v1.1.0/go.mod h1:USzzGAzdJGsU8ZYRmVaMGvKzgEGDDhXvUUsckSv4VfM=
 github.com/cplieger/go/health v1.1.0 h1:vG4wM0JVBXvDXxGm9fnhyn8yA0BuiyB99LE3CPulA4s=
 github.com/cplieger/go/health v1.1.0/go.mod h1:7eOprE7L510iSRZBJabPD4V06TftKymjdtLnLTZPTiY=
 github.com/cplieger/go/httpclient v1.2.0 h1:E+lbIpiNkUkcq3fxdMDYn116cwx6tU1XWmn4mDdBGU0=
