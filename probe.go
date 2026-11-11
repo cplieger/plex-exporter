@@ -7,7 +7,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/cplieger/go/health/probe"
+	"github.com/cplieger/go/health/v2/probe"
 )
 
 // healthzURL is the /healthz address the image's healthcheck asks: the listen
