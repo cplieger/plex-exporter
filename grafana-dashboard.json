@@ -6544,7 +6544,7 @@
         "spec": {
           "id": 151,
           "title": "Plex server",
-          "description": "Shows while the PlexExporterAPIUnreachable alert fires for any exporter: plex-exporter has failed to reach the Plex API for 10 minutes, so the other panels show old values. The usual cause is Plex being down or a revoked or wrong PLEX_TOKEN. The reachability metric carries no server name, so the tile does not follow the Server selection. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "description": "Shows while the PlexExporterAPIUnreachable alert fires for any exporter: plex-exporter has failed to reach the Plex API for 10 minutes, so the other panels show old values. The usual cause is Plex being down or a PLEX_TOKEN that Plex refuses, at startup as well as later, and the exporter log names which. The reachability metric carries no server name, so the tile does not follow the Server selection. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -8207,6 +8207,409 @@
             }
           }
         }
+      },
+      "panel-161": {
+        "kind": "Panel",
+        "spec": {
+          "id": 161,
+          "title": "Session tracker full",
+          "description": "Shows while the PlexExporterSessionMapFull alert fires for any exporter: plex-exporter refused a new Plex session in the last 15 minutes because it already tracks its cap of 256. Those sessions publish no series, so Streams and Active sessions undercount. Tracked sessions against the cap on Exporter health shows how close it runs. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "(0 * max(ALERTS{alertname=\"PlexExporterSessionMapFull\", alertstate=\"firing\"})) or ((0 * max((increase(plex_sessions_dropped_total[15m]) > 0) and (count_over_time((increase(plex_sessions_dropped_total[15m]) > 0)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionMapFull\"}[2m])))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "values": false
+                },
+                "textMode": "auto",
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "Nothing to report",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "yellow"
+                      }
+                    ]
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "index": 0,
+                          "text": "Full",
+                          "color": "yellow"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-162": {
+        "kind": "Panel",
+        "spec": {
+          "id": 162,
+          "title": "Plex Pass data stale",
+          "description": "Shows while the PlexExporterRefreshIncomplete alert fires for any exporter: more than three Plex Pass fetches ran out of the refresh deadline in the last 15 minutes. Host CPU, Host memory and plex_transmit_bytes_total then hold old values while the Plex server tile stays clear, and Refresh deadline misses on Exporter health names the fetch. A busy Plex server is the usual cause. Without the alert rules from alerts/promql.yaml, the tile checks the same condition itself.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "(0 * max(ALERTS{alertname=\"PlexExporterRefreshIncomplete\", alertstate=\"firing\"})) or ((0 * max((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3) and (count_over_time((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterRefreshIncomplete\"}[2m])))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "values": false
+                },
+                "textMode": "auto",
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 28
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "noValue": "Nothing to report",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "yellow"
+                      }
+                    ]
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "index": 0,
+                          "text": "Stale",
+                          "color": "yellow"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-142": {
+        "kind": "Panel",
+        "spec": {
+          "id": 142,
+          "title": "Tracked sessions against the cap",
+          "description": "Plex sessions each plex-exporter tracks, against the red line at its fixed cap of 256. At the cap it refuses new sessions, which then publish no series, and the Session tracker full tile shows. A stopped session stays tracked for about a minute, so the count can sit above the streams playing now. An empty panel means plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "plex_sessions_tracked",
+                        "legendFormat": "{{instance}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                },
+                "tooltip": {
+                  "mode": "multi"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "min": 0,
+                  "max": 256,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 256,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "fillOpacity": 20,
+                    "lineWidth": 2,
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
+                  },
+                  "noValue": "No sessions tracked, or plex-exporter was not scraped",
+                  "decimals": 0
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-143": {
+        "kind": "Panel",
+        "spec": {
+          "id": 143,
+          "title": "Refresh deadline misses in ${span} ${spanunit}",
+          "description": "Plex Pass fetches that plex-exporter skipped in the selected range because the refresh ran out of its deadline, by fetch. Host resources feeds Host CPU and Host memory, and Bandwidth feeds plex_transmit_bytes_total, so a count here means those held old values for a while. The Plex Pass data stale tile shows while it keeps happening. No misses in this range means every refresh finished in time, or plex-exporter was not scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sort_desc(label_replace(label_replace((sum by (fetch) (increase(plex_refresh_deadline_exceeded_total[$__range])) > 0), \"fetch\", \"Host resources\", \"fetch\", \"resources\"), \"fetch\", \"Bandwidth\", \"fetch\", \"bandwidth\"))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time": true
+                      },
+                      "indexByName": {
+                        "fetch": 0,
+                        "Value": 1
+                      },
+                      "renameByName": {
+                        "fetch": "Fetch",
+                        "Value": "Misses"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "sortBy": [
+                  {
+                    "displayName": "Misses",
+                    "desc": true
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "decimals": 0,
+                  "min": 0,
+                  "noValue": "No refresh ran out of time in this range",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "yellow"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Misses"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -8385,6 +8788,66 @@
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-152"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-161"
+                                  },
+                                  "conditionalRendering": {
+                                    "kind": "ConditionalRenderingGroup",
+                                    "spec": {
+                                      "visibility": "show",
+                                      "condition": "or",
+                                      "items": [
+                                        {
+                                          "kind": "ConditionalRenderingData",
+                                          "spec": {
+                                            "value": true
+                                          }
+                                        },
+                                        {
+                                          "kind": "ConditionalRenderingTimeRangeSize",
+                                          "spec": {
+                                            "value": "0s"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-162"
                                   },
                                   "conditionalRendering": {
                                     "kind": "ConditionalRenderingGroup",
@@ -9578,6 +10041,32 @@
                                     "name": "panel-137"
                                   }
                                 }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 17,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-142"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 17,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-143"
+                                  }
+                                }
                               }
                             ]
                           }
@@ -9830,10 +10319,10 @@
               "name": "${datasource}"
             },
             "spec": {
-              "query": "query_result(count(label_replace(count((count(ALERTS{alertname=\"PlexExporterTargetDown\", alertstate=\"firing\"}) or -max(ALERTS{alertname=\"PlexExporterTargetAbsent\", alertstate=\"firing\"})) or ((count((count_over_time((up == 0)[17m:1m]) >= 17) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w]))) or -absent(count_over_time((up)[17m:1m]) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w])))) unless on () count(max_over_time(ALERTS{alertname=~\"PlexExporterTargetDown|PlexExporterTargetAbsent\"}[17m])))), \"tile\", \"150\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))), \"tile\", \"151\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))), \"tile\", \"152\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))), \"tile\", \"153\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))), \"tile\", \"154\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))), \"tile\", \"160\", \"\", \"\") or label_replace(count((round(sum(increase(plex_exporter_errors_total[$__range]))) or vector(0)) and on () ((count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"}[$__range])) or count(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"} offset $__range)) or (count(max_over_time(((count_over_time((sum by (type) (rate(plex_exporter_errors_total[15m])) > 0)[32m:1m]) >= 32))[$__range:1m])) unless on () (count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[$__range])) or count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[32m] offset $__range)))))), \"tile\", \"155\", \"\", \"\") or label_replace(count(max((time() - max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"}) > 1800) or on (server, server_id) (-1 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"failed\"}) == 1) unless on (server, server_id) max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"})))), \"tile\", \"156\", \"\", \"\") or label_replace(count(max(label_replace(0 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"over_limit\"}) == 1) + 2, \"reason\", \"limit\", \"\", \"\") or label_replace(0 * (max by (server, server_id) (plex_history_unmatched_rows{server=~\"$server\"}) > 0) + 1, \"reason\", \"unmatched\", \"\", \"\"))), \"tile\", \"157\", \"\", \"\") or label_replace(count(sum(max by (server, server_id) (plex_library_walk_skipped_libraries{server=~\"$server\"})) > 0), \"tile\", \"158\", \"\", \"\") or label_replace(count(sum(plex_library_unsized_items{server=~\"$server\"}) > 0), \"tile\", \"159\", \"\", \"\") or label_replace(count(max(plex_server_update_available{server=~\"$server\"} and on (server, server_id) (time() - plex_server_update_checked_timestamp_seconds < 604800)) == 1), \"tile\", \"100\", \"\", \"\")) or vector(0))"
+              "query": "query_result(count(label_replace(count((count(ALERTS{alertname=\"PlexExporterTargetDown\", alertstate=\"firing\"}) or -max(ALERTS{alertname=\"PlexExporterTargetAbsent\", alertstate=\"firing\"})) or ((count((count_over_time((up == 0)[17m:1m]) >= 17) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w]))) or -absent(count_over_time((up)[17m:1m]) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w])))) unless on () count(max_over_time(ALERTS{alertname=~\"PlexExporterTargetDown|PlexExporterTargetAbsent\"}[17m])))), \"tile\", \"150\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))), \"tile\", \"151\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))), \"tile\", \"152\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionMapFull\", alertstate=\"firing\"})) or ((0 * max((increase(plex_sessions_dropped_total[15m]) > 0) and (count_over_time((increase(plex_sessions_dropped_total[15m]) > 0)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionMapFull\"}[2m])))), \"tile\", \"161\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterRefreshIncomplete\", alertstate=\"firing\"})) or ((0 * max((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3) and (count_over_time((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterRefreshIncomplete\"}[2m])))), \"tile\", \"162\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))), \"tile\", \"153\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))), \"tile\", \"154\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))), \"tile\", \"160\", \"\", \"\") or label_replace(count((round(sum(increase(plex_exporter_errors_total[$__range]))) or vector(0)) and on () ((count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"}[$__range])) or count(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"} offset $__range)) or (count(max_over_time(((count_over_time((sum by (type) (rate(plex_exporter_errors_total[15m])) > 0)[32m:1m]) >= 32))[$__range:1m])) unless on () (count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[$__range])) or count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[32m] offset $__range)))))), \"tile\", \"155\", \"\", \"\") or label_replace(count(max((time() - max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"}) > 1800) or on (server, server_id) (-1 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"failed\"}) == 1) unless on (server, server_id) max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"})))), \"tile\", \"156\", \"\", \"\") or label_replace(count(max(label_replace(0 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"over_limit\"}) == 1) + 2, \"reason\", \"limit\", \"\", \"\") or label_replace(0 * (max by (server, server_id) (plex_history_unmatched_rows{server=~\"$server\"}) > 0) + 1, \"reason\", \"unmatched\", \"\", \"\"))), \"tile\", \"157\", \"\", \"\") or label_replace(count(sum(max by (server, server_id) (plex_library_walk_skipped_libraries{server=~\"$server\"})) > 0), \"tile\", \"158\", \"\", \"\") or label_replace(count(sum(plex_library_unsized_items{server=~\"$server\"}) > 0), \"tile\", \"159\", \"\", \"\") or label_replace(count(max(plex_server_update_available{server=~\"$server\"} and on (server, server_id) (time() - plex_server_update_checked_timestamp_seconds < 604800)) == 1), \"tile\", \"100\", \"\", \"\")) or vector(0))"
             }
           },
-          "definition": "query_result(count(label_replace(count((count(ALERTS{alertname=\"PlexExporterTargetDown\", alertstate=\"firing\"}) or -max(ALERTS{alertname=\"PlexExporterTargetAbsent\", alertstate=\"firing\"})) or ((count((count_over_time((up == 0)[17m:1m]) >= 17) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w]))) or -absent(count_over_time((up)[17m:1m]) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w])))) unless on () count(max_over_time(ALERTS{alertname=~\"PlexExporterTargetDown|PlexExporterTargetAbsent\"}[17m])))), \"tile\", \"150\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))), \"tile\", \"151\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))), \"tile\", \"152\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))), \"tile\", \"153\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))), \"tile\", \"154\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))), \"tile\", \"160\", \"\", \"\") or label_replace(count((round(sum(increase(plex_exporter_errors_total[$__range]))) or vector(0)) and on () ((count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"}[$__range])) or count(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"} offset $__range)) or (count(max_over_time(((count_over_time((sum by (type) (rate(plex_exporter_errors_total[15m])) > 0)[32m:1m]) >= 32))[$__range:1m])) unless on () (count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[$__range])) or count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[32m] offset $__range)))))), \"tile\", \"155\", \"\", \"\") or label_replace(count(max((time() - max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"}) > 1800) or on (server, server_id) (-1 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"failed\"}) == 1) unless on (server, server_id) max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"})))), \"tile\", \"156\", \"\", \"\") or label_replace(count(max(label_replace(0 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"over_limit\"}) == 1) + 2, \"reason\", \"limit\", \"\", \"\") or label_replace(0 * (max by (server, server_id) (plex_history_unmatched_rows{server=~\"$server\"}) > 0) + 1, \"reason\", \"unmatched\", \"\", \"\"))), \"tile\", \"157\", \"\", \"\") or label_replace(count(sum(max by (server, server_id) (plex_library_walk_skipped_libraries{server=~\"$server\"})) > 0), \"tile\", \"158\", \"\", \"\") or label_replace(count(sum(plex_library_unsized_items{server=~\"$server\"}) > 0), \"tile\", \"159\", \"\", \"\") or label_replace(count(max(plex_server_update_available{server=~\"$server\"} and on (server, server_id) (time() - plex_server_update_checked_timestamp_seconds < 604800)) == 1), \"tile\", \"100\", \"\", \"\")) or vector(0))",
+          "definition": "query_result(count(label_replace(count((count(ALERTS{alertname=\"PlexExporterTargetDown\", alertstate=\"firing\"}) or -max(ALERTS{alertname=\"PlexExporterTargetAbsent\", alertstate=\"firing\"})) or ((count((count_over_time((up == 0)[17m:1m]) >= 17) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w]))) or -absent(count_over_time((up)[17m:1m]) and on (job, instance) (max_over_time(plex_http_reachable[$__range]) or max_over_time(plex_http_reachable[1w])))) unless on () count(max_over_time(ALERTS{alertname=~\"PlexExporterTargetDown|PlexExporterTargetAbsent\"}[17m])))), \"tile\", \"150\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterAPIUnreachable\", alertstate=\"firing\"})) or ((max((plex_http_reachable == 0) and (count_over_time((plex_http_reachable == 0)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterAPIUnreachable\"}[12m])))), \"tile\", \"151\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionPollFailing\", alertstate=\"firing\"})) or ((max((plex_session_poll_reachable == 0) and (count_over_time((plex_session_poll_reachable == 0 and plex_http_reachable == 1)[12m:1m]) >= 12))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionPollFailing\"}[12m])))), \"tile\", \"152\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterSessionMapFull\", alertstate=\"firing\"})) or ((0 * max((increase(plex_sessions_dropped_total[15m]) > 0) and (count_over_time((increase(plex_sessions_dropped_total[15m]) > 0)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterSessionMapFull\"}[2m])))), \"tile\", \"161\", \"\", \"\") or label_replace(count((0 * max(ALERTS{alertname=\"PlexExporterRefreshIncomplete\", alertstate=\"firing\"})) or ((0 * max((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3) and (count_over_time((sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m])) > 3)[2m:1m]) >= 2))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterRefreshIncomplete\"}[2m])))), \"tile\", \"162\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\", alertstate=\"firing\", server=~\"$server\"})) or ((count(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50) and (count_over_time(((max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) - plex_library_items{server=~\"$server\"}) / clamp_min(max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m), 1) > 0.5 and max_over_time(plex_library_items{server=~\"$server\"}[2h] offset 30m) > 50)[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryItemsCollapsed\"}[32m])))), \"tile\", \"153\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryWalkStale\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time((((time() - plex_library_walk_last_success_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (14400 + 2 * plex_library_walk_pass_duration_seconds) or on (server, server_id, library_id) (plex_library_walkable{server=~\"$server\"} unless on (server, server_id, library_id) plex_library_walk_last_success_timestamp_seconds)) and on (job, instance) (time() - process_start_time_seconds > 21600))[32m:1m]) >= 32))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryWalkStale\"}[32m])))), \"tile\", \"154\", \"\", \"\") or label_replace(count((count(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\", alertstate=\"firing\", server=~\"$server\"})) or ((count((count_over_time(((time() - plex_library_last_scan_timestamp_seconds{server=~\"$server\"}) > on (server, server_id) group_left () (2 * plex_server_scheduled_scan_interval_seconds{server=~\"$server\"} + 3600))[17m:1m]) >= 17))) unless on () count(max_over_time(ALERTS{alertname=\"PlexExporterLibraryScanOverdue\"}[17m])))), \"tile\", \"160\", \"\", \"\") or label_replace(count((round(sum(increase(plex_exporter_errors_total[$__range]))) or vector(0)) and on () ((count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"}[$__range])) or count(ALERTS{alertname=\"PlexExporterCollectionErrors\", alertstate=\"firing\"} offset $__range)) or (count(max_over_time(((count_over_time((sum by (type) (rate(plex_exporter_errors_total[15m])) > 0)[32m:1m]) >= 32))[$__range:1m])) unless on () (count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[$__range])) or count(max_over_time(ALERTS{alertname=\"PlexExporterCollectionErrors\"}[32m] offset $__range)))))), \"tile\", \"155\", \"\", \"\") or label_replace(count(max((time() - max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"}) > 1800) or on (server, server_id) (-1 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"failed\"}) == 1) unless on (server, server_id) max by (server, server_id) (plex_history_last_success_timestamp_seconds{server=~\"$server\"})))), \"tile\", \"156\", \"\", \"\") or label_replace(count(max(label_replace(0 * (max by (server, server_id) (plex_history_read_status{server=~\"$server\", status=\"over_limit\"}) == 1) + 2, \"reason\", \"limit\", \"\", \"\") or label_replace(0 * (max by (server, server_id) (plex_history_unmatched_rows{server=~\"$server\"}) > 0) + 1, \"reason\", \"unmatched\", \"\", \"\"))), \"tile\", \"157\", \"\", \"\") or label_replace(count(sum(max by (server, server_id) (plex_library_walk_skipped_libraries{server=~\"$server\"})) > 0), \"tile\", \"158\", \"\", \"\") or label_replace(count(sum(plex_library_unsized_items{server=~\"$server\"}) > 0), \"tile\", \"159\", \"\", \"\") or label_replace(count(max(plex_server_update_available{server=~\"$server\"} and on (server, server_id) (time() - plex_server_update_checked_timestamp_seconds < 604800)) == 1), \"tile\", \"100\", \"\", \"\")) or vector(0))",
           "regex": "/^\\{\\} ([0-9]+) /",
           "sort": "disabled",
           "options": [],

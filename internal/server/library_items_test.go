@@ -9,7 +9,6 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestRefreshLibraryItems_counts_by_type(t *testing.T) {
@@ -325,13 +324,9 @@ func TestFillItemCount_non_numeric_id_records_error(t *testing.T) {
 // whether the gauge was published for it at all.
 func libItemsGauge(t *testing.T, srv *Server, libName string) (float64, bool) {
 	t.Helper()
-	ch := make(chan prometheus.Metric, 4096)
-	srv.Collect(ch)
-	close(ch)
-	for _, m := range collectByDesc(ch)[descKey(metrics.DescLibItems)] {
-		labels, val := metricSnapshot(t, m)
-		if labels["library"] == libName {
-			return val, true
+	for _, m := range series(t, srv, metrics.DescLibItems) {
+		if m.labels["library"] == libName {
+			return m.value, true
 		}
 	}
 	return 0, false

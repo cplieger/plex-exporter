@@ -1,6 +1,5 @@
-# plex-exporter alert rules, the PromQL half, for a Prometheus or Mimir ruler.
-# The three LogQL rules live in alerts/logql.yaml. Load each file into its own
-# ruler, because neither ruler parses the other's expressions.
+# plex-exporter alert rules, for a Prometheus, Mimir or vmalert ruler. They are
+# the only rules plex-exporter ships, and need no log collector.
 #
 # Scrape /metrics, port 9594 by default. Thresholds, "for" windows and severity
 # labels are starting points. The scrape "job" label is yours to set, so the
@@ -70,6 +69,32 @@ groups:
             window for 30m, so Plex metrics of that type are incomplete. The
             usual causes are a Plex API change after a server upgrade or an
             auth issue.
+      - alert: PlexExporterSessionMapFull
+        expr: increase(plex_sessions_dropped_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter is dropping Plex sessions from its tracker"
+          description: >
+            The session tracker is at its cap of 256, so new Plex sessions
+            publish no series and count(plex_plays_active) undercounts. Check
+            plex_sessions_tracked, the concurrent stream count and how fast
+            Plex mints session keys.
+      - alert: PlexExporterRefreshIncomplete
+        expr: >
+          sum without (fetch) (increase(plex_refresh_deadline_exceeded_total[15m]))
+          > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "plex-exporter is running out of time on its Plex refresh"
+          description: >
+            Refresh cycles hit their deadline before the Plex Pass fetches ran,
+            so the plex_host_* gauges and plex_transmit_bytes_total serve old
+            values. plex_http_reachable still reads 1. Check the Plex server's
+            own load.
       - alert: PlexExporterLibraryItemsCollapsed
         expr: >
           (max_over_time(plex_library_items[2h] offset 30m) - plex_library_items)

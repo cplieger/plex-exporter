@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/cplieger/go/slogx/capture"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/plex"
@@ -798,5 +800,160 @@ func TestRefresh_items_refresh_skipped_when_recent(t *testing.T) {
 
 	if itemsRequested {
 		t.Error("items refresh should NOT be triggered when lastItemsRefresh < 15 minutes ago")
+	}
+}
+
+// A Plex Pass fetch counts as a deadline miss only when the refresh deadline
+// ran out under it, the case where its gauges keep serving old values.
+func TestRefreshPlexPass_counts_deadline_misses(t *testing.T) {
+	cases := []struct {
+		name          string
+		slowPath      string
+		status        int
+		cancel        bool
+		wantResources float64
+		wantBandwidth float64
+	}{
+		{name: "resources past the deadline", slowPath: "/statistics/resources", wantResources: 1, wantBandwidth: 1},
+		{name: "bandwidth past the deadline", slowPath: "/statistics/bandwidth", wantBandwidth: 1},
+		{name: "no Plex Pass", status: http.StatusNotFound},
+		{name: "a server error", status: http.StatusInternalServerError},
+		{name: "a shutdown is no deadline miss", slowPath: "/statistics/resources", cancel: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == tc.slowPath {
+					<-r.Context().Done()
+					return
+				}
+				if tc.status != 0 {
+					w.WriteHeader(tc.status)
+					return
+				}
+				switch r.URL.Path {
+				case "/statistics/resources":
+					fmt.Fprint(w, `{"MediaContainer":{"StatisticsResources":[]}}`)
+				case "/statistics/bandwidth":
+					fmt.Fprint(w, `{"MediaContainer":{"StatisticsBandwidth":[]}}`)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer ts.Close()
+			srv := New(newTestClient(t, ts))
+
+			ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+			defer cancel()
+			if tc.cancel {
+				cancel()
+			}
+			srv.refreshResources(ctx)
+			srv.refreshBandwidth(ctx)
+
+			for fetch, want := range map[string]float64{"resources": tc.wantResources, "bandwidth": tc.wantBandwidth} {
+				got, ok := valueOf(t, srv, metrics.DescRefreshDeadlineExceeded, map[string]string{"fetch": fetch})
+				if !ok {
+					t.Errorf("no plex_refresh_deadline_exceeded_total{fetch=%q} sample", fetch)
+				}
+				if got != want {
+					t.Errorf("plex_refresh_deadline_exceeded_total{fetch=%q} = %v, want %v", fetch, got, want)
+				}
+			}
+		})
+	}
+}
+
+// fakeRefreshPlex answers every request with status, or as a Plex server
+// with no libraries while status is 200.
+func fakeRefreshPlex(status *atomic.Int32) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s := int(status.Load()); s != http.StatusOK {
+			w.WriteHeader(s)
+			return
+		}
+		switch r.URL.Path {
+		case "/media/providers":
+			fmt.Fprint(w, `{"MediaContainer":{"friendlyName":"Plex","machineIdentifier":"id1","version":"1.0","MediaProvider":[]}}`)
+		case "/":
+			fmt.Fprint(w, `{"MediaContainer":{"friendlyName":"Plex","machineIdentifier":"id1","version":"1.0"}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+}
+
+func TestRefreshTick_logs_a_standing_failure_once(t *testing.T) {
+	logs := capture.Default(t)
+	var status atomic.Int32
+	status.Store(http.StatusUnauthorized)
+	ts := httptest.NewServer(fakeRefreshPlex(&status))
+	defer ts.Close()
+	srv := New(newTestClient(t, ts))
+	srv.Pace = nil
+
+	for range 10 {
+		srv.refreshTick(t.Context())
+	}
+	if got := logs.CountLevel(slog.LevelWarn, "refresh failed"); got != 1 {
+		t.Errorf("WARN refresh failed logged %d times over 10 failing ticks, want 1", got)
+	}
+	if got, _ := valueOf(t, srv, metrics.DescErrors, map[string]string{"type": "refresh"}); got != 10 {
+		t.Errorf("plex_exporter_errors_total{type=refresh} = %v, want 10", got)
+	}
+
+	status.Store(http.StatusNotFound)
+	for range 3 {
+		srv.refreshTick(t.Context())
+	}
+	if got := logs.CountLevel(slog.LevelWarn, "refresh failed"); got != 2 {
+		t.Errorf("WARN refresh failed logged %d times after the error changed, want 2", got)
+	}
+
+	status.Store(http.StatusOK)
+	srv.refreshTick(t.Context())
+	srv.refreshTick(t.Context())
+	if got := logs.CountLevel(slog.LevelInfo, "refresh recovered"); got != 1 {
+		t.Errorf("INFO refresh recovered logged %d times, want 1", got)
+	}
+	if v, ok := logs.Attr("refresh recovered", "failed_for"); !ok || v.Kind() != slog.KindDuration {
+		t.Errorf("refresh recovered failed_for = %v (present %t), want a duration", v, ok)
+	}
+	if got, _ := valueOf(t, srv, metrics.DescHTTPReachable, nil); got != 1 {
+		t.Errorf("plex_http_reachable = %v after recovery, want 1", got)
+	}
+}
+
+// A degraded start already logged the failure, so the refresh loop logs
+// only its end, measured from the start.
+func TestStartDegraded_seeds_the_outage(t *testing.T) {
+	logs := capture.Default(t)
+	var status atomic.Int32
+	status.Store(http.StatusUnauthorized)
+	ts := httptest.NewServer(fakeRefreshPlex(&status))
+	defer ts.Close()
+	srv := New(newTestClient(t, ts))
+	srv.Pace = nil
+
+	err := srv.Refresh(t.Context())
+	if err == nil {
+		t.Fatal("Setup: Refresh() error = nil against a server answering 401")
+	}
+	srv.StartDegraded(err)
+	if got, _ := valueOf(t, srv, metrics.DescHTTPReachable, nil); got != 0 {
+		t.Errorf("plex_http_reachable = %v after a degraded start, want 0", got)
+	}
+	srv.refreshTick(t.Context())
+	if logs.Contains("refresh failed") {
+		t.Errorf("the first tick re-logged the startup failure: %v", logs.Messages())
+	}
+	if got, _ := valueOf(t, srv, metrics.DescErrors, map[string]string{"type": "refresh"}); got != 2 {
+		t.Errorf("plex_exporter_errors_total{type=refresh} = %v, want 2 (start and tick)", got)
+	}
+
+	status.Store(http.StatusOK)
+	srv.refreshTick(t.Context())
+	if got := logs.CountLevel(slog.LevelInfo, "refresh recovered"); got != 1 {
+		t.Errorf("INFO refresh recovered logged %d times, want 1", got)
 	}
 }

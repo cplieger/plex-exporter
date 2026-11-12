@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/cplieger/plex-exporter/internal/metrics"
 )
 
 type dashPanel struct {
@@ -64,7 +62,17 @@ type dashPanel struct {
 							DrawStyle    string `json:"drawStyle"`
 							BarAlignment int    `json:"barAlignment"`
 						} `json:"custom"`
-						NoValue string `json:"noValue"`
+						NoValue    string `json:"noValue"`
+						Thresholds struct {
+							Steps []struct {
+								Value *float64 `json:"value"`
+								Color string   `json:"color"`
+							} `json:"steps"`
+						} `json:"thresholds"`
+						Mappings []struct {
+							Type    string                     `json:"type"`
+							Options map[string]json.RawMessage `json:"options"`
+						} `json:"mappings"`
 					} `json:"defaults"`
 					Overrides []struct {
 						Matcher struct {
@@ -112,7 +120,6 @@ func exprs(p *dashPanel) []string {
 
 var (
 	metricName = regexp.MustCompile(`\bplex_[a-z_]+`)
-	descName   = regexp.MustCompile(`fqName: "([^"]+)"`)
 	byClause   = regexp.MustCompile(`\bby \(([^)]*)\)`)
 	// onRight captures the labels of an on (...) match and the grouping of
 	// the aggregation that forms its right operand.
@@ -131,10 +138,8 @@ func labelSet(s string) []string {
 
 func TestDashboard_queries_name_served_metrics(t *testing.T) {
 	served := map[string]bool{}
-	for _, d := range metrics.AllDescs {
-		if m := descName.FindStringSubmatch(d.String()); m != nil {
-			served[m[1]] = true
-		}
+	for _, name := range publishedFamilies(t) {
+		served[name] = true
 	}
 	_, panels := loadDashboard(t)
 	for name, p := range panels {
@@ -712,7 +717,8 @@ func autoGridColumns(grid *layoutNode, width float64) int {
 // below the server's facts, and each shows only while its query has data.
 func TestDashboard_attention_tiles_show_only_when_their_query_returns_data(t *testing.T) {
 	alerts := []string{
-		"plex-exporter", "Plex server", "Session poll", "Library lost items", "Libraries not read", "Library scans overdue",
+		"plex-exporter", "Plex server", "Session poll", "Session tracker full", "Plex Pass data stale",
+		"Library lost items", "Libraries not read", "Library scans overdue",
 		"Failed reads in ${span} ${spanunit}", "Watch history stale", "Watch figures hidden", "Libraries skipped",
 		"Items without a size", "Plex update",
 	}
@@ -858,16 +864,7 @@ func TestDashboard_row_headers_fold_at_least_two_panels(t *testing.T) {
 // removed rule fails here instead of leaving the description pointing nowhere.
 func TestDashboard_attention_tiles_name_existing_alert_rules(t *testing.T) {
 	ruleName := regexp.MustCompile(`\bPlex[A-Z][A-Za-z]+\b`)
-	var rules []string
-	for _, f := range []string{"alerts/promql.yaml", "alerts/logql.yaml"} {
-		raw, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatalf("Setup: read %s: %v", f, err)
-		}
-		for _, m := range regexp.MustCompile(`(?m)^\s*- alert: (\S+)$`).FindAllStringSubmatch(string(raw), -1) {
-			rules = append(rules, m[1])
-		}
-	}
+	rules := ruleExprs(t, "alerts/promql.yaml")
 	_, panels := loadDashboard(t)
 	for _, it := range attentionTiles(t) {
 		p := panels[it.Spec.Element.Name]
@@ -876,7 +873,7 @@ func TestDashboard_attention_tiles_name_existing_alert_rules(t *testing.T) {
 			t.Errorf("%q names no alert rule and does not say that none covers it", p.Spec.Title)
 		}
 		for _, n := range named {
-			if !slices.Contains(rules, n) {
+			if _, ok := rules[n]; !ok {
 				t.Errorf("%q names %s, which is not a rule in alerts/", p.Spec.Title, n)
 			}
 		}
@@ -903,16 +900,9 @@ func promqlMetrics(expr string) []string {
 // A tile that names a PromQL rule reads every metric that rule reads, so the
 // tile and the alert cannot be built on different signals.
 func TestDashboard_attention_tiles_read_their_rules_metrics(t *testing.T) {
-	raw, err := os.ReadFile("alerts/promql.yaml")
-	if err != nil {
-		t.Fatalf("Setup: read alerts/promql.yaml: %v", err)
-	}
 	ruleMetrics := map[string][]string{}
-	for _, block := range strings.Split(string(raw), "- alert: ")[1:] {
-		name, rest, _ := strings.Cut(block, "\n")
-		_, expr, _ := strings.Cut(rest, "expr:")
-		expr, _, _ = strings.Cut(expr, "for:")
-		ruleMetrics[strings.TrimSpace(name)] = promqlMetrics(strings.TrimPrefix(strings.TrimSpace(expr), ">"))
+	for name, expr := range ruleExprs(t, "alerts/promql.yaml") {
+		ruleMetrics[name] = promqlMetrics(expr)
 	}
 	if got := ruleMetrics["PlexExporterSessionPollFailing"]; !slices.Equal(got, []string{"plex_session_poll_reachable", "plex_http_reachable"}) {
 		t.Fatalf("Setup: PlexExporterSessionPollFailing reads %q, want plex_session_poll_reachable and plex_http_reachable", got)
@@ -1048,6 +1038,8 @@ var fixedWindows = map[string][]string{
 	"panel-154": {"32m"},
 	"panel-155": {"15m", "32m"},
 	"panel-160": {"17m"},
+	"panel-161": {"15m", "2m"},
+	"panel-162": {"15m", "2m"},
 }
 
 var quotedString = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
@@ -1478,4 +1470,133 @@ func TestDashboard_change_charts_stack_each_library_from_the_range_start(t *test
 			t.Errorf("%q has min %v, which hides a library that shrank", c.title, *m)
 		}
 	}
+}
+
+// The two rules that moved from the log rules into alerts/promql.yaml each
+// light their own tile, so a dashboard reader sees them with no Loki ruler.
+func TestDashboard_moved_rules_have_attention_tiles(t *testing.T) {
+	rules := ruleExprs(t, "alerts/promql.yaml")
+	_, panels := loadDashboard(t)
+	tiles := map[string]string{}
+	for _, it := range attentionTiles(t) {
+		p := panels[it.Spec.Element.Name]
+		tiles[p.Spec.Title] = p.Spec.Description
+	}
+	for _, c := range []struct{ title, rule string }{
+		{"Session tracker full", "PlexExporterSessionMapFull"},
+		{"Plex Pass data stale", "PlexExporterRefreshIncomplete"},
+	} {
+		t.Run(c.rule, func(t *testing.T) {
+			if _, ok := rules[c.rule]; !ok {
+				t.Errorf("alerts/promql.yaml holds no %s", c.rule)
+			}
+			desc, ok := tiles[c.title]
+			if !ok {
+				t.Fatalf("Needs attention has no %q tile", c.title)
+			}
+			if !strings.Contains(desc, c.rule) {
+				t.Errorf("%q description names no %s: %s", c.title, c.rule, desc)
+			}
+		})
+	}
+}
+
+// promtoolExprs returns the expressions alerts/promql_test.yaml evaluates in
+// its promql_expr_test cases, which CI runs against the shipped rules.
+func promtoolExprs(t *testing.T) []string {
+	t.Helper()
+	raw, err := os.ReadFile("alerts/promql_test.yaml")
+	if err != nil {
+		t.Fatalf("Setup: read alerts/promql_test.yaml: %v", err)
+	}
+	var out []string
+	for _, m := range regexp.MustCompile(`(?m)^\s*- expr: '([^']+)'$`).FindAllStringSubmatch(string(raw), -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+// Each listed tile's query is evaluated by promtool beside its rule, with the
+// rule firing and after it resolves, so a tile that would stay blank while its
+// alert fires, or linger after, fails CI. A token Plex refuses at startup
+// leaves plex_http_reachable at 0, which is what lights the Plex server tile.
+func TestDashboard_attention_tiles_render_under_the_rule_fixtures(t *testing.T) {
+	evaluated := promtoolExprs(t)
+	_, panels := loadDashboard(t)
+	for _, c := range []struct{ title, rule, shown string }{
+		{"Session tracker full", "PlexExporterSessionMapFull", "Full"},
+		{"Plex Pass data stale", "PlexExporterRefreshIncomplete", "Stale"},
+		{"Plex server", "PlexExporterAPIUnreachable", "Unreachable"},
+	} {
+		t.Run(c.rule, func(t *testing.T) {
+			p := panelByTitle(t, panels, c.title)
+			e := exprs(&p)
+			if len(e) != 1 || !slices.Contains(evaluated, e[0]) {
+				t.Errorf("%q query %q is not evaluated in alerts/promql_test.yaml", c.title, e)
+			}
+			if got := valueText(&p, "0"); got != c.shown {
+				t.Errorf("%q shows 0 as %q, want %q", c.title, got, c.shown)
+			}
+		})
+	}
+	p := panelByTitle(t, panels, "Plex server")
+	for _, cause := range []string{"PLEX_TOKEN", "at startup"} {
+		if !strings.Contains(p.Spec.Description, cause) {
+			t.Errorf("Plex server description names no %q: %s", cause, p.Spec.Description)
+		}
+	}
+}
+
+// The session tracker's cap is fixed in the exporter and stated in the
+// gauge's HELP text, so the chart's cap line must be that same number.
+func TestDashboard_exporter_health_shows_the_session_cap_and_refresh_misses(t *testing.T) {
+	_, panels := loadDashboard(t)
+	var detail []string
+	for _, it := range row(t, "Exporter health", "Detail").Spec.Layout.Spec.Items {
+		detail = append(detail, panels[it.Spec.Element.Name].Spec.Title)
+	}
+	const tracked, misses = "Tracked sessions against the cap", "Refresh deadline misses in ${span} ${spanunit}"
+	for _, title := range []string{tracked, misses} {
+		if !slices.Contains(detail, title) {
+			t.Errorf("Exporter health Detail holds %q, want %q", detail, title)
+		}
+	}
+	help := regexp.MustCompile(`"plex_sessions_tracked",\s*"[^"]*at most (\d+)"`).FindStringSubmatch(readFile(t, "internal/metrics/descs.go"))
+	if help == nil {
+		t.Fatal("Setup: plex_sessions_tracked HELP names no cap")
+	}
+	p := panelByTitle(t, panels, tracked)
+	if e := exprs(&p); len(e) != 1 || e[0] != "plex_sessions_tracked" || p.Spec.VizConfig.Group != "timeseries" {
+		t.Errorf("%q is a %s of %q, want a timeseries of plex_sessions_tracked", tracked, p.Spec.VizConfig.Group, e)
+	}
+	steps := p.Spec.VizConfig.Spec.FieldConfig.Defaults.Thresholds.Steps
+	if last := len(steps) - 1; last < 1 || steps[last].Value == nil || strconv.FormatFloat(*steps[last].Value, 'f', -1, 64) != help[1] || steps[last].Color != "red" {
+		t.Errorf("%q thresholds %+v, want a last red step at the cap, %s", tracked, steps, help[1])
+	}
+	p = panelByTitle(t, panels, misses)
+	if e := exprs(&p); len(e) != 1 || !strings.Contains(e[0], "sum by (fetch) (increase(plex_refresh_deadline_exceeded_total[$__range]))") {
+		t.Errorf("%q = %q, want the misses per fetch over the range", misses, e)
+	}
+}
+
+// valueText returns the text a panel's value mapping gives value, or "".
+func valueText(p *dashPanel, value string) string {
+	for _, m := range p.Spec.VizConfig.Spec.FieldConfig.Defaults.Mappings {
+		var o struct {
+			Text string `json:"text"`
+		}
+		if raw, ok := m.Options[value]; m.Type == "value" && ok && json.Unmarshal(raw, &o) == nil {
+			return o.Text
+		}
+	}
+	return ""
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("Setup: read %s: %v", path, err)
+	}
+	return string(raw)
 }

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // TopN is how many largest items per library, and newest items per

@@ -1,33 +1,15 @@
 # Running on Kubernetes
 
-This page covers five topics for running plex-exporter on Kubernetes. They are a writable `/tmp`, health probes, a sidecar setup, the labels the Prometheus Operator adds and dashboard delivery. It is for readers who deploy it with manifests, Helm, Flux or Terraform.
-
-## A writable /tmp
-
-The exporter writes its readiness marker to `/tmp/.healthy`. With `securityContext.readOnlyRootFilesystem: true`, mount a small in-memory volume there:
-
-```yaml
-    volumes:
-      - name: tmp
-        emptyDir:
-          medium: Memory
-          sizeLimit: 8Mi
-    # in the container spec
-    volumeMounts:
-      - name: tmp
-        mountPath: /tmp
-```
-
-Without it, `/api/health` answers 503 for as long as the exporter runs, so an HTTP probe on that endpoint fails. [Security](hardening.md#read-only-root-filesystem) explains why.
+This page covers health probes, a sidecar setup, the labels the Prometheus Operator adds and dashboard delivery for running plex-exporter on Kubernetes. It is for readers who deploy it with manifests, Helm, Flux or Terraform.
 
 ## Probes
 
-These probes are a starting point. Both read `/api/health`, so with `readOnlyRootFilesystem: true` they need the `/tmp` mount above.
+These probes are a starting point. Both ask `GET /healthz`, which passes while the exporter serves and fails while it starts or stops, as [Knowing the app is alive](monitoring.md#knowing-the-app-is-alive) explains. `readOnlyRootFilesystem: true` needs no volume for them, because the exporter keeps its health verdict in memory. Plex being unreachable never fails them. A liveness probe that must ignore readiness can use a `tcpSocket` probe on port 9594 instead.
 
 ```yaml
     livenessProbe:
       httpGet:
-        path: /api/health
+        path: /healthz
         port: 9594
       initialDelaySeconds: 0
       periodSeconds: 30
@@ -35,7 +17,7 @@ These probes are a starting point. Both read `/api/health`, so with `readOnlyRoo
       failureThreshold: 3
     readinessProbe:
       httpGet:
-        path: /api/health
+        path: /healthz
         port: 9594
       initialDelaySeconds: 0
       periodSeconds: 30
@@ -45,7 +27,7 @@ These probes are a starting point. Both read `/api/health`, so with `readOnlyRoo
 
 ## Running as a sidecar
 
-You can run the exporter as a sidecar in the Plex pod, with `PLEX_URL` set to `http://localhost:32400`. It needs the `/tmp` mount only when an HTTP probe on `/api/health` is configured. With no probe, it logs one warning at start and runs.
+You can run the exporter as a sidecar in the Plex pod, with `PLEX_URL` set to `http://localhost:32400`.
 
 ## Labels the Prometheus Operator adds
 

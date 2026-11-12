@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/cplieger/go/measure"
 )
 
 // Order matters for the Prometheus wire contract; do not re-order.
@@ -43,80 +43,129 @@ const (
 	FallbackOther    = "other"
 )
 
-// Prometheus descriptors emitted by the collector. Names, help text and
-// label sets are the public metric contract; changing any of them is a
+// Desc declares one family the exporter serves. Its name, type, HELP text and
+// label names are the public metric contract; changing any of them is a
 // breaking release.
+type Desc struct {
+	Name   string
+	Help   string
+	Type   measure.Type
+	Labels []string
+}
+
+func gaugeDesc(name, help string, labels []string) *Desc {
+	return &Desc{Name: name, Help: help, Type: measure.TypeGauge, Labels: labels}
+}
+
+func counterDesc(name, help string, labels []string) *Desc {
+	return &Desc{Name: name, Help: help, Type: measure.TypeCounter, Labels: labels}
+}
+
+// Declare returns a new measure declaration of d. A measure desc belongs to
+// the one collector it is handed to, so every collector declares its own.
+func (d *Desc) Declare() *measure.Desc {
+	if d.Type == measure.TypeCounter {
+		return measure.NewCounterDesc(d.Name, d.Help, d.Labels)
+	}
+	return measure.NewGaugeDesc(d.Name, d.Help, d.Labels)
+}
+
+// Descriptors emitted by the collector.
 var (
-	DescServerInfo = prometheus.NewDesc(
+	DescServerInfo = gaugeDesc(
 		"plex_server_info", "Plex server information",
-		append(srvLabels, "version", "platform", "platform_version", "plex_pass"), nil,
+		append(srvLabels, "version", "platform", "platform_version", "plex_pass"),
 	)
-	DescHostCPU = prometheus.NewDesc(
+	DescHostCPU = gaugeDesc(
 		"plex_host_cpu_utilization_ratio", "Host CPU utilization (0-1)",
-		srvLabels, nil,
+		srvLabels,
 	)
-	DescHostMem = prometheus.NewDesc(
+	DescHostMem = gaugeDesc(
 		"plex_host_memory_utilization_ratio", "Host memory utilization (0-1)",
-		srvLabels, nil,
+		srvLabels,
 	)
-	DescLibDuration = prometheus.NewDesc(
+	DescLibDuration = gaugeDesc(
 		"plex_library_duration_milliseconds", "Total library duration in ms",
-		libLabels, nil,
+		libLabels,
 	)
-	DescLibStorage = prometheus.NewDesc(
+	DescLibStorage = gaugeDesc(
 		"plex_library_storage_bytes", "Total library storage in bytes",
-		libLabels, nil,
+		libLabels,
 	)
-	DescLibItems = prometheus.NewDesc(
+	DescLibItems = gaugeDesc(
 		"plex_library_items", "Number of items in a library section",
-		append(libLabels, "content_type"), nil,
+		append(libLabels, "content_type"),
 	)
-	DescTransmitBytes = prometheus.NewDesc(
+	DescTransmitBytes = counterDesc(
 		"plex_transmit_bytes_total", "Bytes transmitted (bandwidth API)",
-		srvLabels, nil,
+		srvLabels,
 	)
-	DescActiveTranscodes = prometheus.NewDesc(
+	DescActiveTranscodes = gaugeDesc(
 		"plex_active_transcode_sessions", "Active transcode sessions",
-		srvLabels, nil,
+		srvLabels,
 	)
-	DescPlayCount = prometheus.NewDesc(
+	DescPlayCount = gaugeDesc(
 		"plex_plays_active", "Currently active play sessions (1 per session)",
-		playLabels, nil,
+		playLabels,
 	)
-	DescPlaySeconds = prometheus.NewDesc(
+	DescPlaySeconds = counterDesc(
 		"plex_play_seconds_total", "Total play time per session",
-		playLabels, nil,
+		playLabels,
 	)
-	DescSessionBandwidth = prometheus.NewDesc(
+	DescSessionBandwidth = gaugeDesc(
 		"plex_session_bandwidth_kbps", "Session bandwidth in kbps",
-		append(srvLabels, "session", "user", "location"), nil,
+		append(srvLabels, "session", "user", "location"),
 	)
-	DescSessionBitrate = prometheus.NewDesc(
+	DescSessionBitrate = gaugeDesc(
 		"plex_session_bitrate_kbps",
 		"Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.",
-		append(srvLabels, "session", "user", "location"), nil,
+		append(srvLabels, "session", "user", "location"),
 	)
-	DescHTTPReachable = prometheus.NewDesc(
+	DescHTTPReachable = gaugeDesc(
 		"plex_http_reachable",
 		"Whether the exporter's last poll of the configured Plex server succeeded (1) or failed (0)",
-		nil, nil,
+		nil,
 	)
-	DescSessionPollReachable = prometheus.NewDesc(
+	DescSessionPollReachable = gaugeDesc(
 		"plex_session_poll_reachable",
 		"Whether the exporter's last /status/sessions poll succeeded (1) or failed (0)",
-		nil, nil,
+		nil,
 	)
-	DescHTTPRetries = prometheus.NewDesc(
+	DescHTTPRetries = counterDesc(
 		"plex_http_retries_total",
 		"HTTP retries the exporter's Plex client performed across all requests",
-		nil, nil,
+		nil,
 	)
-	DescErrors = prometheus.NewDesc(
+	DescErrors = counterDesc(
 		"plex_exporter_errors_total",
 		"Exporter errors by type",
-		[]string{"type"}, nil,
+		[]string{"type"},
+	)
+	DescBuildInfo = gaugeDesc(
+		"plex_exporter_build_info",
+		"Always 1, labelled with the plex-exporter release this process runs",
+		[]string{"version"},
+	)
+	DescSessionsTracked = gaugeDesc(
+		"plex_sessions_tracked",
+		"Plex sessions the exporter tracks, at most 256",
+		nil,
+	)
+	DescSessionsDropped = counterDesc(
+		"plex_sessions_dropped_total",
+		"Times a new Plex session was refused because the exporter already tracked 256, counted on each poll",
+		nil,
+	)
+	DescRefreshDeadlineExceeded = counterDesc(
+		"plex_refresh_deadline_exceeded_total",
+		"Plex Pass fetches skipped because the refresh ran out of its 45s deadline",
+		[]string{"fetch"},
 	)
 )
+
+// RefreshFetches is the closed set of `fetch` label values emitted on
+// DescRefreshDeadlineExceeded.
+var RefreshFetches = []string{"resources", "bandwidth"}
 
 // libIDLabels identify a library without its free-text name, which the
 // dashboard joins from plex_library_storage_bytes.
@@ -126,30 +175,30 @@ var libIDLabels = []string{LabelServer, LabelServerID, labelLibraryType, labelLi
 // active population is bounded by libstats.TopN, never by the catalog size.
 var itemLabels = append(slices.Clone(libIDLabels), "rating_key", "title", "year")
 
-func libDesc(name, help string, extra ...string) *prometheus.Desc {
-	return prometheus.NewDesc(name, help, append(slices.Clone(libIDLabels), extra...), nil)
+func libDesc(name, help string, extra ...string) *Desc {
+	return gaugeDesc(name, help, append(slices.Clone(libIDLabels), extra...))
 }
 
-func srvDesc(name, help string, extra ...string) *prometheus.Desc {
-	return prometheus.NewDesc(name, help, append(slices.Clone(srvLabels), extra...), nil)
+func srvDesc(name, help string, extra ...string) *Desc {
+	return gaugeDesc(name, help, append(slices.Clone(srvLabels), extra...))
 }
 
 // Library-content descriptors, published from the hourly catalog walk.
 var (
-	DescTopItemBytes = prometheus.NewDesc(
+	DescTopItemBytes = gaugeDesc(
 		"plex_library_top_item_bytes",
 		"Size in bytes of one of the 10 largest items in a library (a show counts all its episodes)",
-		itemLabels, nil,
+		itemLabels,
 	)
-	DescTopItemLastPlayed = prometheus.NewDesc(
+	DescTopItemLastPlayed = gaugeDesc(
 		"plex_library_top_item_last_played_timestamp_seconds",
 		"Last play by any account of one of the 10 largest items, as a Unix time; 0 when no play is recorded",
-		itemLabels, nil,
+		itemLabels,
 	)
-	DescRecentItemAdded = prometheus.NewDesc(
+	DescRecentItemAdded = gaugeDesc(
 		"plex_library_recent_item_added_timestamp_seconds",
 		"When one of the 10 newest items on the server was added, as a Unix time",
-		append(slices.Clone(itemLabels), "episode"), nil,
+		append(slices.Clone(itemLabels), "episode"),
 	)
 	DescWatchAgeBytes = libDesc("plex_library_watch_age_bytes",
 		"Bytes of sized items by when any account last played them", "last_watched")
@@ -211,16 +260,16 @@ var (
 		"session", "decode", "encode", "source_codec", "target_codec")
 )
 
-// AllDescs is the single source of truth for the descriptors emitted by
-// Describe/Collect. Adding a descriptor here automatically extends the
-// Describe-set test and keeps the two methods in sync.
-var AllDescs = []*prometheus.Desc{
+// AllDescs lists every family the collector declares; a family missing here
+// is dropped from the page at every scrape.
+var AllDescs = []*Desc{
 	DescServerInfo, DescHostCPU, DescHostMem,
 	DescLibDuration, DescLibStorage, DescLibItems,
 	DescTransmitBytes, DescActiveTranscodes,
 	DescPlayCount, DescPlaySeconds,
 	DescSessionBandwidth, DescSessionBitrate,
-	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors,
+	DescHTTPReachable, DescSessionPollReachable, DescHTTPRetries, DescErrors, DescBuildInfo,
+	DescSessionsTracked, DescSessionsDropped, DescRefreshDeadlineExceeded,
 	DescTopItemBytes, DescTopItemLastPlayed, DescRecentItemAdded,
 	DescWatchAgeBytes, DescWatchAgeItems, DescResolutionBytes, DescCodecBytes,
 	DescMultiVersionItems, DescExtraVersionBytes, DescNewestItemAdded, DescAddedItems,

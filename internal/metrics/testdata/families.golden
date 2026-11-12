@@ -1,0 +1,49 @@
+plex_server_info	gauge	server,server_id,version,platform,platform_version,plex_pass	Plex server information
+plex_host_cpu_utilization_ratio	gauge	server,server_id	Host CPU utilization (0-1)
+plex_host_memory_utilization_ratio	gauge	server,server_id	Host memory utilization (0-1)
+plex_library_duration_milliseconds	gauge	server,server_id,library_type,library,library_id	Total library duration in ms
+plex_library_storage_bytes	gauge	server,server_id,library_type,library,library_id	Total library storage in bytes
+plex_library_items	gauge	server,server_id,library_type,library,library_id,content_type	Number of items in a library section
+plex_transmit_bytes_total	counter	server,server_id	Bytes transmitted (bandwidth API)
+plex_active_transcode_sessions	gauge	server,server_id	Active transcode sessions
+plex_plays_active	gauge	server,server_id,library,library_id,library_type,media_type,title,child_title,grandchild_title,grandchild_index,stream_type,stream_resolution,stream_file_resolution,device,device_type,user,session,transcode_type,subtitle_action,location,local	Currently active play sessions (1 per session)
+plex_play_seconds_total	counter	server,server_id,library,library_id,library_type,media_type,title,child_title,grandchild_title,grandchild_index,stream_type,stream_resolution,stream_file_resolution,device,device_type,user,session,transcode_type,subtitle_action,location,local	Total play time per session
+plex_session_bandwidth_kbps	gauge	server,server_id,session,user,location	Session bandwidth in kbps
+plex_session_bitrate_kbps	gauge	server,server_id,session,user,location	Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.
+plex_http_reachable	gauge		Whether the exporter's last poll of the configured Plex server succeeded (1) or failed (0)
+plex_session_poll_reachable	gauge		Whether the exporter's last /status/sessions poll succeeded (1) or failed (0)
+plex_http_retries_total	counter		HTTP retries the exporter's Plex client performed across all requests
+plex_exporter_errors_total	counter	type	Exporter errors by type
+plex_exporter_build_info	gauge	version	Always 1, labelled with the plex-exporter release this process runs
+plex_sessions_tracked	gauge		Plex sessions the exporter tracks, at most 256
+plex_sessions_dropped_total	counter		Times a new Plex session was refused because the exporter already tracked 256, counted on each poll
+plex_refresh_deadline_exceeded_total	counter	fetch	Plex Pass fetches skipped because the refresh ran out of its 45s deadline
+plex_library_top_item_bytes	gauge	server,server_id,library_type,library_id,rating_key,title,year	Size in bytes of one of the 10 largest items in a library (a show counts all its episodes)
+plex_library_top_item_last_played_timestamp_seconds	gauge	server,server_id,library_type,library_id,rating_key,title,year	Last play by any account of one of the 10 largest items, as a Unix time; 0 when no play is recorded
+plex_library_recent_item_added_timestamp_seconds	gauge	server,server_id,library_type,library_id,rating_key,title,year,episode	When one of the 10 newest items on the server was added, as a Unix time
+plex_library_watch_age_bytes	gauge	server,server_id,library_type,library_id,last_watched	Bytes of sized items by when any account last played them
+plex_library_watch_age_items	gauge	server,server_id,library_type,library_id,last_watched	Items by when any account last played them
+plex_library_resolution_bytes	gauge	server,server_id,library_type,library_id,video_resolution	Bytes of sized items by video resolution
+plex_library_codec_bytes	gauge	server,server_id,library_type,library_id,video_codec	Bytes of sized items by video codec
+plex_library_multi_version_items	gauge	server,server_id,library_type,library_id	Items with more than one version (media file set)
+plex_library_extra_version_bytes	gauge	server,server_id,library_type,library_id	Bytes held by every version of an item except its largest
+plex_library_newest_item_added_timestamp_seconds	gauge	server,server_id,library_type,library_id	When the newest item in the library was added, as a Unix time
+plex_library_added_items	gauge	server,server_id,library_type,library_id,window	Items added within the window
+plex_library_walkable	gauge	server,server_id,library_type,library_id	1 for each library the exporter reads item by item
+plex_library_last_scan_timestamp_seconds	gauge	server,server_id,library_type,library_id	When Plex last scanned the library, as a Unix time
+plex_library_walk_last_success_timestamp_seconds	gauge	server,server_id,library_type,library_id	When the exporter last read every item of the library, as a Unix time
+plex_library_walk_duration_seconds	gauge	server,server_id,library_type,library_id	How long the last complete read of the library took
+plex_library_unsized_items	gauge	server,server_id,library_type,library_id	Items whose file size Plex did not report for every version, left out of every byte figure
+plex_library_walk_pass_duration_seconds	gauge	server,server_id	How long the last pass over every read library took
+plex_library_walk_skipped_libraries	gauge	server,server_id	Libraries past the limit of libraries the exporter reads item by item
+plex_library_walk_complete	gauge	server,server_id	1 when the last pass read every library it covers and none was skipped
+plex_library_watch_age_complete	gauge	server,server_id	1 when every read library's watch-age figures come from current watch history with no unmatched rows
+plex_history_read_status	gauge	server,server_id,status	1 for the outcome of the last full watch-history read
+plex_history_last_success_timestamp_seconds	gauge	server,server_id	When the exporter last read watch history successfully, as a Unix time
+plex_history_unmatched_rows	gauge	server,server_id	Watch-history rows with a non-numeric item key, or an item key but no play time, since the last full read, counted up to 250,000
+plex_history_deleted_item_rows	gauge	server,server_id	Watch-history rows for items no longer in Plex since the last full read, counted up to 250,000
+plex_server_activity_progress_ratio	gauge	server,server_id,activity_type,library_type,library_id	Progress of running Plex background work (0-1, -1 when Plex reports no estimate)
+plex_server_update_available	gauge	server,server_id,state	1 when Plex reports a release newer than the running version
+plex_server_update_checked_timestamp_seconds	gauge	server,server_id	When Plex last checked for an update, as a Unix time
+plex_server_scheduled_scan_interval_seconds	gauge	server,server_id	How often Plex scans every library on its own schedule, present only while that schedule is on
+plex_session_video_transcode	gauge	server,server_id,session,decode,encode,source_codec,target_codec	1 for each session transcoding video and 0 once it has ended, by where Plex decodes and encodes it

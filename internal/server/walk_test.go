@@ -11,7 +11,6 @@ import (
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -238,9 +237,9 @@ func TestWalkPass_unmatched_history_rows_hide_watch_completeness(t *testing.T) {
 	if got := series(t, srv, metrics.DescTopItemLastPlayed); len(got) != 0 {
 		t.Errorf("top-item last-played series with unmatched rows = %v, want none", got)
 	}
-	for _, d := range []*prometheus.Desc{metrics.DescWatchAgeBytes, metrics.DescWatchAgeItems} {
+	for _, d := range []*metrics.Desc{metrics.DescWatchAgeBytes, metrics.DescWatchAgeItems} {
 		if got := series(t, srv, d); len(got) != 0 {
-			t.Errorf("%s with unmatched rows = %v, want none", d, got)
+			t.Errorf("%s with unmatched rows = %v, want none", d.Name, got)
 		}
 	}
 	if _, ok := valueOf(t, srv, metrics.DescTopItemBytes, libMatch("1", "rating_key", "10")); !ok {
@@ -422,8 +421,9 @@ func TestWalkPass_skips_libraries_past_the_limit(t *testing.T) {
 	}
 }
 
-// A pedantic registry rejects any collected metric whose descriptor
-// Describe did not send, so every family must be in metrics.AllDescs.
+// A sample for a family the collector did not declare is dropped from the
+// page, so every family this fixture emits must be in metrics.AllDescs, and
+// the fixture emits every family.
 func TestCollect_every_emitted_family_is_described(t *testing.T) {
 	fp := newFakePlex()
 	fp.sections = twoSections
@@ -443,16 +443,11 @@ func TestCollect_every_emitted_family_is_described(t *testing.T) {
 		ss.VideoTranscoding, ss.VideoDecode, ss.VideoEncode = true, "hardware", "hardware"
 	})
 
-	reg := prometheus.NewPedanticRegistry()
-	if err := reg.Register(srv); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-	families, err := reg.Gather()
-	if err != nil {
-		t.Fatalf("Gather() error = %v", err)
-	}
-	if len(families) != len(metrics.AllDescs) {
-		t.Errorf("gathered %d families, want every one of the %d in AllDescs", len(families), len(metrics.AllDescs))
+	families := byFamily(gatherCollector(t, srv.Collector("v1")))
+	for _, d := range metrics.AllDescs {
+		if len(families[d.Name]) == 0 {
+			t.Errorf("%s has no sample, want the fixture to emit every family", d.Name)
+		}
 	}
 }
 
@@ -469,13 +464,7 @@ func TestWalkPass_row_repeated_across_pages_is_emitted_once(t *testing.T) {
 	srv := newWalkServer(t, fp, movies)
 	srv.walkPass(t.Context(), false)
 
-	reg := prometheus.NewPedanticRegistry()
-	if err := reg.Register(srv); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-	if _, err := reg.Gather(); err != nil {
-		t.Errorf("Gather() error = %v, want none", err)
-	}
+	gatherSamples(t, srv.collect)
 	// The 505 movies are sized 1000 to 1504 bytes.
 	if v, _ := valueOf(t, srv, metrics.DescResolutionBytes, libMatch("1", "video_resolution", "1080")); v != 632260 {
 		t.Errorf("1080 bytes = %v, want 632260 with each item once", v)

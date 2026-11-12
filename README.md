@@ -21,7 +21,7 @@ plex-exporter lets you follow your Plex server in Grafana and alerts you to prob
 
 plex-exporter is built for Plex server owners. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
 
-You need a Plex Media Server and its admin token. plex-exporter's graphs and eight alerts come from your Prometheus, Grafana and Alertmanager, and three from Loki, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#the-smallest-stack-sends-notifications-only) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
+You need a Plex Media Server and its admin token. plex-exporter's graphs and ten alerts come from your Prometheus, Grafana and Alertmanager, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
 
 Consider [Tautulli](https://github.com/Tautulli/Tautulli) if you want a web app made for Plex, with watch history, per-user statistics and notifications for streams and recently added media.
 
@@ -103,7 +103,7 @@ Which TLS setting you need depends on your `PLEX_URL`:
 
 | Port | Description |
 | --- | --- |
-| `9594` | Prometheus metrics at `/metrics` and the health check at `/api/health` |
+| `9594` | Prometheus metrics at `/metrics` and the health check at `GET /healthz` |
 
 The exporter needs no volumes.
 
@@ -117,32 +117,31 @@ The exporter only connects out, to the Plex server you configure. It sends the t
 
 ## Troubleshooting
 
-The image's healthcheck runs `/plex-exporter health`, which reads a marker file the exporter writes in `/tmp` once its metrics server is listening. `/api/health` reads the same marker and answers 503 while the exporter starts or stops.
+The image's healthcheck runs `/plex-exporter health`, which asks `GET /healthz` on the exporter's own port. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told. Plex being unreachable never makes it unhealthy: that shows as `plex_http_reachable` at `0`.
 
-At startup, the container exits on an error only you can fix, and Docker restarts it. That is a rejected token, any other 4xx status except 408 and 429, a certificate problem or a listen port it cannot bind. On a DNS error, a timeout, a 408, a 429 or a 5xx, it starts anyway with `plex_http_reachable` at `0`. Once started, it keeps running through Plex errors and retries every 5 seconds.
+At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `PLEX_URL` is not an http or https address, `PLEX_CA_CERT_PATH` cannot be read or holds no certificate, or the listen port cannot be bound, and Docker restarts it. Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running with `plex_http_reachable` at `0`, and it retries every 5 seconds.
 
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
 - Host CPU, memory and `plex_transmit_bytes_total` are missing. They need Plex Pass, and appear once Plex has answered for them.
-- With `read_only: true` in your compose file, `/api/health` answers 503. Mount a writable `/tmp`, as [Security](docs/hardening.md#read-only-root-filesystem) shows.
 - A library's item count lags after a large scan, because counts are read every 15 minutes.
 
 ## Monitoring
 
-plex-exporter serves 45 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. Eight PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and three LogQL rules for the container log in [`alerts/logql.yaml`](alerts/logql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them.
+plex-exporter serves 49 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. The page also carries the Go runtime and process metrics under the names Go's official Prometheus client uses. Ten PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them. The image has a Docker healthcheck; [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
 
 ## Documentation
 
 - [How plex-exporter works](docs/how-it-works.md) explains how often it reads Plex and when each metric appears.
 - [Monitoring and alerts](docs/monitoring.md) lists every metric and label, the dashboard downloads and the alert rules.
 - [Security](docs/hardening.md) covers the read-only compose settings, the exporter's limits and what the image contains.
-- [Running on Kubernetes](docs/kubernetes.md) covers the `/tmp` mount, probes, a sidecar setup and Prometheus Operator labels.
+- [Running on Kubernetes](docs/kubernetes.md) covers probes, a sidecar setup, Prometheus Operator labels and dashboard delivery.
 
 ## Credits
 
 - The metric and label names follow [prometheus-plex-exporter](https://github.com/jsclayton/prometheus-plex-exporter) by [@jsclayton](https://github.com/jsclayton), the Grafana Hackathon 2022 exporter this project builds on.
 - The `plex_library_items` metric with its `content_type` label, and the `transcode_type` and `subtitle_action` labels, follow the [@timothystewart6 fork](https://github.com/timothystewart6/prometheus-plex-exporter) of that exporter.
-- It reads the [Plex Media Server API](https://developer.plex.tv/pms/) and serves its metrics with [prometheus/client_golang](https://github.com/prometheus/client_golang), the Go client library for Prometheus.
+- It reads the [Plex Media Server API](https://developer.plex.tv/pms/) and serves its metrics with [measure](https://github.com/cplieger/go/tree/main/measure), a Prometheus metrics library with no dependencies.
 
 ## Contributing
 

@@ -2,13 +2,13 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
 	"slices"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cplieger/plex-exporter/internal/history"
@@ -17,16 +17,17 @@ import (
 	"github.com/cplieger/plex-exporter/internal/pacer"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 	"golang.org/x/sync/errgroup"
 )
 
-// Server is the Plex orchestrator. Fields are exported so Describe/Collect
-// and tests can read and mutate them under mu without accessor methods.
+// Server is the Plex orchestrator. Fields are exported so the collector and
+// tests can read and mutate them under mu without accessor methods.
 type Server struct {
 	LastItemsRefresh     time.Time
 	LastProvidersRefresh time.Time
 	ErrorCounts          map[string]float64
+	deadlineMisses       map[string]float64
 	Client               *plex.Client
 	Sessions             *sessions.Tracker
 	// History and Pace may be nil, which turns off watch figures and pacing.
@@ -39,6 +40,7 @@ type Server struct {
 	Version           string
 	Platform          string
 	walks             walkState
+	outage            refreshOutage
 	Libraries         []library.Library
 	background        backgroundState
 	HostMem           float64
@@ -47,7 +49,6 @@ type Server struct {
 	LastBandwidthAt   int
 	ActiveTranscodes  int
 	mu                sync.Mutex
-	refreshing        atomic.Bool
 	HTTPReachable     bool
 	SessionsReachable bool
 	PlexPass          bool
@@ -108,7 +109,7 @@ const providersRefreshInterval = time.Minute
 // Refresh polls Plex for server identity, library list, host resources,
 // and bandwidth. Called from startup and from RunRefreshLoop on a ticker.
 // The zero LastProvidersRefresh on the first call always fetches providers,
-// so startup fail-fast classification still keys on that endpoint.
+// so startup's error classification still keys on that endpoint.
 func (s *Server) Refresh(outerCtx context.Context) error {
 	ctx, cancel := context.WithTimeout(outerCtx, 45*time.Second)
 	defer cancel()
@@ -171,40 +172,67 @@ func (s *Server) Refresh(outerCtx context.Context) error {
 	return nil
 }
 
+// refreshOutage is a standing refresh failure, so the log says when it
+// starts, when its error changes and when it ends, not on every tick.
+// Only the refresh loop touches it once the loop has started.
+type refreshOutage struct {
+	since   time.Time
+	lastErr string
+}
+
+func (o *refreshOutage) failed(now time.Time, err error) {
+	if o.since.IsZero() {
+		o.since = now
+	} else if err.Error() == o.lastErr {
+		return
+	}
+	o.lastErr = err.Error()
+	slog.Warn("refresh failed", "error", err)
+}
+
+func (o *refreshOutage) recovered(now time.Time) {
+	if o.since.IsZero() {
+		return
+	}
+	slog.Info("refresh recovered", "failed_for", now.Sub(o.since))
+	*o = refreshOutage{}
+}
+
+// StartDegraded records a failed first Refresh, which the caller has
+// logged, so RunRefreshLoop logs only its recovery or a different error.
+// Call it before RunRefreshLoop starts.
+func (s *Server) StartDegraded(err error) {
+	s.RecordError("refresh")
+	s.SetHTTPReachable(false)
+	s.outage = refreshOutage{since: time.Now(), lastErr: err.Error()}
+}
+
 // RunRefreshLoop invokes Refresh on a 5-second ticker until ctx is
-// cancelled, skipping a tick if the previous Refresh is still in-flight.
+// cancelled; time.Ticker drops the ticks that fall while a Refresh runs.
 func (s *Server) RunRefreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	// Seed from startup's reachability state so a recovery after a degraded
-	// start logs "refresh recovered" without a spurious line on tick one.
-	s.mu.Lock()
-	prevFailed := !s.HTTPReachable
-	s.mu.Unlock()
 	for {
 		select {
 		case <-ticker.C:
-			if !s.refreshing.CompareAndSwap(false, true) {
-				continue // previous Refresh still running, skip this tick
-			}
-			if err := s.Refresh(ctx); err != nil {
-				s.SetHTTPReachable(false)
-				s.RecordError("refresh")
-				slog.Warn("refresh failed", "error", err)
-				prevFailed = true
-				s.refreshing.Store(false)
-				continue
-			}
-			s.SetHTTPReachable(true)
-			if prevFailed {
-				slog.Info("refresh recovered")
-				prevFailed = false
-			}
-			s.refreshing.Store(false)
+			s.refreshTick(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+// refreshTick runs one Refresh and records its outcome. Every failure
+// counts in plex_exporter_errors_total; the log follows refreshOutage.
+func (s *Server) refreshTick(ctx context.Context) {
+	if err := s.Refresh(ctx); err != nil {
+		s.SetHTTPReachable(false)
+		s.RecordError("refresh")
+		s.outage.failed(time.Now(), err)
+		return
+	}
+	s.SetHTTPReachable(true)
+	s.outage.recovered(time.Now())
 }
 
 // SetHTTPReachable sets the HTTPReachable flag under lock.
@@ -235,6 +263,7 @@ type snapshot struct {
 	walks             map[string]libWalk
 	activities        map[activityKey]float64
 	ErrorCounts       map[string]float64
+	deadlineMisses    map[string]float64
 	PlatformVersion   string
 	Name              string
 	ID                string
@@ -254,6 +283,8 @@ type snapshot struct {
 	HTTPReachable     float64
 	SessionsReachable float64
 	Retries           float64
+	sessionsDropped   float64
+	sessionsTracked   int
 	ResourcesRead     bool
 	BandwidthRead     bool
 	passDone          bool
@@ -261,7 +292,7 @@ type snapshot struct {
 }
 
 // snapshot returns a consistent point-in-time copy of the server's
-// metric-visible state, so Collect never holds s.mu across a channel send.
+// metric-visible state, so a scrape never holds s.mu while it emits.
 func (s *Server) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -283,6 +314,11 @@ func (s *Server) snapshot() snapshot {
 	}
 	copy(snap.Libraries, s.Libraries)
 	maps.Copy(snap.ErrorCounts, s.ErrorCounts)
+	snap.deadlineMisses = maps.Clone(s.deadlineMisses)
+	if s.Sessions != nil {
+		tracked, dropped := s.Sessions.Counts()
+		snap.sessionsTracked, snap.sessionsDropped = tracked, float64(dropped)
+	}
 	snap.walks = make(map[string]libWalk, len(s.walks.libs))
 	for id, w := range s.walks.libs {
 		snap.walks[id] = *w
@@ -417,10 +453,25 @@ func (s *Server) tryItemCount(ctx context.Context, libID string, metadataType in
 	return count, true
 }
 
+// recordDeadlineMiss counts a Plex Pass fetch that failed because the
+// refresh deadline ran out, and not because Plex answered or shut down.
+func (s *Server) recordDeadlineMiss(ctx context.Context, fetch string) {
+	if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deadlineMisses == nil {
+		s.deadlineMisses = make(map[string]float64, len(metrics.RefreshFetches))
+	}
+	s.deadlineMisses[fetch]++
+}
+
 func (s *Server) refreshResources(ctx context.Context) {
 	stats, err := s.Client.StatisticsResources(ctx, 6)
 	if err != nil {
 		if ctx.Err() != nil {
+			s.recordDeadlineMiss(ctx, "resources")
 			slog.Warn("resources fetch skipped, context deadline exceeded", "error", err)
 		} else {
 			slog.Debug("resources unavailable", "error", err)
@@ -442,6 +493,7 @@ func (s *Server) refreshBandwidth(ctx context.Context) {
 	samples, err := s.Client.StatisticsBandwidth(ctx, 6)
 	if err != nil {
 		if ctx.Err() != nil {
+			s.recordDeadlineMiss(ctx, "bandwidth")
 			slog.Warn("bandwidth fetch skipped, context deadline exceeded", "error", err)
 		} else {
 			slog.Debug("bandwidth unavailable", "error", err)

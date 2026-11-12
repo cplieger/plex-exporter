@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/plex-exporter/internal/metrics"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 	"pgregory.net/rapid"
 )
 

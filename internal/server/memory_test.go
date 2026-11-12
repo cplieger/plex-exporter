@@ -15,7 +15,7 @@ import (
 
 	"github.com/cplieger/plex-exporter/internal/history"
 	"github.com/cplieger/plex-exporter/internal/libstats"
-	"github.com/cplieger/plexapi/v2"
+	"github.com/cplieger/plexapi/v3"
 )
 
 const (

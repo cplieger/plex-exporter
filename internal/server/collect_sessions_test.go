@@ -7,7 +7,6 @@ import (
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestCollectSessionsPlaying(t *testing.T) {
@@ -33,11 +32,7 @@ func TestCollectSessionsPlaying(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) })
 	// 4 metrics: play_count, play_seconds, session_bandwidth, session_bitrate
 	if len(ms) != 4 {
 		t.Errorf("collectSessions produced %d metrics, want 4", len(ms))
@@ -53,11 +48,7 @@ func TestCollectSessionsSkipsZeroPlayStarted(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) })
 	// 0 metrics — the session is skipped (zero playStarted) and nothing else is emitted
 	if len(ms) != 0 {
 		t.Errorf("collectSessions produced %d metrics, want 0", len(ms))
@@ -79,11 +70,7 @@ func TestCollectSessionsLibraryLookup(t *testing.T) {
 
 	libs := []library.Library{{ID: "3", Name: "4K Movies", Type: library.TypeMovie}}
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", libs)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", libs) })
 	// 2 metrics: play_count, play_seconds
 	if len(ms) != 2 {
 		t.Errorf("collectSessions produced %d metrics, want 2", len(ms))
@@ -103,11 +90,7 @@ func TestCollectSessionsUnknownLibrary(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) })
 	// 2 metrics: play_count, play_seconds
 	if len(ms) != 2 {
 		t.Errorf("collectSessions produced %d metrics, want 2", len(ms))
@@ -131,11 +114,7 @@ func TestCollectSessionsPendingTranscodeNormalized(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) })
 	if len(ms) < 2 {
 		t.Errorf("collectSessions produced %d metrics, want at least 2", len(ms))
 	}
@@ -162,11 +141,7 @@ func TestCollectSessionsEpisodeLabels(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) })
 	// 2 metrics: play_count, play_seconds
 	if len(ms) != 2 {
 		t.Errorf("collectSessions episode produced %d metrics, want 2", len(ms))
@@ -208,11 +183,7 @@ func TestCollectSessionsMultipleSessions(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	ms := drainMetrics(ch)
+	ms := gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) })
 	// 7 metrics:
 	//   s1 has bandwidth=8000 and bitrate=10000 → play_count, play_seconds, session_bandwidth, session_bitrate (4)
 	//   s2 has no bandwidth and bitrate=3000    → play_count, play_seconds, session_bitrate (3)
@@ -247,17 +218,13 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	playMetrics := byDesc[descKey(metrics.DescPlayCount)]
+	byDesc := byFamily(gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) }))
+	playMetrics := byDesc[metrics.DescPlayCount.Name]
 	if len(playMetrics) != 1 {
 		t.Fatalf("expected 1 play_count metric, got %d", len(playMetrics))
 	}
 
-	labels, _ := metricSnapshot(t, playMetrics[0])
+	labels := playMetrics[0].labels
 
 	if labels["stream_type"] != "transcode" {
 		t.Errorf("stream_type = %q, want transcode", labels["stream_type"])
@@ -288,11 +255,11 @@ func TestCollectSessions_stream_labels_from_media(t *testing.T) {
 		t.Errorf("user = %q, want testuser", labels["user"])
 	}
 
-	bitrateMetrics := byDesc[descKey(metrics.DescSessionBitrate)]
+	bitrateMetrics := byDesc[metrics.DescSessionBitrate.Name]
 	if len(bitrateMetrics) != 1 {
 		t.Fatalf("expected 1 session_bitrate metric, got %d", len(bitrateMetrics))
 	}
-	_, brVal := metricSnapshot(t, bitrateMetrics[0])
+	brVal := bitrateMetrics[0].value
 	if brVal != 20000 {
 		t.Errorf("session_bitrate value = %v, want 20000", brVal)
 	}
@@ -320,17 +287,13 @@ func TestCollectSessions_no_media_uses_defaults(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	playMetrics := byDesc[descKey(metrics.DescPlayCount)]
+	byDesc := byFamily(gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) }))
+	playMetrics := byDesc[metrics.DescPlayCount.Name]
 	if len(playMetrics) != 1 {
 		t.Fatalf("expected 1 play_count metric, got %d", len(playMetrics))
 	}
 
-	labels, _ := metricSnapshot(t, playMetrics[0])
+	labels := playMetrics[0].labels
 
 	if labels["stream_type"] != metrics.ValUnknown {
 		t.Errorf("stream_type = %q, want %q (no media)", labels["stream_type"], metrics.ValUnknown)
@@ -345,7 +308,7 @@ func TestCollectSessions_no_media_uses_defaults(t *testing.T) {
 		t.Errorf("stream_file_resolution = %q, want empty (no mediaMeta media)", labels["stream_file_resolution"])
 	}
 
-	if got := len(byDesc[descKey(metrics.DescSessionBitrate)]); got != 0 {
+	if got := len(byDesc[metrics.DescSessionBitrate.Name]); got != 0 {
 		t.Errorf("expected 0 session_bitrate metrics when Media is empty, got %d", got)
 	}
 }
@@ -369,17 +332,13 @@ func TestCollectSessions_local_true_label(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	playMetrics := byDesc[descKey(metrics.DescPlayCount)]
+	byDesc := byFamily(gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) }))
+	playMetrics := byDesc[metrics.DescPlayCount.Name]
 	if len(playMetrics) != 1 {
 		t.Fatalf("expected 1 play_count metric, got %d", len(playMetrics))
 	}
 
-	labels, _ := metricSnapshot(t, playMetrics[0])
+	labels := playMetrics[0].labels
 	if labels["local"] != metrics.ValTrue {
 		t.Errorf("local = %q, want true", labels["local"])
 	}
@@ -414,19 +373,15 @@ func TestCollectSessions_library_lookup_sets_labels(t *testing.T) {
 
 	libs := []library.Library{{ID: "5", Name: "4K Movies", Type: library.TypeMovie}}
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", libs)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	playMetrics := byDesc[descKey(metrics.DescPlayCount)]
+	byDesc := byFamily(gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", libs) }))
+	playMetrics := byDesc[metrics.DescPlayCount.Name]
 	if len(playMetrics) != 2 {
 		t.Fatalf("expected 2 play_count metrics, got %d", len(playMetrics))
 	}
 
 	// Find each session's metric by the session label
 	for _, m := range playMetrics {
-		labels, _ := metricSnapshot(t, m)
+		labels := m.labels
 		switch labels["session"] {
 		case "s1":
 			if labels["library"] != "PresetLib" {
@@ -466,12 +421,8 @@ func TestCollectSessions_bandwidth_only_when_positive(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	bwMetrics := byDesc[descKey(metrics.DescSessionBandwidth)]
+	byDesc := byFamily(gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) }))
+	bwMetrics := byDesc[metrics.DescSessionBandwidth.Name]
 	if len(bwMetrics) != 0 {
 		t.Errorf("expected 0 session_bandwidth metrics (bandwidth=0), got %d", len(bwMetrics))
 	}
@@ -495,17 +446,13 @@ func TestCollectSessions_play_seconds_stopped_uses_prev(t *testing.T) {
 	}
 
 	srv := &Server{Name: "Srv", ID: "id1", Sessions: tracker}
-	ch := make(chan prometheus.Metric, 4096)
-	srv.collectSessions(ch, "Srv", "id1", nil)
-	close(ch)
-
-	byDesc := collectByDesc(ch)
-	secMetrics := byDesc[descKey(metrics.DescPlaySeconds)]
+	byDesc := byFamily(gatherSamples(t, func(em *emitter) { srv.collectSessions(em, "Srv", "id1", nil) }))
+	secMetrics := byDesc[metrics.DescPlaySeconds.Name]
 	if len(secMetrics) != 1 {
 		t.Fatalf("expected 1 play_seconds metric, got %d", len(secMetrics))
 	}
 
-	_, val := metricSnapshot(t, secMetrics[0])
+	val := secMetrics[0].value
 	// Should be ~5 seconds (prevPlayedTime), NOT ~1000 seconds
 	if val > 10 {
 		t.Errorf("play_seconds = %v, want ~5 (stopped session should use prevPlayedTime only)", val)

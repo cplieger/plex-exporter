@@ -6,8 +6,6 @@ package main
 import (
 	"cmp"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"log/slog"
 	"net"
@@ -17,22 +15,70 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/envx/v2"
-	"github.com/cplieger/health"
+	"github.com/cplieger/go/envx"
+	"github.com/cplieger/go/health/v2"
+	"github.com/cplieger/go/httpclient"
+	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"
-	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/slogx"
-	"github.com/cplieger/webhttp/v3"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/cplieger/plexapi/v3"
 )
+
+// healthzPath is the health route; the image's healthcheck and the
+// documented probes ask it.
+const healthzPath = "/healthz"
+
+const notServingReason = "plex-exporter is starting or shutting down"
+
+// healthProbeTimeout sits inside the Dockerfile's 5s HEALTHCHECK --timeout, so
+// a hung listener fails the check with a written reason instead of a kill.
+const healthProbeTimeout = 4 * time.Second
+
+// version is the release this binary was built as, set with
+// -ldflags "-X main.version=<tag>"; a build without it reports "dev".
+var version = "dev"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "health" {
-		health.RunProbe(health.DefaultPath)
+		os.Exit(probeHealth(os.Stderr, listenAddr(), healthProbeTimeout))
 	}
 	os.Exit(run())
+}
+
+func listenAddr() string {
+	return cmp.Or(envx.String("LISTEN_ADDR"), ":9594")
+}
+
+// newRegistry builds the /metrics registry: the exporter's families, and the
+// Go runtime and process families every measure registry serves.
+func newRegistry(ps *server.Server) *measure.Registry {
+	reg := measure.NewRegistry("")
+	reg.MustRegister(ps.Collector(version))
+	return reg
+}
+
+// metricsHandler serves reg's page, gzipped for a scraper that asks.
+func metricsHandler(reg *measure.Registry) http.Handler {
+	return httpserver.Gzip(httpserver.WithGzipTypes("text/plain"))(reg.Handler())
+}
+
+// routes serves /metrics and GET /healthz, which reports serving.
+func routes(metrics http.Handler, serving health.Signal) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics)
+	mux.Handle("GET "+healthzPath, health.CheckHandler(health.Check{Signal: serving, Reason: notServingReason}))
+
+	// Chain is outermost-first: Logging records the final status (even a
+	// recovered panic), Recoverer converts a panic to its 500 before
+	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
+	// machine-scraped, non-browser.
+	return httpserver.Chain(mux,
+		httpserver.Logging(httpserver.WithProbeLogLevel("/metrics", healthzPath)),
+		httpserver.Recoverer(),
+		httpserver.SecurityHeaders(),
+	)
 }
 
 func run() int {
@@ -40,12 +86,6 @@ func run() int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	// Clear a health marker left by a crashed previous run so the probe
-	// does not report healthy before the initial Plex connection succeeds.
-	marker := health.NewMarker(health.DefaultPath)
-	marker.Set(false)
-	defer marker.Cleanup()
 
 	plexURL, err := envx.Require("PLEX_URL")
 	if err != nil {
@@ -59,10 +99,10 @@ func run() int {
 		slog.Error("startup config error", "error", err)
 		return 1
 	}
-	listenAddr := cmp.Or(envx.String("LISTEN_ADDR"), ":9594")
+	listenAddr := listenAddr()
 
 	caCertPath := envx.String("PLEX_CA_CERT_PATH")
-	slog.Info("starting plex-exporter",
+	slog.Info("starting plex-exporter", "version", version,
 		"server", plexURL, "listen", listenAddr,
 		"ca_cert_path", caCertPath)
 
@@ -82,16 +122,15 @@ func run() int {
 			slog.Info("shutdown requested during startup", "cause", context.Cause(ctx))
 			return 0
 		}
-		if isFatalStartupError(refreshErr) {
+		// Every Plex failure starts degraded: plex_http_reachable 0 and the
+		// refresh error count carry it until RunRefreshLoop reaches Plex.
+		// The level tells the reader whether to act.
+		if operatorFixable(refreshErr) {
 			slog.Error("cannot connect to plex server", "error", refreshErr)
-			ps.RecordError("refresh")
-			return 1
+		} else {
+			slog.Warn("initial plex connection failed; starting in degraded state", "error", refreshErr)
 		}
-		// Transient failure: start degraded rather than crash-loop. RunRefreshLoop
-		// recovers and flips plex_http_reachable to 1 once Plex is reachable.
-		slog.Warn("initial plex connection failed; starting in degraded state", "error", refreshErr)
-		ps.RecordError("refresh")
-		ps.SetHTTPReachable(false)
+		ps.StartDegraded(refreshErr)
 	} else {
 		ps.SetHTTPReachable(true)
 		ps.SetSessionsReachable(true)
@@ -100,34 +139,18 @@ func run() int {
 			"libraries", len(ps.Libraries))
 	}
 
-	prometheus.MustRegister(ps)
 	go ps.RunRefreshLoop(ctx)
 
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/api/health", health.Handler(marker))
+	st := health.NewStatus()
+	handler := routes(metricsHandler(newRegistry(ps)), st)
 
-	// Chain is outermost-first: Logging records the final status (even a
-	// recovered panic), Recoverer converts a panic to its 500 before
-	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
-	// machine-scraped, non-browser. ProbeLogLevel keeps a healthy probe at
-	// Debug and surfaces a failing one at Warn/Error with status + request id.
-	handler := webhttp.Chain(mux,
-		webhttp.Logging(webhttp.ProbeLogLevel("/metrics", "/api/health")),
-		webhttp.Recoverer(),
-		webhttp.SecurityHeaders(),
-	)
-
-	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; NewServer
+	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; New
 	// leaves them unset by default.
-	srv := webhttp.NewServer(handler,
-		webhttp.WithReadHeaderTimeout(5*time.Second),
-		webhttp.WithReadTimeout(5*time.Second),
-		webhttp.WithWriteTimeout(10*time.Second),
-	)
+	srv := httpserver.New(handler)
+	srv.ReadHeaderTimeout = 5 * time.Second
+	srv.ReadTimeout = 5 * time.Second
+	srv.WriteTimeout = 10 * time.Second
 
-	// Bind the listener before marking healthy so a port-in-use failure is
-	// reported before Docker's healthcheck can observe a stale-true state.
 	lc := &net.ListenConfig{}
 	listener, err := lc.Listen(ctx, "tcp", listenAddr)
 	if err != nil {
@@ -135,7 +158,7 @@ func run() int {
 		return 1
 	}
 
-	marker.Set(true)
+	st.Set(true)
 
 	go ps.Sessions.RunPruneLoop(ctx)
 	go ps.RunSessionPollLoop(ctx)
@@ -143,16 +166,13 @@ func run() int {
 	go ps.RunLibraryWalkLoop(ctx)
 
 	slog.Info("starting metrics server", "addr", listener.Addr().String())
-	// WithPreDrain flips the health marker to unhealthy strictly BEFORE
-	// webhttp.Run drains, so probes see red during the drain window (the
-	// marker is a FILE the healthcheck CLI reads; listener closure alone does
-	// not cover it). On a serve-error exit Run skips it; deferred marker.Cleanup
-	// covers that path.
-	preDrain := webhttp.WithPreDrain(func(context.Context) {
-		marker.Set(false)
+	// WithPreDrain marks the app unhealthy before httpserver.Run drains, so a
+	// probe answered during the drain reads 503.
+	preDrain := httpserver.WithPreDrain(func(context.Context) {
+		st.BeginDrain()
 		slog.Info("shutting down", "cause", context.Cause(ctx))
 	})
-	if srvErr := webhttp.Run(ctx, srv, listener, nil, webhttp.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
+	if srvErr := httpserver.Run(ctx, srv, listener, httpserver.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
 		slog.Error("metrics server failed", "error", srvErr)
 		ps.RecordError("metrics_server")
 		return 1
@@ -160,22 +180,17 @@ func run() int {
 	return 0
 }
 
-// isFatalStartupError reports whether an initial Plex Refresh error will
-// not resolve without operator action (bad token/URL, a 404, or a
-// TLS/certificate error) versus a transient connectivity failure that
-// RunRefreshLoop can recover from (dial/DNS/timeout, or a 5xx).
-func isFatalStartupError(err error) bool {
+// operatorFixable reports whether an initial Plex Refresh error will not
+// resolve without operator action (bad token/URL, a 404, or a TLS failure
+// httpclient.CauseOf names: a certificate, a fatal alert or a plain-HTTP
+// answer) versus a transient connectivity failure (dial/DNS/timeout, or a
+// 5xx).
+func operatorFixable(err error) bool {
 	if plexapi.IsConfigError(err) {
 		return true
 	}
 	if errors.Is(err, plex.ErrNotFound) {
 		return true
 	}
-	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
-		return true
-	}
-	if _, ok := errors.AsType[x509.UnknownAuthorityError](err); ok {
-		return true
-	}
-	return false
+	return httpclient.CauseOf(err) == httpclient.CauseTLS
 }

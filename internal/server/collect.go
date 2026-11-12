@@ -1,15 +1,16 @@
 package server
 
 import (
+	"context"
 	"strconv"
 	"time"
 
+	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/textsafe"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
-	"github.com/cplieger/plexapi/v2"
-	"github.com/cplieger/runesafe/v3"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/cplieger/plexapi/v3"
 )
 
 // maxLabelLen is the maximum byte length for user-controlled Prometheus
@@ -17,27 +18,57 @@ import (
 // strings.
 const maxLabelLen = 128
 
-// Describe implements prometheus.Collector. The descriptor set is the
-// single source of truth published in metrics.AllDescs so that Describe
-// and Collect cannot drift.
-func (*Server) Describe(ch chan<- *prometheus.Desc) {
-	for _, d := range metrics.AllDescs {
-		ch <- d
-	}
+// Collector returns a new collector that reads s at every scrape and serves
+// version as plex_exporter_build_info.
+func (s *Server) Collector(version string) *measure.Collector {
+	return newCollector(func(em *emitter) {
+		em.emit(metrics.DescBuildInfo, 1, version)
+		s.collect(em)
+	})
 }
 
-// Collect implements prometheus.Collector.
-func (s *Server) Collect(ch chan<- prometheus.Metric) {
+// newCollector declares every family in metrics.AllDescs for one collector
+// that runs collect at every scrape.
+func newCollector(collect func(*emitter)) *measure.Collector {
+	descs := make(map[*metrics.Desc]*measure.Desc, len(metrics.AllDescs))
+	declared := make([]*measure.Desc, 0, len(metrics.AllDescs))
+	for _, d := range metrics.AllDescs {
+		md := d.Declare()
+		descs[d] = md
+		declared = append(declared, md)
+	}
+	return measure.NewCollector(func(_ context.Context, e *measure.Emitter) {
+		collect(&emitter{e: e, descs: descs})
+	}, declared...)
+}
+
+// emitter writes one scrape's samples under the families its collector
+// declared.
+type emitter struct {
+	e     *measure.Emitter
+	descs map[*metrics.Desc]*measure.Desc
+}
+
+func (em *emitter) emit(d *metrics.Desc, v float64, labels ...string) {
+	em.e.Emit(em.descs[d], v, labels...)
+}
+
+func (s *Server) collect(em *emitter) {
 	snap := s.snapshot()
 
-	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPReachable, prometheus.GaugeValue, snap.HTTPReachable)
-	ch <- prometheus.MustNewConstMetric(metrics.DescSessionPollReachable, prometheus.GaugeValue, snap.SessionsReachable)
-	ch <- prometheus.MustNewConstMetric(metrics.DescHTTPRetries, prometheus.CounterValue, snap.Retries)
-	// Emit one sample per known error type so rate()/increase() return zero
-	// rather than stale values.
+	em.emit(metrics.DescHTTPReachable, snap.HTTPReachable)
+	em.emit(metrics.DescSessionPollReachable, snap.SessionsReachable)
+	em.emit(metrics.DescHTTPRetries, snap.Retries)
+	// Emit one sample per known error type and fetch so rate()/increase()
+	// return zero rather than stale values.
 	for _, typ := range metrics.ErrorTypes {
-		ch <- prometheus.MustNewConstMetric(metrics.DescErrors, prometheus.CounterValue, snap.ErrorCounts[typ], typ)
+		em.emit(metrics.DescErrors, snap.ErrorCounts[typ], typ)
 	}
+	for _, fetch := range metrics.RefreshFetches {
+		em.emit(metrics.DescRefreshDeadlineExceeded, snap.deadlineMisses[fetch], fetch)
+	}
+	em.emit(metrics.DescSessionsTracked, float64(snap.sessionsTracked))
+	em.emit(metrics.DescSessionsDropped, snap.sessionsDropped)
 
 	// Prometheus drops an empty label value, so a server-scoped sample emitted
 	// before Plex has answered lands on a different series than the healthy one.
@@ -45,38 +76,34 @@ func (s *Server) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	ch <- prometheus.MustNewConstMetric(metrics.DescServerInfo, prometheus.GaugeValue, 1,
+	em.emit(metrics.DescServerInfo, 1,
 		snap.Name, snap.ID, snap.Version, snap.Platform, snap.PlatformVersion, snap.PlexPass)
-	ch <- prometheus.MustNewConstMetric(metrics.DescActiveTranscodes, prometheus.GaugeValue,
-		float64(snap.ActiveTranscodes), snap.Name, snap.ID)
+	em.emit(metrics.DescActiveTranscodes, float64(snap.ActiveTranscodes), snap.Name, snap.ID)
 	if snap.ResourcesRead {
-		ch <- prometheus.MustNewConstMetric(metrics.DescHostCPU, prometheus.GaugeValue, snap.HostCPU, snap.Name, snap.ID)
-		ch <- prometheus.MustNewConstMetric(metrics.DescHostMem, prometheus.GaugeValue, snap.HostMem, snap.Name, snap.ID)
+		em.emit(metrics.DescHostCPU, snap.HostCPU, snap.Name, snap.ID)
+		em.emit(metrics.DescHostMem, snap.HostMem, snap.Name, snap.ID)
 	}
 	if snap.BandwidthRead {
-		ch <- prometheus.MustNewConstMetric(metrics.DescTransmitBytes, prometheus.CounterValue, snap.TransmitBytes, snap.Name, snap.ID)
+		em.emit(metrics.DescTransmitBytes, snap.TransmitBytes, snap.Name, snap.ID)
 	}
 
 	for _, lib := range snap.Libraries {
 		libName := truncLabel(lib.Name)
-		ch <- prometheus.MustNewConstMetric(metrics.DescLibDuration, prometheus.GaugeValue,
-			float64(lib.DurationTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
-		ch <- prometheus.MustNewConstMetric(metrics.DescLibStorage, prometheus.GaugeValue,
-			float64(lib.StorageTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
+		em.emit(metrics.DescLibDuration, float64(lib.DurationTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
+		em.emit(metrics.DescLibStorage, float64(lib.StorageTotal), snap.Name, snap.ID, lib.Type, libName, lib.ID)
 		if lib.ItemsKnown {
-			ch <- prometheus.MustNewConstMetric(metrics.DescLibItems, prometheus.GaugeValue,
-				float64(lib.ItemsCount), snap.Name, snap.ID, lib.Type, libName, lib.ID,
+			em.emit(metrics.DescLibItems, float64(lib.ItemsCount), snap.Name, snap.ID, lib.Type, libName, lib.ID,
 				library.ContentTypeLabel(lib.Type))
 		}
 	}
-	s.collectSessions(ch, snap.Name, snap.ID, snap.Libraries)
-	collectCatalog(ch, &snap)
+	s.collectSessions(em, snap.Name, snap.ID, snap.Libraries)
+	collectCatalog(em, &snap)
 }
 
-// collectSessions emits per-session Prometheus metrics, from a
-// sessions-only snapshot taken under the tracker lock (Collect already
-// took the server-level snapshot).
-func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID string, libs []library.Library) {
+// collectSessions emits per-session metrics from a sessions-only snapshot
+// taken under the tracker lock (collect already took the server-level
+// snapshot).
+func (s *Server) collectSessions(em *emitter, srvName, srvID string, libs []library.Library) {
 	sessSnaps := s.Sessions.SnapshotSessions()
 
 	libByID := make(map[string]library.Library, len(libs))
@@ -92,14 +119,13 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 
 		labelVals := sessionLabelValues(srvName, srvID, &sess, sessID, libByID)
 
-		ch <- prometheus.MustNewConstMetric(metrics.DescPlayCount, prometheus.GaugeValue, 1, labelVals...)
+		em.emit(metrics.DescPlayCount, 1, labelVals...)
 
 		totalPlay := sess.PrevPlayedTime
 		if sess.State == sessions.StatePlaying {
 			totalPlay += time.Since(sess.PlayStarted)
 		}
-		ch <- prometheus.MustNewConstMetric(metrics.DescPlaySeconds, prometheus.CounterValue,
-			totalPlay.Seconds(), labelVals...)
+		em.emit(metrics.DescPlaySeconds, totalPlay.Seconds(), labelVals...)
 		if sess.VideoTranscoding {
 			// An ended session reads 0 while it waits to be pruned, so its
 			// row keeps the pipeline but it adds no transcode time.
@@ -107,15 +133,14 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 			if sess.State == sessions.StateStopped {
 				transcoding = 0
 			}
-			ch <- prometheus.MustNewConstMetric(metrics.DescSessionVideoTranscode, prometheus.GaugeValue, transcoding,
+			em.emit(metrics.DescSessionVideoTranscode, transcoding,
 				srvName, srvID, sessID, sess.VideoDecode, sess.VideoEncode, sess.SourceVideoCodec, sess.TargetVideoCodec)
 		}
 
 		user, _, bw := sessionElements(&sess.Meta)
 
 		if bw.Bandwidth > 0 {
-			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBandwidth, prometheus.GaugeValue,
-				float64(bw.Bandwidth),
+			em.emit(metrics.DescSessionBandwidth, float64(bw.Bandwidth),
 				srvName, srvID, sessID, truncLabel(user.Title),
 				metrics.LocationAllowlist.Normalize(orDefault(bw.Location, metrics.ValUnknown)))
 		}
@@ -123,8 +148,7 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 		// Bitrate is a gauge (not a play-count label) so cardinality is bounded
 		// by session count, not by every adaptive-streaming bitrate value seen.
 		if br := sessionBitrate(&sess.Meta); br > 0 {
-			ch <- prometheus.MustNewConstMetric(metrics.DescSessionBitrate, prometheus.GaugeValue,
-				br,
+			em.emit(metrics.DescSessionBitrate, br,
 				srvName, srvID, sessID, truncLabel(user.Title),
 				metrics.LocationAllowlist.Normalize(orDefault(bw.Location, metrics.ValUnknown)))
 		}
@@ -134,7 +158,7 @@ func (s *Server) collectSessions(ch chan<- prometheus.Metric, srvName, srvID str
 // truncLabel bounds a label value to maxLabelLen bytes, capping Prometheus
 // cardinality from user-controlled Plex API strings.
 func truncLabel(s string) string {
-	return runesafe.CapBytes(s, maxLabelLen)
+	return textsafe.CapBytes(s, maxLabelLen)
 }
 
 // streamLabels returns (streamType, resolution) derived from the
