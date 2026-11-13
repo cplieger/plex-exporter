@@ -6,6 +6,8 @@ github.com/cplieger/go/httpclient v1.2.0 h1:E+lbIpiNkUkcq3fxdMDYn116cwx6tU1XWmn4
 github.com/cplieger/go/httpclient v1.2.0/go.mod h1:couTQSCNdgNwOotbaQREGcM4CjUKZJ4Bdb7FSkNwL8U=
 github.com/cplieger/go/httpserver v1.3.0 h1:bZEeBZ6Xe49Pu+PAJ5jFVyaeEDooU1DBCmL11uW0rfY=
 github.com/cplieger/go/httpserver v1.3.0/go.mod h1:MuZxKRRjQG6DAJBO88cTGhVdhSCmBu2PMeA/DWRbiTQ=
+github.com/cplieger/go/httpserver v1.4.0 h1:Bx8fwSJtIKGPoXZgKVnTbvVWk58urTXxY8U1JtFpDJk=
+github.com/cplieger/go/httpserver v1.4.0/go.mod h1:MuZxKRRjQG6DAJBO88cTGhVdhSCmBu2PMeA/DWRbiTQ=
 github.com/cplieger/go/measure v1.2.0 h1:z1XR86jCx65RPQX+p6IRghfS41PdpidYaH+oGIN1J/U=
 github.com/cplieger/go/measure v1.2.0/go.mod h1:oH0qxNStRZYbEn3iHpXv/7jKcrjg/EzsxrhLhBK6BC0=
 github.com/cplieger/go/pathinside v1.1.0 h1:INqhQezkPwf/gA4fGxVuTBvV4bh4CedFGKm36c+GeIQ=
