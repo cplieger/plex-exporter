@@ -30,7 +30,7 @@ plex-exporter is free software under the GPL-3.0-or-later license.
 
 ## Quick start
 
-The image is on GitHub Container Registry and Docker Hub, for `amd64` and `arm64`. Both have the same images and tags. This is the [`compose.yaml`](compose.yaml) in this repository.
+The image is on GitHub Container Registry and on Docker Hub as `cplieger/plex-exporter`, for `amd64` and `arm64`. Both have the same images and tags. This is the [`compose.yaml`](compose.yaml) in this repository.
 
 ```yaml
 services:
