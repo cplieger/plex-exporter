@@ -17,7 +17,7 @@ Current code-scanning and vulnerability results are on the repository's Security
 
 ## Read-only root filesystem
 
-Add these lines to the `plex-exporter` service to run it with a read-only root filesystem, no Linux capabilities and no privilege escalation. The exporter writes no file: its health verdict lives in memory. So it needs no `tmpfs` or volume, and `/healthz` never depends on a writable folder.
+Add these lines to the `plex-exporter` service to run it with a read-only root filesystem, no Linux capabilities and no privilege escalation. The exporter writes no file and keeps its health verdict in memory. So it needs no `tmpfs` or volume, and `/healthz` never depends on a writable folder.
 
 ```yaml
     read_only: true

@@ -45,7 +45,7 @@ Host CPU and memory and the bandwidth counter come from statistics endpoints tha
 
 A library's `plex_library_items` series is absent until its count has been read once. A library read as empty reports `0`.
 
-The library content series appear after a library's first complete item-by-item read, and a library that fails a later read keeps the figures of its last complete one. The watch figures appear only once watch history has been read in full. [Monitoring and alerts](monitoring.md#watch-figures) explains when they are hidden.
+The library content series appear after a library's first complete item-by-item read, and a library that fails a later read keeps the figures of its last complete one. The watch figures appear only once watch history has been read in full. [Metrics reference](metrics.md#watch-figures) explains when they are hidden.
 
 ## Why it is built this way
 
@@ -54,4 +54,4 @@ The library content series appear after a library's first complete item-by-item 
 - It runs on `gcr.io/distroless/static-debian13` as the non-root user 65532, with no shell or package manager.
 - It serves a standard `/metrics` endpoint, so any Prometheus-compatible scraper and any Grafana dashboard can read it. It has no charts of its own.
 - Each stream's bitrate is its own `plex_session_bitrate_kbps` series rather than a label on the play metrics. Plex changes the bitrate during adaptive streaming, and a label would start a new series each time.
-- Titles and the library, user, device and device type names from Plex are cut to 128 bytes, and session keys to 64. The `stream_type`, `media_type`, `location` and resolution labels are mapped to a fixed set, and the tracker holds 256 sessions at most. So an unexpected Plex answer cannot create an unbounded number of series. [Monitoring and alerts](monitoring.md#session-labels) lists the sets.
+- Titles and the library, user, device and device type names from Plex are cut to 128 bytes, and session keys to 64. The `stream_type`, `media_type`, `location` and resolution labels are mapped to a fixed set, and the tracker holds 256 sessions at most. So an unexpected Plex answer cannot create an unbounded number of series. [Metrics reference](metrics.md#session-labels) lists the sets.
