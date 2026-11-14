@@ -14,14 +14,14 @@ plex-exporter lets you follow your Plex server in Grafana and alerts you to prob
 - Shows who watches what, on which device, and whether it plays directly or transcodes on your GPU or CPU.
 - Tracks each stream's bandwidth and bitrate, and whether the viewer is local or remote.
 - Counts each library's items, length and disk space, and lists its largest items with their last play.
-- Adds host CPU, memory and bandwidth with Plex Pass.
-- Comes with a Grafana dashboard and ten alert rules, one for a revoked token.
+- With Plex Pass, adds the server's CPU and memory use and upload traffic.
+- Ships a Grafana dashboard and ten alert rules, one for a rejected token.
 
 ## Who it is for
 
 plex-exporter is built for Plex server owners. It checks Plex for streams every 5 seconds, so a new stream appears within seconds.
 
-You need a Plex Media Server and its admin token. plex-exporter's graphs and ten alerts come from your Prometheus, Grafana and Alertmanager, which the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md) sets up. Another Prometheus-compatible scraper, such as Grafana Alloy, works too. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
+You need a Plex Media Server and its admin token. You also need Prometheus and Grafana, plus Alertmanager for the alerts, as the [monitoring guide](https://github.com/cplieger/docs/blob/main/docs/monitoring.md) sets up. Grafana Alloy can scrape the metrics instead. Run one container for each Plex server. Its metrics page has no login, so keep it on your own network.
 
 Consider [Tautulli](https://github.com/Tautulli/Tautulli) if you want a web app made for Plex, with watch history, per-user statistics and notifications for streams and recently added media.
 
@@ -75,7 +75,7 @@ On Unraid, open the **Apps** tab, search for plex-exporter and click **Install**
 
 The repository ships [`grafana-dashboard.json`](grafana-dashboard.json), the Plex Exporter dashboard built on these metrics. It needs Grafana 13.2 or newer.
 
-Load the copy from the release that matches your image tag into Grafana 13.2 or newer, as [Importing an app's dashboard](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#importing-an-apps-dashboard) shows, because each release's dashboard matches the metrics that image serves. Every release names the dashboard `plex-exporter`, so importing a newer copy and choosing **Import (Overwrite)** updates it in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
+Each release's dashboard matches the metrics that image serves, so load the copy from the release that matches your image tag. [Importing an app's dashboard](https://github.com/cplieger/docs/blob/main/docs/monitoring.md#importing-an-apps-dashboard) shows how. Every release names the dashboard `plex-exporter`, so importing a newer copy and choosing **Import (Overwrite)** updates it in place. [Monitoring and alerts](docs/monitoring.md#dashboard) lists the release download and the OCI artifact for automated delivery.
 
 On Grafana 13.1 or older, take `grafana-dashboard.json` from release [v4.1.3](https://github.com/cplieger/plex-exporter/releases/tag/v4.1.3), the last one in the older dashboard format. That file gets no further changes, so you maintain it yourself.
 
@@ -105,7 +105,7 @@ Which TLS setting you need depends on your `PLEX_URL`:
 | --- | --- |
 | `9594` | Prometheus metrics at `/metrics` and the health check at `GET /healthz` |
 
-The exporter needs no volumes.
+The exporter writes no file, so it needs no volume.
 
 ## Security
 
@@ -117,9 +117,11 @@ The exporter only connects out, to the Plex server you configure. It sends the t
 
 ## Troubleshooting
 
-The image's healthcheck runs `/plex-exporter health`, which asks `GET /healthz` on the exporter's own port. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told. Plex being unreachable never makes it unhealthy: that shows as `plex_http_reachable` at `0`.
+The image's healthcheck runs `/plex-exporter health`, which asks `GET /healthz` on the exporter's own port. [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
 
-At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `PLEX_URL` is not an http or https address, `PLEX_CA_CERT_PATH` cannot be read or holds no certificate, or the listen port cannot be bound, and Docker restarts it. Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running with `plex_http_reachable` at `0`, and it retries every 5 seconds.
+The container exits at startup when `PLEX_URL` is unset or is not an http or https address with a host. It also exits when neither `PLEX_TOKEN` nor `PLEX_TOKEN_FILE` supplies a token, or the token file cannot be read. It exits when the `PLEX_CA_CERT_PATH` file cannot be read or holds no certificate, or the listen address cannot be bound. Docker then restarts it.
+
+Any error from Plex, such as a rejected token, a 404, a TLS failure, a timeout or a 5xx, leaves it running and healthy, with the `plex_http_reachable` metric at `0`. It retries every 5 seconds.
 
 - The log shows `cannot connect to plex server` with `401 Unauthorized`. The token is wrong or revoked, so find it again with step 1 of the quick start.
 - The log shows `initial plex connection failed; starting in degraded state`. The exporter cannot reach `PLEX_URL` yet, so try that address from another device.
@@ -128,12 +130,13 @@ At startup, the container exits only when `PLEX_URL` or `PLEX_TOKEN` is unset, `
 
 ## Monitoring
 
-plex-exporter serves 49 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and the exporter tracks 256 streams at most. The page also carries the Go runtime and process metrics under the names Go's official Prometheus client uses. Ten PromQL alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml). The bundled dashboard needs Grafana 13.2 or newer. [Monitoring and alerts](docs/monitoring.md) lists every metric and rule and shows how to load them. The image has a Docker healthcheck; [Knowing the app is alive](docs/monitoring.md#knowing-the-app-is-alive) says what it proves and who is told.
+plex-exporter serves 49 metrics on `/metrics`, for the exporter itself, the server, its libraries, their contents and each stream. Each stream adds at most five series, and it tracks 256 streams at most. The page also carries the Go runtime and process metrics that stock Go dashboards read. Ten Prometheus alert rules ship in [`alerts/promql.yaml`](alerts/promql.yaml), and the bundled dashboard needs Grafana 13.2 or newer. [Metrics reference](docs/metrics.md) lists every metric, and [Monitoring and alerts](docs/monitoring.md) every rule and how to load it.
 
 ## Documentation
 
 - [How plex-exporter works](docs/how-it-works.md) explains how often it reads Plex and when each metric appears.
-- [Monitoring and alerts](docs/monitoring.md) lists every metric and label, the dashboard downloads and the alert rules.
+- [Metrics reference](docs/metrics.md) lists every metric and label, for building your own panels.
+- [Monitoring and alerts](docs/monitoring.md) lists the alert rules, the log lines, the dashboard downloads and the health checks.
 - [Security](docs/hardening.md) covers the read-only compose settings, the exporter's limits and what the image contains.
 - [Running on Kubernetes](docs/kubernetes.md) covers probes, a sidecar setup, Prometheus Operator labels and dashboard delivery.
 
