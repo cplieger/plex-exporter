@@ -1,0 +1,197 @@
+# HELP plex_server_info Plex server information
+# TYPE plex_server_info gauge
+plex_server_info{platform="Linux",platform_version="6.1",plex_pass="true",server="Home \"Plex\"\\Server",server_id="mid1",version="1.41.0"} 1
+# HELP plex_host_cpu_utilization_ratio Host CPU utilization (0-1)
+# TYPE plex_host_cpu_utilization_ratio gauge
+plex_host_cpu_utilization_ratio{server="Home \"Plex\"\\Server",server_id="mid1"} 0.42
+# HELP plex_host_memory_utilization_ratio Host memory utilization (0-1)
+# TYPE plex_host_memory_utilization_ratio gauge
+plex_host_memory_utilization_ratio{server="Home \"Plex\"\\Server",server_id="mid1"} 0.655
+# HELP plex_library_duration_milliseconds Total library duration in ms
+# TYPE plex_library_duration_milliseconds gauge
+plex_library_duration_milliseconds{library="Music",library_id="3",library_type="artist",server="Home \"Plex\"\\Server",server_id="mid1"} 1000
+plex_library_duration_milliseconds{library="Movies",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 7200000
+plex_library_duration_milliseconds{library="TV\nShows",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 360000
+# HELP plex_library_storage_bytes Total library storage in bytes
+# TYPE plex_library_storage_bytes gauge
+plex_library_storage_bytes{library="Music",library_id="3",library_type="artist",server="Home \"Plex\"\\Server",server_id="mid1"} 2000
+plex_library_storage_bytes{library="Movies",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 5000000000
+plex_library_storage_bytes{library="TV\nShows",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 900000
+# HELP plex_library_items Number of items in a library section
+# TYPE plex_library_items gauge
+plex_library_items{content_type="movies",library="Movies",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 2
+plex_library_items{content_type="episodes",library="TV\nShows",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_transmit_bytes_total Bytes transmitted (bandwidth API)
+# TYPE plex_transmit_bytes_total counter
+plex_transmit_bytes_total{server="Home \"Plex\"\\Server",server_id="mid1"} 123456789
+# HELP plex_active_transcode_sessions Active transcode sessions
+# TYPE plex_active_transcode_sessions gauge
+plex_active_transcode_sessions{server="Home \"Plex\"\\Server",server_id="mid1"} 1
+# HELP plex_plays_active Currently active play sessions (1 per session)
+# TYPE plex_plays_active gauge
+plex_plays_active{child_title="",device="TV",device_type="Plex for LG",grandchild_index="",grandchild_title="",library="Movies",library_id="1",library_type="movie",local="true",location="lan",media_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",session="s1",stream_file_resolution="4k",stream_resolution="1080",stream_type="transcode",subtitle_action="burn",title="Movie Ten",transcode_type="video",user="ann \"a\\b\""} 1
+plex_plays_active{child_title="Season 2",device="",device_type="",grandchild_index="3",grandchild_title="Pilot",library="unknown",library_id="0",library_type="unknown",local="false",location="unknown",media_type="episode",server="Home \"Plex\"\\Server",server_id="mid1",session="s2",stream_file_resolution="",stream_resolution="",stream_type="unknown",subtitle_action="none",title="Show",transcode_type="none",user=""} 1
+# HELP plex_play_seconds_total Total play time per session
+# TYPE plex_play_seconds_total counter
+plex_play_seconds_total{child_title="",device="TV",device_type="Plex for LG",grandchild_index="",grandchild_title="",library="Movies",library_id="1",library_type="movie",local="true",location="lan",media_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",session="s1",stream_file_resolution="4k",stream_resolution="1080",stream_type="transcode",subtitle_action="burn",title="Movie Ten",transcode_type="video",user="ann \"a\\b\""} 120
+plex_play_seconds_total{child_title="Season 2",device="",device_type="",grandchild_index="3",grandchild_title="Pilot",library="unknown",library_id="0",library_type="unknown",local="false",location="unknown",media_type="episode",server="Home \"Plex\"\\Server",server_id="mid1",session="s2",stream_file_resolution="",stream_resolution="",stream_type="unknown",subtitle_action="none",title="Show",transcode_type="none",user=""} 90
+# HELP plex_session_bandwidth_kbps Session bandwidth in kbps
+# TYPE plex_session_bandwidth_kbps gauge
+plex_session_bandwidth_kbps{location="lan",server="Home \"Plex\"\\Server",server_id="mid1",session="s1",user="ann \"a\\b\""} 9000
+# HELP plex_session_bitrate_kbps Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.
+# TYPE plex_session_bitrate_kbps gauge
+plex_session_bitrate_kbps{location="lan",server="Home \"Plex\"\\Server",server_id="mid1",session="s1",user="ann \"a\\b\""} 8000
+# HELP plex_http_reachable Whether the exporter's last poll of the configured Plex server succeeded (1) or failed (0)
+# TYPE plex_http_reachable gauge
+plex_http_reachable 1
+# HELP plex_session_poll_reachable Whether the exporter's last /status/sessions poll succeeded (1) or failed (0)
+# TYPE plex_session_poll_reachable gauge
+plex_session_poll_reachable 1
+# HELP plex_http_retries_total HTTP retries the exporter's Plex client performed across all requests
+# TYPE plex_http_retries_total counter
+plex_http_retries_total 0
+# HELP plex_exporter_errors_total Exporter errors by type
+# TYPE plex_exporter_errors_total counter
+plex_exporter_errors_total{type="activities_fetch"} 0
+plex_exporter_errors_total{type="history_fetch"} 1
+plex_exporter_errors_total{type="invalid_rating_key"} 0
+plex_exporter_errors_total{type="library_items"} 0
+plex_exporter_errors_total{type="library_walk"} 0
+plex_exporter_errors_total{type="metadata_fetch"} 0
+plex_exporter_errors_total{type="metrics_server"} 0
+plex_exporter_errors_total{type="prefs_fetch"} 0
+plex_exporter_errors_total{type="refresh"} 3
+plex_exporter_errors_total{type="sections_fetch"} 0
+plex_exporter_errors_total{type="sessions_fetch"} 0
+plex_exporter_errors_total{type="updater_fetch"} 0
+# HELP plex_exporter_build_info Always 1, labelled with the plex-exporter release this process runs
+# TYPE plex_exporter_build_info gauge
+plex_exporter_build_info{version="v9.9.9"} 1
+# HELP plex_sessions_tracked Plex sessions the exporter tracks, at most 256
+# TYPE plex_sessions_tracked gauge
+plex_sessions_tracked 2
+# HELP plex_sessions_dropped_total Times a new Plex session was refused because the exporter already tracked 256, counted on each poll
+# TYPE plex_sessions_dropped_total counter
+plex_sessions_dropped_total 0
+# HELP plex_refresh_deadline_exceeded_total Plex Pass fetches skipped because the refresh ran out of its 45s deadline
+# TYPE plex_refresh_deadline_exceeded_total counter
+plex_refresh_deadline_exceeded_total{fetch="bandwidth"} 2
+plex_refresh_deadline_exceeded_total{fetch="resources"} 0
+# HELP plex_library_top_item_bytes Size in bytes of one of the 10 largest items in a library (a show counts all its episodes)
+# TYPE plex_library_top_item_bytes gauge
+plex_library_top_item_bytes{library_id="1",library_type="movie",rating_key="10",server="Home \"Plex\"\\Server",server_id="mid1",title="Movie Ten",year=""} 2000
+plex_library_top_item_bytes{library_id="1",library_type="movie",rating_key="11",server="Home \"Plex\"\\Server",server_id="mid1",title="Movie \"Eleven\"",year="2001"} 3000
+# HELP plex_library_top_item_last_played_timestamp_seconds Last play by any account of one of the 10 largest items, as a Unix time; 0 when no play is recorded
+# TYPE plex_library_top_item_last_played_timestamp_seconds gauge
+plex_library_top_item_last_played_timestamp_seconds{library_id="1",library_type="movie",rating_key="10",server="Home \"Plex\"\\Server",server_id="mid1",title="Movie Ten",year=""} 0
+plex_library_top_item_last_played_timestamp_seconds{library_id="1",library_type="movie",rating_key="11",server="Home \"Plex\"\\Server",server_id="mid1",title="Movie \"Eleven\"",year="2001"} 912124920
+# HELP plex_library_recent_item_added_timestamp_seconds When one of the 10 newest items on the server was added, as a Unix time
+# TYPE plex_library_recent_item_added_timestamp_seconds gauge
+plex_library_recent_item_added_timestamp_seconds{episode="",library_id="1",library_type="movie",rating_key="10",server="Home \"Plex\"\\Server",server_id="mid1",title="Movie Ten",year=""} 946598520
+plex_library_recent_item_added_timestamp_seconds{episode="S02E03",library_id="2",library_type="show",rating_key="20",server="Home \"Plex\"\\Server",server_id="mid1",title="Show",year="2019"} 946677720
+# HELP plex_library_watch_age_bytes Bytes of sized items by when any account last played them
+# TYPE plex_library_watch_age_bytes gauge
+plex_library_watch_age_bytes{last_watched="90d_1y",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_bytes{last_watched="never",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1000
+plex_library_watch_age_bytes{last_watched="over_1y",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_bytes{last_watched="under_90d",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 4000
+plex_library_watch_age_bytes{last_watched="90d_1y",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_bytes{last_watched="never",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_bytes{last_watched="over_1y",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_bytes{last_watched="under_90d",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_library_watch_age_items Items by when any account last played them
+# TYPE plex_library_watch_age_items gauge
+plex_library_watch_age_items{last_watched="90d_1y",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_items{last_watched="never",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1
+plex_library_watch_age_items{last_watched="over_1y",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_items{last_watched="under_90d",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1
+plex_library_watch_age_items{last_watched="90d_1y",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_items{last_watched="never",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_items{last_watched="over_1y",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+plex_library_watch_age_items{last_watched="under_90d",library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_library_resolution_bytes Bytes of sized items by video resolution
+# TYPE plex_library_resolution_bytes gauge
+plex_library_resolution_bytes{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",video_resolution="1080"} 3000
+plex_library_resolution_bytes{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",video_resolution="2160"} 2000
+# HELP plex_library_codec_bytes Bytes of sized items by video codec
+# TYPE plex_library_codec_bytes gauge
+plex_library_codec_bytes{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",video_codec="h264"} 3000
+plex_library_codec_bytes{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",video_codec="hevc"} 2000
+# HELP plex_library_multi_version_items Items with more than one version (media file set)
+# TYPE plex_library_multi_version_items gauge
+plex_library_multi_version_items{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1
+plex_library_multi_version_items{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_library_extra_version_bytes Bytes held by every version of an item except its largest
+# TYPE plex_library_extra_version_bytes gauge
+plex_library_extra_version_bytes{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1500
+plex_library_extra_version_bytes{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_library_newest_item_added_timestamp_seconds When the newest item in the library was added, as a Unix time
+# TYPE plex_library_newest_item_added_timestamp_seconds gauge
+plex_library_newest_item_added_timestamp_seconds{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 946598520
+# HELP plex_library_added_items Items added within the window
+# TYPE plex_library_added_items gauge
+plex_library_added_items{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",window="24h"} 0
+plex_library_added_items{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1",window="7d"} 2
+plex_library_added_items{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1",window="24h"} 0
+plex_library_added_items{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1",window="7d"} 0
+# HELP plex_library_walkable 1 for each library the exporter reads item by item
+# TYPE plex_library_walkable gauge
+plex_library_walkable{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1
+plex_library_walkable{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 1
+# HELP plex_library_last_scan_timestamp_seconds When Plex last scanned the library, as a Unix time
+# TYPE plex_library_last_scan_timestamp_seconds gauge
+plex_library_last_scan_timestamp_seconds{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 946674120
+# HELP plex_library_walk_last_success_timestamp_seconds When the exporter last read every item of the library, as a Unix time
+# TYPE plex_library_walk_last_success_timestamp_seconds gauge
+plex_library_walk_last_success_timestamp_seconds{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 946684320
+plex_library_walk_last_success_timestamp_seconds{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 946683720
+# HELP plex_library_walk_duration_seconds How long the last complete read of the library took
+# TYPE plex_library_walk_duration_seconds gauge
+plex_library_walk_duration_seconds{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1.5
+plex_library_walk_duration_seconds{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 90
+# HELP plex_library_unsized_items Items whose file size Plex did not report for every version, left out of every byte figure
+# TYPE plex_library_unsized_items gauge
+plex_library_unsized_items{library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 1
+plex_library_unsized_items{library_id="2",library_type="show",server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_library_walk_pass_duration_seconds How long the last pass over every read library took
+# TYPE plex_library_walk_pass_duration_seconds gauge
+plex_library_walk_pass_duration_seconds{server="Home \"Plex\"\\Server",server_id="mid1"} 92
+# HELP plex_library_walk_skipped_libraries Libraries past the limit of libraries the exporter reads item by item
+# TYPE plex_library_walk_skipped_libraries gauge
+plex_library_walk_skipped_libraries{server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_library_walk_complete 1 when the last pass read every library it covers and none was skipped
+# TYPE plex_library_walk_complete gauge
+plex_library_walk_complete{server="Home \"Plex\"\\Server",server_id="mid1"} 1
+# HELP plex_library_watch_age_complete 1 when every read library's watch-age figures come from current watch history with no unmatched rows
+# TYPE plex_library_watch_age_complete gauge
+plex_library_watch_age_complete{server="Home \"Plex\"\\Server",server_id="mid1"} 1
+# HELP plex_history_read_status 1 for the outcome of the last full watch-history read
+# TYPE plex_history_read_status gauge
+plex_history_read_status{server="Home \"Plex\"\\Server",server_id="mid1",status="complete"} 1
+plex_history_read_status{server="Home \"Plex\"\\Server",server_id="mid1",status="failed"} 0
+plex_history_read_status{server="Home \"Plex\"\\Server",server_id="mid1",status="over_limit"} 0
+# HELP plex_history_last_success_timestamp_seconds When the exporter last read watch history successfully, as a Unix time
+# TYPE plex_history_last_success_timestamp_seconds gauge
+plex_history_last_success_timestamp_seconds{server="Home \"Plex\"\\Server",server_id="mid1"} 946684920
+# HELP plex_history_unmatched_rows Watch-history rows with a non-numeric item key, or an item key but no play time, since the last full read, counted up to 250,000
+# TYPE plex_history_unmatched_rows gauge
+plex_history_unmatched_rows{server="Home \"Plex\"\\Server",server_id="mid1"} 0
+# HELP plex_history_deleted_item_rows Watch-history rows for items no longer in Plex since the last full read, counted up to 250,000
+# TYPE plex_history_deleted_item_rows gauge
+plex_history_deleted_item_rows{server="Home \"Plex\"\\Server",server_id="mid1"} 1
+# HELP plex_server_activity_progress_ratio Progress of running Plex background work (0-1, -1 when Plex reports no estimate)
+# TYPE plex_server_activity_progress_ratio gauge
+plex_server_activity_progress_ratio{activity_type="butler",library_id="",library_type="",server="Home \"Plex\"\\Server",server_id="mid1"} -1
+plex_server_activity_progress_ratio{activity_type="library.update.section",library_id="1",library_type="movie",server="Home \"Plex\"\\Server",server_id="mid1"} 0.4
+# HELP plex_server_update_available 1 when Plex reports a release newer than the running version
+# TYPE plex_server_update_available gauge
+plex_server_update_available{server="Home \"Plex\"\\Server",server_id="mid1",state="available"} 1
+# HELP plex_server_update_checked_timestamp_seconds When Plex last checked for an update, as a Unix time
+# TYPE plex_server_update_checked_timestamp_seconds gauge
+plex_server_update_checked_timestamp_seconds{server="Home \"Plex\"\\Server",server_id="mid1"} 946663320
+# HELP plex_server_scheduled_scan_interval_seconds How often Plex scans every library on its own schedule, present only while that schedule is on
+# TYPE plex_server_scheduled_scan_interval_seconds gauge
+plex_server_scheduled_scan_interval_seconds{server="Home \"Plex\"\\Server",server_id="mid1"} 3600
+# HELP plex_session_video_transcode 1 for each session transcoding video and 0 once it has ended, by where Plex decodes and encodes it
+# TYPE plex_session_video_transcode gauge
+plex_session_video_transcode{decode="hardware",encode="software",server="Home \"Plex\"\\Server",server_id="mid1",session="s1",source_codec="hevc",target_codec="h264"} 1

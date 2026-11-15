@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/plex-exporter/internal/library"
 	"github.com/cplieger/plex-exporter/internal/metrics"
 	"github.com/cplieger/plex-exporter/internal/sessions"
@@ -73,6 +73,21 @@ func gatherCollector(tb testing.TB, c *measure.Collector) []sample {
 		}
 	}
 	return out
+}
+
+// servePage returns the /metrics page a registry holding only c serves.
+func servePage(tb testing.TB, c *measure.Collector) string {
+	tb.Helper()
+	reg := measure.NewRegistry("")
+	if err := reg.Register(c); err != nil {
+		tb.Fatalf("Setup: register: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	reg.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(tb.Context(), http.MethodGet, "/metrics", http.NoBody))
+	if rec.Code != http.StatusOK {
+		tb.Fatalf("GET /metrics = %d, want 200", rec.Code)
+	}
+	return rec.Body.String()
 }
 
 // byFamily groups samples by family name.
