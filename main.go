@@ -19,7 +19,7 @@ import (
 	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpclient"
 	"github.com/cplieger/go/httpserver"
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/go/measure"
+	"github.com/cplieger/go/measure/v2"
 )
 
 // Order matters for the Prometheus wire contract; do not re-order.
@@ -50,115 +50,125 @@ type Desc struct {
 	Name   string
 	Help   string
 	Type   measure.Type
+	Unit   measure.Unit
 	Labels []string
 }
 
-func gaugeDesc(name, help string, labels []string) *Desc {
-	return &Desc{Name: name, Help: help, Type: measure.TypeGauge, Labels: labels}
+func gaugeDesc(name, help string, unit measure.Unit, labels []string) *Desc {
+	return &Desc{Name: name, Help: help, Type: measure.TypeGauge, Unit: unit, Labels: labels}
 }
 
-func counterDesc(name, help string, labels []string) *Desc {
-	return &Desc{Name: name, Help: help, Type: measure.TypeCounter, Labels: labels}
+func counterDesc(name, help string, unit measure.Unit, labels []string) *Desc {
+	return &Desc{Name: name, Help: help, Type: measure.TypeCounter, Unit: unit, Labels: labels}
 }
 
 // Declare returns a new measure declaration of d. A measure desc belongs to
 // the one collector it is handed to, so every collector declares its own.
 func (d *Desc) Declare() *measure.Desc {
 	if d.Type == measure.TypeCounter {
-		return measure.NewCounterDesc(d.Name, d.Help, d.Labels)
+		return measure.NewCounterDesc(d.Name, d.Help, d.Unit, d.Labels)
 	}
-	return measure.NewGaugeDesc(d.Name, d.Help, d.Labels)
+	return measure.NewGaugeDesc(d.Name, d.Help, d.Unit, d.Labels)
 }
 
 // Descriptors emitted by the collector.
 var (
 	DescServerInfo = gaugeDesc(
-		"plex_server_info", "Plex server information",
+		"plex_server_info", "Plex server information", measure.UnitNone,
 		append(srvLabels, "version", "platform", "platform_version", "plex_pass"),
 	)
 	DescHostCPU = gaugeDesc(
-		"plex_host_cpu_utilization_ratio", "Host CPU utilization (0-1)",
+		"plex_host_cpu_utilization_ratio", "Host CPU utilization (0-1)", measure.UnitRatio,
 		srvLabels,
 	)
 	DescHostMem = gaugeDesc(
-		"plex_host_memory_utilization_ratio", "Host memory utilization (0-1)",
+		"plex_host_memory_utilization_ratio", "Host memory utilization (0-1)", measure.UnitRatio,
 		srvLabels,
 	)
 	DescLibDuration = gaugeDesc(
-		"plex_library_duration_milliseconds", "Total library duration in ms",
+		"plex_library_duration_milliseconds", "Total library duration in ms", measure.UnitNone,
 		libLabels,
 	)
 	DescLibStorage = gaugeDesc(
-		"plex_library_storage_bytes", "Total library storage in bytes",
+		"plex_library_storage_bytes", "Total library storage in bytes", measure.UnitBytes,
 		libLabels,
 	)
 	DescLibItems = gaugeDesc(
-		"plex_library_items", "Number of items in a library section",
+		"plex_library_items", "Number of items in a library section", measure.UnitNone,
 		append(libLabels, "content_type"),
 	)
 	DescTransmitBytes = counterDesc(
-		"plex_transmit_bytes_total", "Bytes transmitted (bandwidth API)",
+		"plex_transmit_bytes_total", "Bytes transmitted (bandwidth API)", measure.UnitBytes,
 		srvLabels,
 	)
 	DescActiveTranscodes = gaugeDesc(
-		"plex_active_transcode_sessions", "Active transcode sessions",
+		"plex_active_transcode_sessions", "Active transcode sessions", measure.UnitNone,
 		srvLabels,
 	)
 	DescPlayCount = gaugeDesc(
-		"plex_plays_active", "Currently active play sessions (1 per session)",
+		"plex_plays_active", "Currently active play sessions (1 per session)", measure.UnitNone,
 		playLabels,
 	)
 	DescPlaySeconds = counterDesc(
-		"plex_play_seconds_total", "Total play time per session",
+		"plex_play_seconds_total", "Total play time per session", measure.UnitSeconds,
 		playLabels,
 	)
 	DescSessionBandwidth = gaugeDesc(
-		"plex_session_bandwidth_kbps", "Session bandwidth in kbps",
+		"plex_session_bandwidth_kbps", "Session bandwidth in kbps", measure.UnitNone,
 		append(srvLabels, "session", "user", "location"),
 	)
 	DescSessionBitrate = gaugeDesc(
 		"plex_session_bitrate_kbps",
 		"Live stream bitrate per session (kbps). Replaces the former stream_bitrate label on plex_plays_active/plex_play_seconds_total, which caused unbounded cardinality as Plex reported changing bitrate values during adaptive streaming.",
+		measure.UnitNone,
 		append(srvLabels, "session", "user", "location"),
 	)
 	DescHTTPReachable = gaugeDesc(
 		"plex_http_reachable",
 		"Whether the exporter's last poll of the configured Plex server succeeded (1) or failed (0)",
+		measure.UnitNone,
 		nil,
 	)
 	DescSessionPollReachable = gaugeDesc(
 		"plex_session_poll_reachable",
 		"Whether the exporter's last /status/sessions poll succeeded (1) or failed (0)",
+		measure.UnitNone,
 		nil,
 	)
 	DescHTTPRetries = counterDesc(
 		"plex_http_retries_total",
 		"HTTP retries the exporter's Plex client performed across all requests",
+		measure.UnitCount,
 		nil,
 	)
 	DescErrors = counterDesc(
 		"plex_exporter_errors_total",
 		"Exporter errors by type",
+		measure.UnitCount,
 		[]string{"type"},
 	)
 	DescBuildInfo = gaugeDesc(
 		"plex_exporter_build_info",
 		"Always 1, labelled with the plex-exporter release this process runs",
+		measure.UnitNone,
 		[]string{"version"},
 	)
 	DescSessionsTracked = gaugeDesc(
 		"plex_sessions_tracked",
 		"Plex sessions the exporter tracks, at most 256",
+		measure.UnitNone,
 		nil,
 	)
 	DescSessionsDropped = counterDesc(
 		"plex_sessions_dropped_total",
 		"Times a new Plex session was refused because the exporter already tracked 256, counted on each poll",
+		measure.UnitCount,
 		nil,
 	)
 	DescRefreshDeadlineExceeded = counterDesc(
 		"plex_refresh_deadline_exceeded_total",
 		"Plex Pass fetches skipped because the refresh ran out of its 45s deadline",
+		measure.UnitCount,
 		[]string{"fetch"},
 	)
 )
@@ -175,12 +185,12 @@ var libIDLabels = []string{LabelServer, LabelServerID, labelLibraryType, labelLi
 // active population is bounded by libstats.TopN, never by the catalog size.
 var itemLabels = append(slices.Clone(libIDLabels), "rating_key", "title", "year")
 
-func libDesc(name, help string, extra ...string) *Desc {
-	return gaugeDesc(name, help, append(slices.Clone(libIDLabels), extra...))
+func libDesc(name, help string, unit measure.Unit, extra ...string) *Desc {
+	return gaugeDesc(name, help, unit, append(slices.Clone(libIDLabels), extra...))
 }
 
-func srvDesc(name, help string, extra ...string) *Desc {
-	return gaugeDesc(name, help, append(slices.Clone(srvLabels), extra...))
+func srvDesc(name, help string, unit measure.Unit, extra ...string) *Desc {
+	return gaugeDesc(name, help, unit, append(slices.Clone(srvLabels), extra...))
 }
 
 // Library-content descriptors, published from the hourly catalog walk.
@@ -188,75 +198,80 @@ var (
 	DescTopItemBytes = gaugeDesc(
 		"plex_library_top_item_bytes",
 		"Size in bytes of one of the 10 largest items in a library (a show counts all its episodes)",
+		measure.UnitBytes,
 		itemLabels,
 	)
 	DescTopItemLastPlayed = gaugeDesc(
 		"plex_library_top_item_last_played_timestamp_seconds",
 		"Last play by any account of one of the 10 largest items, as a Unix time; 0 when no play is recorded",
+		measure.UnitSeconds,
 		itemLabels,
 	)
 	DescRecentItemAdded = gaugeDesc(
 		"plex_library_recent_item_added_timestamp_seconds",
 		"When one of the 10 newest items on the server was added, as a Unix time",
+		measure.UnitSeconds,
 		append(slices.Clone(itemLabels), "episode"),
 	)
 	DescWatchAgeBytes = libDesc("plex_library_watch_age_bytes",
-		"Bytes of sized items by when any account last played them", "last_watched")
+		"Bytes of sized items by when any account last played them", measure.UnitBytes, "last_watched")
 	DescWatchAgeItems = libDesc("plex_library_watch_age_items",
-		"Items by when any account last played them", "last_watched")
+		"Items by when any account last played them", measure.UnitNone, "last_watched")
 	DescResolutionBytes = libDesc("plex_library_resolution_bytes",
-		"Bytes of sized items by video resolution", "video_resolution")
+		"Bytes of sized items by video resolution", measure.UnitBytes, "video_resolution")
 	DescCodecBytes = libDesc("plex_library_codec_bytes",
-		"Bytes of sized items by video codec", "video_codec")
+		"Bytes of sized items by video codec", measure.UnitBytes, "video_codec")
 	DescMultiVersionItems = libDesc("plex_library_multi_version_items",
-		"Items with more than one version (media file set)")
+		"Items with more than one version (media file set)", measure.UnitNone)
 	DescExtraVersionBytes = libDesc("plex_library_extra_version_bytes",
-		"Bytes held by every version of an item except its largest")
+		"Bytes held by every version of an item except its largest", measure.UnitBytes)
 	DescNewestItemAdded = libDesc("plex_library_newest_item_added_timestamp_seconds",
-		"When the newest item in the library was added, as a Unix time")
+		"When the newest item in the library was added, as a Unix time", measure.UnitSeconds)
 	DescAddedItems = libDesc("plex_library_added_items",
-		"Items added within the window", "window")
+		"Items added within the window", measure.UnitNone, "window")
 	DescWalkable = libDesc("plex_library_walkable",
-		"1 for each library the exporter reads item by item")
+		"1 for each library the exporter reads item by item", measure.UnitNone)
 	DescLastScan = libDesc("plex_library_last_scan_timestamp_seconds",
-		"When Plex last scanned the library, as a Unix time")
+		"When Plex last scanned the library, as a Unix time", measure.UnitSeconds)
 	DescWalkLastSuccess = libDesc("plex_library_walk_last_success_timestamp_seconds",
-		"When the exporter last read every item of the library, as a Unix time")
+		"When the exporter last read every item of the library, as a Unix time", measure.UnitSeconds)
 	DescWalkDuration = libDesc("plex_library_walk_duration_seconds",
-		"How long the last complete read of the library took")
+		"How long the last complete read of the library took", measure.UnitSeconds)
 	DescUnsizedItems = libDesc("plex_library_unsized_items",
-		"Items whose file size Plex did not report for every version, left out of every byte figure")
+		"Items whose file size Plex did not report for every version, left out of every byte figure", measure.UnitNone)
 	DescWalkPassDuration = srvDesc("plex_library_walk_pass_duration_seconds",
-		"How long the last pass over every read library took")
+		"How long the last pass over every read library took", measure.UnitSeconds)
 	DescWalkSkipped = srvDesc("plex_library_walk_skipped_libraries",
-		"Libraries past the limit of libraries the exporter reads item by item")
+		"Libraries past the limit of libraries the exporter reads item by item", measure.UnitNone)
 	DescWalkComplete = srvDesc("plex_library_walk_complete",
-		"1 when the last pass read every library it covers and none was skipped")
+		"1 when the last pass read every library it covers and none was skipped", measure.UnitNone)
 	DescWatchAgeComplete = srvDesc("plex_library_watch_age_complete",
-		"1 when every read library's watch-age figures come from current watch history with no unmatched rows")
+		"1 when every read library's watch-age figures come from current watch history with no unmatched rows", measure.UnitNone)
 )
 
 // Watch-history, server-activity, update and transcode descriptors.
 var (
 	DescHistoryReadStatus = srvDesc("plex_history_read_status",
-		"1 for the outcome of the last full watch-history read", "status")
+		"1 for the outcome of the last full watch-history read", measure.UnitNone, "status")
 	DescHistoryLastSuccess = srvDesc("plex_history_last_success_timestamp_seconds",
-		"When the exporter last read watch history successfully, as a Unix time")
+		"When the exporter last read watch history successfully, as a Unix time", measure.UnitSeconds)
 	DescHistoryUnmatched = srvDesc("plex_history_unmatched_rows",
-		"Watch-history rows with a non-numeric item key, or an item key but no play time, since the last full read, counted up to 250,000")
+		"Watch-history rows with a non-numeric item key, or an item key but no play time, since the last full read, counted up to 250,000", measure.UnitNone)
 	DescHistoryDeleted = srvDesc("plex_history_deleted_item_rows",
-		"Watch-history rows for items no longer in Plex since the last full read, counted up to 250,000")
+		"Watch-history rows for items no longer in Plex since the last full read, counted up to 250,000", measure.UnitNone)
 	DescActivityProgress = srvDesc("plex_server_activity_progress_ratio",
 		"Progress of running Plex background work (0-1, -1 when Plex reports no estimate)",
+		measure.UnitRatio,
 		"activity_type", labelLibraryType, labelLibraryID)
 	DescUpdateAvailable = srvDesc("plex_server_update_available",
-		"1 when Plex reports a release newer than the running version", "state")
+		"1 when Plex reports a release newer than the running version", measure.UnitNone, "state")
 	DescUpdateChecked = srvDesc("plex_server_update_checked_timestamp_seconds",
-		"When Plex last checked for an update, as a Unix time")
+		"When Plex last checked for an update, as a Unix time", measure.UnitSeconds)
 	DescScanInterval = srvDesc("plex_server_scheduled_scan_interval_seconds",
-		"How often Plex scans every library on its own schedule, present only while that schedule is on")
+		"How often Plex scans every library on its own schedule, present only while that schedule is on", measure.UnitSeconds)
 	DescSessionVideoTranscode = srvDesc("plex_session_video_transcode",
 		"1 for each session transcoding video and 0 once it has ended, by where Plex decodes and encodes it",
+		measure.UnitNone,
 		"session", "decode", "encode", "source_codec", "target_codec")
 )
 
