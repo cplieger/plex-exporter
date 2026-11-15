@@ -1689,7 +1689,7 @@
         "spec": {
           "id": 70,
           "title": "Watch time by delivery",
-          "description": "Hours watched, stacked by delivery: direct play sends the file as it is, direct stream repackages it, and transcode re-encodes it. A growing orange transcode band means a device or a file format forces conversions, so check the Transcoding tab for which players. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. The legend total adds up the bars, which start at the first whole slice inside the range, and a missing bar means nothing played or plex-exporter was not scraped.",
+          "description": "Hours watched, stacked by delivery: direct play sends the file as it is, direct stream repackages it, and transcode re-encodes it. A growing orange transcode band means a device or a file format forces conversions, so check the Transcoding tab for which players. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. A slice where a stream starts, or one near a plex-exporter restart, a failed scrape or a scrape outage, can show fewer or more hours than were watched.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1706,7 +1706,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"directplay\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Direct play"
                       }
                     },
@@ -1725,7 +1725,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"copy\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Direct stream"
                       }
                     },
@@ -1744,7 +1744,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=\"transcode\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Transcode"
                       }
                     },
@@ -1763,7 +1763,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", stream_type=~\"unknown|other\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Unknown"
                       }
                     },
@@ -1889,7 +1889,7 @@
         "spec": {
           "id": 71,
           "title": "Watch time by network",
-          "description": "Hours watched, stacked by home network, remote, and Unknown for streams with no network location. Remote watching uses your upload bandwidth, so a growing yellow remote band explains slow remote streams. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. The legend total adds up the bars, which start at the first whole slice inside the range, and a missing bar means nothing played or plex-exporter was not scraped.",
+          "description": "Hours watched, stacked by home network, remote, and Unknown for streams with no network location. Remote watching uses your upload bandwidth, so a growing yellow remote band explains slow remote streams. Each bar covers an equal slice of the range, an hour at 24 hours and a day at 30 days, and the newest bar grows until its slice ends. A slice where a stream starts, or one near a plex-exporter restart, a failed scrape or a scrape outage, can show fewer or more hours than were watched.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1906,7 +1906,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", location=\"lan\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", location=\"lan\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", location=\"lan\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", location=\"lan\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Home network"
                       }
                     },
@@ -1925,7 +1925,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", location=\"wan\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", location=\"wan\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", location=\"wan\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", location=\"wan\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Remote"
                       }
                     },
@@ -1944,7 +1944,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(increase(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval)) / 3600 and on () (vector(time()) >= $__from / 1000)",
+                        "expr": "sum((last_over_time(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval) - plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"} and min_over_time(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval) >= plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval) and min_over_time(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval) < plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}) or (last_over_time(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval) - min_over_time(plex_play_seconds_total{server=~\"$server\", location=~\"unknown|other\"}[$__interval] offset -$__interval))) / 3600 and on () (vector(time()) >= $__from / 1000)",
                         "legendFormat": "Unknown"
                       }
                     },

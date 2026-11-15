@@ -342,3 +342,107 @@ tests:
                 periodically is on. A scan that keeps failing usually means
                 the library's media folder is missing or unreadable, so check the
                 mount and the Plex Media Server log.
+
+  # The dashboard's Watch time by delivery Direct play query, with $server, its 5m slice and
+  # $__from filled in, so the bar at 10m covers 10m to 15m, in hours. promtool loads input
+  # samples only up to a group's latest eval_time, so each group ends by reading the total at 15m.
+  # TestDashboard_watch_time_bars_are_the_tested_query fails when the query and the dashboard differ.
+  - name: "Watch time: a bar counts the time played in its slice"
+    interval: 1m
+    input_series:
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="1"}'
+        values: '0+60x30'
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="2"}'
+        values: '0+30x30'
+    promql_expr_test:
+      - expr: &watch_time 'sum((last_over_time(plex_play_seconds_total{server=~".+", stream_type="directplay"}[5m] offset -5m) - plex_play_seconds_total{server=~".+", stream_type="directplay"} and min_over_time(plex_play_seconds_total{server=~".+", stream_type="directplay"}[5m] offset -5m) >= plex_play_seconds_total{server=~".+", stream_type="directplay"}) or (last_over_time(plex_play_seconds_total{server=~".+", stream_type="directplay"}[5m] offset -5m) and min_over_time(plex_play_seconds_total{server=~".+", stream_type="directplay"}[5m] offset -5m) < plex_play_seconds_total{server=~".+", stream_type="directplay"}) or (last_over_time(plex_play_seconds_total{server=~".+", stream_type="directplay"}[5m] offset -5m) - min_over_time(plex_play_seconds_total{server=~".+", stream_type="directplay"}[5m] offset -5m))) / 3600 and on () (vector(time()) >= 0 / 1000)'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 0.125
+      - expr: 'sum(plex_play_seconds_total)'
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 1350
+  - name: "Watch time: a stream that plays through an exporter restart counts its time after the restart"
+    interval: 1m
+    input_series:
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="1"}'
+        values: '0+60x11 0+60x10'
+    promql_expr_test:
+      - expr: *watch_time
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 0.05
+      - expr: 'sum(plex_play_seconds_total)'
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 180
+  - name: "Watch time: a session first seen inside the slice counts its growth there, not the time it carried in"
+    interval: 1m
+    input_series:
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="1"}'
+        values: '_x12 3000+60x10'
+    promql_expr_test:
+      - expr: *watch_time
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 0.05
+      - expr: 'sum(plex_play_seconds_total)'
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 3180
+  - name: "Watch time: a session that starts inside the slice leaves out its time before its first scrape"
+    interval: 1m
+    input_series:
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="1"}'
+        values: '_x11 30+60x10'
+    promql_expr_test:
+      - expr: *watch_time
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 0.06666666666666667
+      - expr: 'sum(plex_play_seconds_total)'
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 270
+  - name: "Watch time: a session that ended before the slice draws no bar"
+    interval: 1m
+    input_series:
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="1"}'
+        values: '0+60x9'
+    promql_expr_test:
+      - expr: *watch_time
+        eval_time: 10m
+        exp_samples: []
+      - expr: 'sum(plex_play_seconds_total)'
+        eval_time: 15m
+        exp_samples: []
+  - name: "Watch time: a scrape outage that leaves no stale marker moves its play time into the slice after it"
+    interval: 1m
+    input_series:
+      - series: 'plex_play_seconds_total{job="plex-exporter", instance="exporter:9594", server="Plex", server_id="id1", stream_type="directplay", session="1"}'
+        values: '0+60x3 _x5 540+60x10'
+    promql_expr_test:
+      - expr: *watch_time
+        eval_time: 0m
+        exp_samples:
+          - labels: '{}'
+            value: 0.05
+      - expr: *watch_time
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0.11666666666666667
+      - expr: 'sum(plex_play_seconds_total)'
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 900
