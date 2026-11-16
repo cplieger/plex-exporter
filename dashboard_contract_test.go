@@ -364,6 +364,298 @@ func TestDashboard_bar_subqueries_count_no_step_after_the_range(t *testing.T) {
 	}
 }
 
+func allExprs(t *testing.T) map[string]string {
+	t.Helper()
+	_, panels := loadDashboard(t)
+	out := map[string]string{}
+	for name, p := range panels {
+		for i, e := range exprs(&p) {
+			out[fmt.Sprintf("%s %q query %d", name, p.Spec.Title, i)] = e
+		}
+	}
+	for name, v := range dashVariables(t) {
+		if v.Kind == "QueryVariable" {
+			out["variable "+name] = v.dataQuery(t).Spec.Query
+		}
+	}
+	return out
+}
+
+const promqlString = `"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|` + "`[^`]*`"
+
+var (
+	// bracedVariable matches ${name}, whose braces are no selector.
+	bracedVariable = regexp.MustCompile(`\$\{\w+(?::\w+)?\}`)
+	matcherPart    = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*|` + promqlString + `)\s*(=~|!~|!=|=)\s*(` + promqlString + `)$`)
+	stringPart     = regexp.MustCompile(`^(?:` + promqlString + `)$`)
+)
+
+// skipString returns the index just past the string literal opening at s[i].
+func skipString(s string, i int) int {
+	q := s[i]
+	for i++; i < len(s); i++ {
+		switch {
+		case s[i] == '\\' && q != '`':
+			i++
+		case s[i] == q:
+			return i + 1
+		}
+	}
+	return len(s)
+}
+
+// promqlUnquote decodes a string literal. PromQL escapes as Go does
+// (https://prometheus.io/docs/prometheus/latest/querying/basics/#string-literals),
+// so "inst\x61nce" names the instance label.
+func promqlUnquote(s string) (string, error) {
+	if s[0] == '\'' {
+		s = `"` + strings.ReplaceAll(strings.ReplaceAll(s[1:len(s)-1], `\'`, `'`), `"`, `\"`) + `"`
+	}
+	return strconv.Unquote(s)
+}
+
+// skipComment returns the index of the newline ending the # comment at s[i].
+func skipComment(s string, i int) int {
+	if j := strings.IndexByte(s[i:], '\n'); j >= 0 {
+		return i + j
+	}
+	return len(s)
+}
+
+// selectors returns the comma-split parts of each {...} block of expr.
+// Quoted strings and # comments are skipped, so a brace or comma inside a
+// label value neither ends a block nor splits a matcher, and a quote in a
+// comment opens no string.
+func selectors(expr string) [][]string {
+	var out [][]string
+	var parts []string
+	start, part := -1, 0
+	for i := 0; i < len(expr); i++ {
+		switch c := expr[i]; {
+		case c == '#':
+			i = skipComment(expr, i)
+		case c == '"' || c == '\'' || c == '`':
+			i = skipString(expr, i) - 1
+		case c == '{':
+			start, part, parts = i, i+1, nil
+		case (c == ',' || c == '}') && start >= 0:
+			if p := strings.TrimSpace(expr[part:i]); p != "" {
+				parts = append(parts, p)
+			}
+			part = i + 1
+			if c == '}' {
+				out = append(out, parts)
+				start = -1
+			}
+		}
+	}
+	return out
+}
+
+// Grafana regex-escapes a variable only when it is multi-value or include-all
+// (interpolateQueryExpr,
+// https://github.com/grafana/grafana-prometheus-datasource/blob/v13.2.3/packages/grafana-prometheus/src/escaping.ts),
+// so a regex instance matcher reads an IPv6 target's brackets as a character
+// class and a host name's dots as any character. Without an instance variable
+// Grafana leaves $instance as text, which matches no series.
+func TestDashboard_queries_match_the_instance_exactly(t *testing.T) {
+	queries := allExprs(t)
+	if len(queries) == 0 {
+		t.Fatal("no query found; the pattern no longer reads the dashboard")
+	}
+	_, hasInstance := dashVariables(t)["instance"]
+	for where, e := range queries {
+		var matchers [][]string
+		for _, parts := range selectors(bracedVariable.ReplaceAllString(e, "$$v")) {
+			instances := 0
+			for _, part := range parts {
+				m := matcherPart.FindStringSubmatch(part)
+				if m == nil {
+					if !stringPart.MatchString(part) {
+						t.Errorf("%s holds %q in a selector, which is no label matcher: %s", where, part, e)
+					}
+					continue
+				}
+				label, lerr := m[1], error(nil)
+				if stringPart.MatchString(label) {
+					label, lerr = promqlUnquote(label)
+				}
+				value, verr := promqlUnquote(m[3])
+				if lerr != nil || verr != nil {
+					t.Errorf("%s quotes %q in a form the check cannot read: %s", where, part, e)
+					continue
+				}
+				if label == "instance" {
+					instances++
+					matchers = append(matchers, []string{m[2], value})
+				}
+			}
+			if instances > 1 {
+				t.Errorf("%s matches instance twice in one selector: %s", where, e)
+			}
+		}
+		pinned := slices.ContainsFunc(matchers, func(m []string) bool { return m[0] == "=" && m[1] == "$instance" })
+		for _, m := range matchers {
+			switch {
+			case !hasInstance:
+				t.Errorf("%s matches instance%s%q, but the dashboard has no instance variable: %s", where, m[0], m[1], e)
+			case m[0] != "=" || m[1] != "$instance" && (m[1] != "" || !pinned):
+				t.Errorf("%s matches instance%s%q, want instance=\"$instance\", or instance=\"\" beside it: %s", where, m[0], m[1], e)
+			}
+		}
+	}
+}
+
+var (
+	counterCall = regexp.MustCompile(`\b(increase|rate|irate)\s*\(`)
+	// oneSlotRange matches a range or subquery range of exactly one
+	// $__interval, once canonicalIntervals has rewritten its spelling.
+	oneSlotRange = regexp.MustCompile(`\[\s*\$(?:__interval|\{__interval\}|\{__interval_ms\}ms)\s*(?::[^\]]*)?\]`)
+	// Grafana's variable grammar, variableRegex in
+	// https://github.com/grafana/grafana/blob/v13.2.3/public/app/features/variables/utils.ts
+	grafanaVariable = regexp.MustCompile(`\$(\w+)|\[\[(\w+?)(?::\w+)?\]\]|\$\{(\w+)(?:\.[^:^}]+)?(?::[^}]+)?\}`)
+)
+
+// canonicalIntervals rewrites every Grafana spelling of $__interval and
+// $__interval_ms, such as [[__interval]] or ${__interval_ms:raw}, as
+// $__interval and ${__interval_ms}.
+func canonicalIntervals(expr string) string {
+	return grafanaVariable.ReplaceAllStringFunc(expr, func(ref string) string {
+		m := grafanaVariable.FindStringSubmatch(ref)
+		switch m[1] + m[2] + m[3] {
+		case "__interval":
+			return "$__interval"
+		case "__interval_ms":
+			return "${__interval_ms}"
+		}
+		return ref
+	})
+}
+
+// blankLiterals empties each string literal and # comment in expr, so a
+// label value or a comment is never read as a call or a range.
+func blankLiterals(expr string) string {
+	var b strings.Builder
+	for i := 0; i < len(expr); i++ {
+		switch c := expr[i]; c {
+		case '#':
+			i = skipComment(expr, i) - 1
+		case '"', '\'', '`':
+			i = skipString(expr, i) - 1
+			b.WriteString(`""`)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// callArgs returns the arguments of the call whose parenthesis opens at
+// expr[open], up to its matching parenthesis, skipping quoted strings and
+// # comments.
+func callArgs(expr string, open int) string {
+	depth := 0
+	for i := open; i < len(expr); i++ {
+		switch expr[i] {
+		case '#':
+			i = skipComment(expr, i)
+		case '"', '\'', '`':
+			i = skipString(expr, i) - 1
+		case '(':
+			depth++
+		case ')':
+			if depth--; depth == 0 {
+				return expr[open+1 : i]
+			}
+		}
+	}
+	return expr[open+1:]
+}
+
+// oneSlotCalls returns how many increase, rate and irate calls expr makes,
+// and the name of each one whose window is one $__interval.
+func oneSlotCalls(expr string) (calls int, oneSlot []string) {
+	e := blankLiterals(canonicalIntervals(expr))
+	for _, loc := range counterCall.FindAllStringSubmatchIndex(e, -1) {
+		calls++
+		if oneSlotRange.MatchString(callArgs(e, loc[1]-1)) {
+			oneSlot = append(oneSlot, e[loc[2]:loc[3]])
+		}
+	}
+	return calls, oneSlot
+}
+
+// $__interval falls to the scrape interval at short ranges, so a counter's
+// window over it holds one sample and increase or rate returns nothing.
+func TestDashboard_counter_windows_outlast_one_scrape(t *testing.T) {
+	calls := 0
+	for where, e := range allExprs(t) {
+		n, oneSlot := oneSlotCalls(e)
+		calls += n
+		for _, call := range oneSlot {
+			t.Errorf("%s calls %s over $__interval, want $__rate_interval or an offset difference: %s", where, call, e)
+		}
+	}
+	if calls == 0 {
+		t.Error("no increase or rate call found; the pattern no longer reads the dashboard")
+	}
+}
+
+// The shipped dashboard spells every window $__interval, so only these rows
+// pin the other spellings Grafana accepts and the literals the guard skips.
+func TestDashboard_counter_window_guard_reads_every_interval_spelling(t *testing.T) {
+	for _, tc := range []struct {
+		expr    string
+		oneSlot bool
+	}{
+		{`increase(x[$__interval])`, true},
+		{`increase(x[[[__interval]]])`, true},
+		{`increase(x[${__interval:raw}])`, true},
+		{`increase(x[${__interval_ms:raw}ms])`, true},
+		{`increase(x[[[__interval_ms]]ms])`, true},
+		{`rate((x)[[[__interval]]:])`, true},
+		{`increase(x[$__rate_interval])`, false},
+		{`increase(x[5m:${__interval:raw}])`, false},
+		{`increase(x{note="[[[__interval]]]"}[5m])`, false},
+		{"increase(x[5m]) # rate(x[$__interval])", false},
+	} {
+		if calls, oneSlot := oneSlotCalls(tc.expr); calls != 1 || (len(oneSlot) == 1) != tc.oneSlot {
+			t.Errorf("oneSlotCalls(%s) = %d, %q, want 1 call, one slot %t", tc.expr, calls, oneSlot, tc.oneSlot)
+		}
+	}
+}
+
+// alerts/promql_test.yaml evaluates the first watch-time bar's slice
+// arithmetic, so every watch-time bar must be that query on its own selector.
+func TestDashboard_watch_time_bars_are_the_tested_query(t *testing.T) {
+	selector := regexp.MustCompile(`plex_play_seconds_total\{[^}]*\}`)
+	_, panels := loadDashboard(t)
+	var tested, shape string
+	for _, title := range []string{"Watch time by delivery", "Watch time by network"} {
+		p := panelByTitle(t, panels, title)
+		for _, e := range exprs(&p) {
+			sels := selector.FindAllString(e, -1)
+			if len(sels) == 0 || slices.ContainsFunc(sels, func(s string) bool { return s != sels[0] }) {
+				t.Errorf("%q = %s, want one plex_play_seconds_total selector throughout", title, e)
+			}
+			s := selector.ReplaceAllString(e, "C")
+			if tested == "" {
+				tested, shape = e, s
+			} else if s != shape {
+				t.Errorf("%q = %s, want the tested query %s on its own selector", title, e, tested)
+			}
+		}
+	}
+	want := strings.NewReplacer(`$server`, ".+", `$__interval`, "5m", `$__from`, "0").Replace(tested)
+	m := regexp.MustCompile(`(?m)expr: &watch_time '([^']*)'$`).FindStringSubmatch(readFile(t, "alerts/promql_test.yaml"))
+	if m == nil {
+		t.Fatal("alerts/promql_test.yaml has no expr anchored as watch_time")
+	}
+	if m[1] != want {
+		t.Errorf("alerts/promql_test.yaml tests\n%s\nthe dashboard reads, with its variables filled in,\n%s", m[1], want)
+	}
+}
+
 // A stat reads its value off the last point of a range query, which Grafana
 // aligns down to the step, so the default 7 days must step by at most 2m:
 // gtime.RoundInterval gives 2m up to 210 s. It rounds a step down by up to
