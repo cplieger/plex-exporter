@@ -84,6 +84,8 @@ Renovate can keep the URL current with its `github-releases` datasource. The sam
 
 The tiles that show the current state ask for an instant value rather than a range. So when a label splits a series, such as a new `version` after a Plex upgrade, each tile still shows one row.
 
+The Libraries not read tile also reads `process_start_time_seconds`, so that like its alert it waits 6 hours after the exporter starts. Keep the `process_*` series in your scrape, or that tile never shows.
+
 ## Knowing the app is alive
 
 | Route | Method | Port | Login | Answers |

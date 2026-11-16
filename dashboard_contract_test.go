@@ -509,9 +509,46 @@ func TestDashboard_queries_match_the_instance_exactly(t *testing.T) {
 var (
 	counterCall = regexp.MustCompile(`\b(increase|rate|irate)\s*\(`)
 	// oneSlotRange matches a range or subquery range of exactly one
-	// $__interval, in each of Grafana's spellings of it.
+	// $__interval, once canonicalIntervals has rewritten its spelling.
 	oneSlotRange = regexp.MustCompile(`\[\s*\$(?:__interval|\{__interval\}|\{__interval_ms\}ms)\s*(?::[^\]]*)?\]`)
+	// Grafana's variable grammar, variableRegex in
+	// https://github.com/grafana/grafana/blob/v13.2.3/public/app/features/variables/utils.ts
+	grafanaVariable = regexp.MustCompile(`\$(\w+)|\[\[(\w+?)(?::\w+)?\]\]|\$\{(\w+)(?:\.[^:^}]+)?(?::[^}]+)?\}`)
 )
+
+// canonicalIntervals rewrites every Grafana spelling of $__interval and
+// $__interval_ms, such as [[__interval]] or ${__interval_ms:raw}, as
+// $__interval and ${__interval_ms}.
+func canonicalIntervals(expr string) string {
+	return grafanaVariable.ReplaceAllStringFunc(expr, func(ref string) string {
+		m := grafanaVariable.FindStringSubmatch(ref)
+		switch m[1] + m[2] + m[3] {
+		case "__interval":
+			return "$__interval"
+		case "__interval_ms":
+			return "${__interval_ms}"
+		}
+		return ref
+	})
+}
+
+// blankLiterals empties each string literal and # comment in expr, so a
+// label value or a comment is never read as a call or a range.
+func blankLiterals(expr string) string {
+	var b strings.Builder
+	for i := 0; i < len(expr); i++ {
+		switch c := expr[i]; c {
+		case '#':
+			i = skipComment(expr, i) - 1
+		case '"', '\'', '`':
+			i = skipString(expr, i) - 1
+			b.WriteString(`""`)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
 
 // callArgs returns the arguments of the call whose parenthesis opens at
 // expr[open], up to its matching parenthesis, skipping quoted strings and
@@ -535,20 +572,56 @@ func callArgs(expr string, open int) string {
 	return expr[open+1:]
 }
 
+// oneSlotCalls returns how many increase, rate and irate calls expr makes,
+// and the name of each one whose window is one $__interval.
+func oneSlotCalls(expr string) (calls int, oneSlot []string) {
+	e := blankLiterals(canonicalIntervals(expr))
+	for _, loc := range counterCall.FindAllStringSubmatchIndex(e, -1) {
+		calls++
+		if oneSlotRange.MatchString(callArgs(e, loc[1]-1)) {
+			oneSlot = append(oneSlot, e[loc[2]:loc[3]])
+		}
+	}
+	return calls, oneSlot
+}
+
 // $__interval falls to the scrape interval at short ranges, so a counter's
 // window over it holds one sample and increase or rate returns nothing.
 func TestDashboard_counter_windows_outlast_one_scrape(t *testing.T) {
 	calls := 0
 	for where, e := range allExprs(t) {
-		for _, loc := range counterCall.FindAllStringSubmatchIndex(e, -1) {
-			calls++
-			if args := callArgs(e, loc[1]-1); oneSlotRange.MatchString(args) {
-				t.Errorf("%s calls %s over $__interval, want $__rate_interval or an offset difference: %s", where, e[loc[2]:loc[3]], e)
-			}
+		n, oneSlot := oneSlotCalls(e)
+		calls += n
+		for _, call := range oneSlot {
+			t.Errorf("%s calls %s over $__interval, want $__rate_interval or an offset difference: %s", where, call, e)
 		}
 	}
 	if calls == 0 {
 		t.Error("no increase or rate call found; the pattern no longer reads the dashboard")
+	}
+}
+
+// The shipped dashboard spells every window $__interval, so only these rows
+// pin the other spellings Grafana accepts and the literals the guard skips.
+func TestDashboard_counter_window_guard_reads_every_interval_spelling(t *testing.T) {
+	for _, tc := range []struct {
+		expr    string
+		oneSlot bool
+	}{
+		{`increase(x[$__interval])`, true},
+		{`increase(x[[[__interval]]])`, true},
+		{`increase(x[${__interval:raw}])`, true},
+		{`increase(x[${__interval_ms:raw}ms])`, true},
+		{`increase(x[[[__interval_ms]]ms])`, true},
+		{`rate((x)[[[__interval]]:])`, true},
+		{`increase(x[$__rate_interval])`, false},
+		{`increase(x[5m:${__interval:raw}])`, false},
+		{`increase(x{note="[[[__interval]]]"}[5m])`, false},
+		{"increase(x[5m]) # rate(x[$__interval])", false},
+	} {
+		if calls, oneSlot := oneSlotCalls(tc.expr); calls != 1 || (len(oneSlot) == 1) != tc.oneSlot {
+			t.Errorf("oneSlotCalls(%s) = %d, %q, want 1 call, one slot %t", tc.expr, calls, oneSlot, tc.oneSlot)
+		}
 	}
 }
 
