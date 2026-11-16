@@ -10120,8 +10120,8 @@
           "refresh": "never",
           "regex": "",
           "current": {
-            "text": "Mimir",
-            "value": "mimir"
+            "text": "",
+            "value": ""
           },
           "options": [],
           "multi": false,
