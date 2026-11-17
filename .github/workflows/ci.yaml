@@ -32,7 +32,7 @@ jobs:
       contents: read
       id-token: write
       security-events: write
-    uses: cplieger/ci/.github/workflows/ci.yaml@2a90e6439d82dee3ccb07f11e78660f652b44e5d # v3
+    uses: cplieger/ci/.github/workflows/ci.yaml@ee6c0cba119ebd16eb01fdc1efdec8c7d8094429 # v3
     with:
       runner: ${{ vars.CI_RUNNER }}
       go-test-timeout: ${{ vars.GO_TEST_TIMEOUT }}
