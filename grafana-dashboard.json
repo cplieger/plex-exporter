@@ -1028,7 +1028,7 @@
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Transcodes",
+          "title": "Transcodes now",
           "description": "Streams Plex is converting right now on the selected servers, because the player cannot play the file as it is. Transcoding uses the most CPU, so a high count explains a slow server. The tile turns yellow at 1 transcode and orange at 3, and zero is normal when your players support your files. Unknown means plex-exporter has not identified the server yet.",
           "links": [],
           "data": {
@@ -1359,7 +1359,7 @@
         "kind": "Panel",
         "spec": {
           "id": 40,
-          "title": "Streams",
+          "title": "Streams now",
           "description": "Streams playing or paused right now on the selected servers, with the trend over the time range. A stream drops out about a minute after it stops. The figure is blue when idle and turns yellow at 1 stream, orange at 3 and red at 5, because each stream uses upload bandwidth and server time. Unknown means plex-exporter has not identified the server yet.",
           "links": [],
           "data": {
