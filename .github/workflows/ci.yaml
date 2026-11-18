@@ -30,7 +30,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: cplieger/ci/.github/workflows/ci.yaml@12b3af6df480e4ab0e80e4dac12118ff22fc5d58 # v3
+    uses: cplieger/ci/.github/workflows/ci.yaml@559839d721cf81abbaf9719f25c4679e5e1b5e84 # v3
     with:
       runner: ${{ vars.CI_RUNNER }}
       go-test-timeout: ${{ vars.GO_TEST_TIMEOUT }}
