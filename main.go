@@ -4,21 +4,20 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/cplieger/go/envx"
 	"github.com/cplieger/go/health/v2"
 	"github.com/cplieger/go/httpclient"
-	"github.com/cplieger/go/httpserver"
+	"github.com/cplieger/go/httpserver/v2"
 	"github.com/cplieger/go/measure/v2"
 	"github.com/cplieger/go/slogx"
 	"github.com/cplieger/plex-exporter/internal/plex"
@@ -48,7 +47,12 @@ func main() {
 }
 
 func listenAddr() string {
-	return cmp.Or(envx.String("LISTEN_ADDR"), ":9594")
+	return httpserver.ListenAddr(envx.String("LISTEN_ADDR"), ":9594")
+}
+
+// allowedHosts is ALLOWED_HOSTS' entries. Empty checks no Host.
+func allowedHosts() []string {
+	return strings.Split(envx.String("ALLOWED_HOSTS"), ",")
 }
 
 // newRegistry builds the /metrics registry: the exporter's families, and the
@@ -64,21 +68,9 @@ func metricsHandler(reg *measure.Registry) http.Handler {
 	return httpserver.Gzip(httpserver.WithGzipTypes("text/plain"))(reg.Handler())
 }
 
-// routes serves /metrics and GET /healthz, which reports serving.
-func routes(metrics http.Handler, serving health.Signal) http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics)
-	mux.Handle("GET "+healthzPath, health.CheckHandler(health.Check{Signal: serving, Reason: notServingReason}))
-
-	// Chain is outermost-first: Logging records the final status (even a
-	// recovered panic), Recoverer converts a panic to its 500 before
-	// SecurityHeaders' baseline is set. No CSP/HSTS: both endpoints are
-	// machine-scraped, non-browser.
-	return httpserver.Chain(mux,
-		httpserver.Logging(httpserver.WithProbeLogLevel("/metrics", healthzPath)),
-		httpserver.Recoverer(),
-		httpserver.SecurityHeaders(),
-	)
+// healthzHandler answers GET /healthz from the serving verdict.
+func healthzHandler(serving health.Signal) http.Handler {
+	return health.CheckHandler(health.Check{Signal: serving, Reason: notServingReason})
 }
 
 func run() int {
@@ -142,19 +134,16 @@ func run() int {
 	go ps.RunRefreshLoop(ctx)
 
 	st := health.NewStatus()
-	handler := routes(metricsHandler(newRegistry(ps)), st)
-
-	// ReadTimeout/WriteTimeout guard against slow-body/slow-write DoS; New
-	// leaves them unset by default.
-	srv := httpserver.New(handler)
-	srv.ReadHeaderTimeout = 5 * time.Second
-	srv.ReadTimeout = 5 * time.Second
-	srv.WriteTimeout = 10 * time.Second
-
-	lc := &net.ListenConfig{}
-	listener, err := lc.Listen(ctx, "tcp", listenAddr)
+	ops, err := httpserver.ListenOps(ctx, httpserver.OpsConfig{
+		Metrics:      metricsHandler(newRegistry(ps)),
+		Healthz:      healthzHandler(st),
+		Setting:      "LISTEN_ADDR",
+		Addr:         listenAddr,
+		HostsSetting: "ALLOWED_HOSTS",
+		Hosts:        allowedHosts(),
+	})
 	if err != nil {
-		slog.Error("cannot bind listen address", "addr", listenAddr, "error", err)
+		slog.Error("cannot start the metrics listener", "error", err)
 		return 1
 	}
 
@@ -165,14 +154,14 @@ func run() int {
 	go ps.RunHistoryLoop(ctx)
 	go ps.RunLibraryWalkLoop(ctx)
 
-	slog.Info("starting metrics server", "addr", listener.Addr().String())
-	// WithPreDrain marks the app unhealthy before httpserver.Run drains, so a
-	// probe answered during the drain reads 503.
-	preDrain := httpserver.WithPreDrain(func(context.Context) {
+	slog.Info("starting metrics server", "addr", ops.Addr().String())
+	// The ops listener outlives ctx by its own grace, so the verdict flips at
+	// the signal and a probe answered during that window reads 503.
+	context.AfterFunc(ctx, func() {
 		st.BeginDrain()
 		slog.Info("shutting down", "cause", context.Cause(ctx))
 	})
-	if srvErr := httpserver.Run(ctx, srv, listener, httpserver.WithShutdownGrace(15*time.Second), preDrain); srvErr != nil {
+	if srvErr := httpserver.RunWithOps(ctx, ops); srvErr != nil {
 		slog.Error("metrics server failed", "error", srvErr)
 		ps.RecordError("metrics_server")
 		return 1

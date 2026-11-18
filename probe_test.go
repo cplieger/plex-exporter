@@ -3,15 +3,12 @@ package main
 import (
 	"io"
 	"net"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestProbeHealth_passes_only_a_serving_listener(t *testing.T) {
-	metrics := http.NotFoundHandler()
 	for _, tc := range []struct {
 		name    string
 		serving bool
@@ -21,9 +18,7 @@ func TestProbeHealth_passes_only_a_serving_listener(t *testing.T) {
 		{"not serving", false, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ts := httptest.NewServer(routes(metrics, fixedSignal(tc.serving)))
-			defer ts.Close()
-			if got := probeHealth(io.Discard, ts.Listener.Addr().String(), 2*time.Second); got != tc.want {
+			if got := probeHealth(io.Discard, serveOps(t, fixedSignal(tc.serving)), 2*time.Second); got != tc.want {
 				t.Errorf("probeHealth = %d, want %d", got, tc.want)
 			}
 		})

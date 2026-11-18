@@ -89,6 +89,7 @@ Every setting is an environment variable, read once at start. Run `docker compos
 | `PLEX_TOKEN` | The admin token of your Plex server. Leave it out when `PLEX_TOKEN_FILE` is set | required |
 | `PLEX_TOKEN_FILE` | Path to a file holding the token, such as a Docker secret. It takes precedence over `PLEX_TOKEN` and keeps the token out of `docker inspect` | _(unset)_ |
 | `LISTEN_ADDR` | Address and port the metrics server listens on | `:9594` |
+| `ALLOWED_HOSTS` | Comma-separated `Host` names or IPs to serve, such as `plex-exporter,192.0.2.10`. Unset serves every `Host`. A request from the container itself is always served | _(unset)_ |
 | `PLEX_CA_CERT_PATH` | Path inside the container to the PEM file of the CA that signed your Plex certificate. TLS verification stays on | _(unset)_ |
 
 The exporter strips one trailing line ending from the token file, and refuses to start when the file holds only whitespace.
