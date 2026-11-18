@@ -785,7 +785,7 @@ func TestDashboard_always_shown_tile_rows_fill_one_line(t *testing.T) {
 		tab, row string
 		want     []string
 	}{
-		{"Overview", "Server overview", []string{"Plex version", "Streams", "Transcodes", "Items added in ${span} ${spanunit}"}},
+		{"Overview", "Server overview", []string{"Plex version", "Streams now", "Transcodes now", "Items added in ${span} ${spanunit}"}},
 		{"Libraries", "Totals", []string{"Total items", "Total storage", "Total duration"}},
 	} {
 		grid := row(t, c.tab, c.row).Spec.Layout
