@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/go/masked"
 	"github.com/cplieger/plexapi/v3"
 )
 
@@ -30,7 +31,7 @@ func newTestClient(serverURL string, token plexapi.Token, hc *http.Client) (*Cli
 
 func TestNewClient_invalid_url_returns_error(t *testing.T) {
 	for _, u := range []string{"ftp://plex:32400", "http://", "://bad"} {
-		if _, err := NewClient(Options{ServerURL: u, Token: "tok"}); err == nil {
+		if _, err := NewClient(Options{ServerURL: u, Token: masked.NewSecret("tok")}); err == nil {
 			t.Errorf("NewClient(%q) succeeded, want error", u)
 		}
 	}
@@ -43,7 +44,7 @@ func TestNewClient_empty_token_errors(t *testing.T) {
 }
 
 func TestNewClient_ca_cert_path_missing_file_errors(t *testing.T) {
-	_, err := NewClient(Options{ServerURL: "https://plex:32400", Token: "tok", CACertPath: filepath.Join(t.TempDir(), "nope.pem")})
+	_, err := NewClient(Options{ServerURL: "https://plex:32400", Token: masked.NewSecret("tok"), CACertPath: filepath.Join(t.TempDir(), "nope.pem")})
 	if err == nil {
 		t.Fatal("missing CA file accepted")
 	}
@@ -57,7 +58,7 @@ func TestNewClient_ca_cert_path_invalid_pem_errors(t *testing.T) {
 	if err := os.WriteFile(p, []byte("not a pem"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewClient(Options{ServerURL: "https://plex:32400", Token: "tok", CACertPath: p}); err == nil {
+	if _, err := NewClient(Options{ServerURL: "https://plex:32400", Token: masked.NewSecret("tok"), CACertPath: p}); err == nil {
 		t.Fatal("garbage PEM accepted")
 	}
 }
@@ -72,7 +73,7 @@ func TestNewClient_ca_cert_pins_tls(t *testing.T) {
 	if err := os.WriteFile(p, pemBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := NewClient(Options{ServerURL: ts.URL, Token: "tok", CACertPath: p})
+	c, err := NewClient(Options{ServerURL: ts.URL, Token: masked.NewSecret("tok"), CACertPath: p})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestNewClient_counts_retries(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer ts.Close()
-	c, err := NewClient(Options{ServerURL: ts.URL, Token: "tok"})
+	c, err := NewClient(Options{ServerURL: ts.URL, Token: masked.NewSecret("tok")})
 	if err != nil {
 		t.Fatal(err)
 	}

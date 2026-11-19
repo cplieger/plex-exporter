@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/go/masked"
 	"github.com/cplieger/plex-exporter/internal/plex"
 	"github.com/cplieger/plex-exporter/internal/server"
 )
@@ -99,7 +100,7 @@ func TestAlerts_released_names_are_kept_or_removed_on_purpose(t *testing.T) {
 // carry, read from the registry run serves.
 func publishedFamilies(t *testing.T) []string {
 	t.Helper()
-	client, err := plex.NewClient(plex.Options{ServerURL: "http://192.0.2.1:32400", Token: "test-token"})
+	client, err := plex.NewClient(plex.Options{ServerURL: "http://192.0.2.1:32400", Token: masked.NewSecret("test-token")})
 	if err != nil {
 		t.Fatalf("Setup: plex client: %v", err)
 	}

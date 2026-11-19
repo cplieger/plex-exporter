@@ -97,7 +97,9 @@ func TestMemory_large_library_and_history_stay_bounded(t *testing.T) {
 		t.Skip("allocates a 500,000-item library")
 	}
 	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestMemoryChild$", "-test.count=1")
-	cmd.Env = append(os.Environ(), memoryChildEnv+"=1")
+	// atexit_sleep_ms=0: under -race the child would otherwise sleep a second
+	// at exit.
+	cmd.Env = append(os.Environ(), memoryChildEnv+"=1", "GORACE=atexit_sleep_ms=0")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("child failed: %v\n%s", err, out)

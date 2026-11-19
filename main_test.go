@@ -122,7 +122,9 @@ func startExporter(t *testing.T, env map[string]string) *exporterProc {
 			cmd.Env = append(cmd.Env, kv)
 		}
 	}
-	cmd.Env = append(cmd.Env, runMainEnv+"=1")
+	// atexit_sleep_ms=0: under -race the child would otherwise sleep a second
+	// at exit.
+	cmd.Env = append(cmd.Env, runMainEnv+"=1", "GORACE=atexit_sleep_ms=0")
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}

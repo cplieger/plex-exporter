@@ -686,7 +686,7 @@ func variableQuery(t *testing.T, name string) string {
 		t.Errorf("variable %s is %s hide %q refresh %q saves %v regex %q, want a hidden QueryVariable refreshed on time range change, saving 0, reading the count",
 			name, v.Kind, v.Spec.Hide, v.Spec.Refresh, v.Spec.Current.Value, v.Spec.Regex)
 	}
-	return v.dataQuery(t).Spec.Query
+	return v.dataQuery(t).runs()
 }
 
 // A row still draws its header and space when every tile in it is hidden, so
@@ -1265,8 +1265,39 @@ type variableDataQuery struct {
 		Name string `json:"name"`
 	} `json:"datasource"`
 	Spec struct {
-		Query string `json:"query"`
+		// LegacyStringValue is nil when the key is absent and "null" when null.
+		LegacyStringValue json.RawMessage `json:"__legacyStringValue"`
+		Query             string          `json:"query"`
 	} `json:"spec"`
+}
+
+// runs is the query Grafana runs: __legacyStringValue, null as "", when that
+// key is present (getDataQueryForVariable), and query otherwise.
+func (q variableDataQuery) runs() string {
+	if q.Spec.LegacyStringValue == nil {
+		return q.Spec.Query
+	}
+	var s string
+	_ = json.Unmarshal(q.Spec.LegacyStringValue, &s)
+	return s
+}
+
+// TestVariableDataQueryRunsWhatGrafanaRuns pins runs to the query Grafana
+// runs, so a pin on query cannot pass while __legacyStringValue holds another.
+func TestVariableDataQueryRunsWhatGrafanaRuns(t *testing.T) {
+	for _, tc := range []struct{ name, spec, want string }{
+		{"query only", `{"query":"up"}`, "up"},
+		{"legacy wins", `{"query":"up","__legacyStringValue":"down"}`, "down"},
+		{"legacy null is empty", `{"query":"up","__legacyStringValue":null}`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := dashVariable{}
+			v.Spec.Query = json.RawMessage(`{"spec":` + tc.spec + `}`)
+			if got := v.dataQuery(t).runs(); got != tc.want {
+				t.Errorf("runs = %q, want %q", got, tc.want)
+			}
+		})
+	}
 }
 
 func (v *dashVariable) dataQuery(t *testing.T) variableDataQuery {

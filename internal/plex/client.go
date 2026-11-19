@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cplieger/go/masked"
 	"github.com/cplieger/plexapi/v3"
 )
 
@@ -43,7 +44,7 @@ type Options struct {
 	// validates it at construction.
 	ServerURL string
 	// Token authenticates every request (X-Plex-Token).
-	Token string
+	Token masked.Secret
 	// CACertPath, when non-empty, pins the PEM file at that path as the
 	// sole TLS trust anchor (verification stays ON) — the recommended
 	// setup for a self-signed Plex. Empty uses the OS trust store (right
@@ -53,7 +54,7 @@ type Options struct {
 
 // NewClient returns a Client configured by opts.
 func NewClient(opts Options) (*Client, error) {
-	if opts.Token == "" {
+	if opts.Token.IsZero() {
 		return nil, errors.New("plex: Options.Token must not be empty")
 	}
 	retries := new(atomic.Int64)
@@ -72,7 +73,7 @@ func NewClient(opts Options) (*Client, error) {
 		}
 		apiOpts = append(apiOpts, plexapi.WithCACertPEM(pemBytes))
 	}
-	api, err := plexapi.New(opts.ServerURL, plexapi.Token(opts.Token), apiOpts...)
+	api, err := plexapi.New(opts.ServerURL, plexapi.Token(opts.Token.Reveal()), apiOpts...)
 	if err != nil {
 		return nil, err
 	}
