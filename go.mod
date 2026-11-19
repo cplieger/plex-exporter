@@ -6,7 +6,7 @@ require (
 	github.com/cplieger/go/envx/v2 v2.0.0-dev.1
 	github.com/cplieger/go/health/v2 v2.0.0
 	github.com/cplieger/go/httpclient v1.2.0
-	github.com/cplieger/go/httpserver/v2 v2.0.0-dev.7
+	github.com/cplieger/go/httpserver/v2 v2.0.0-dev.8
 	github.com/cplieger/go/masked v1.0.0-dev.1
 	github.com/cplieger/go/measure/v2 v2.1.0-dev.2
 	github.com/cplieger/go/slogx v1.1.0
