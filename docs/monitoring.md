@@ -13,7 +13,7 @@ plex-exporter serves a metrics page and ships metric alert rules and a Grafana d
 
 ## Metrics
 
-The page is always on, at `/metrics` on port 9594, which `LISTEN_ADDR` changes. It has no login, so keep the port on your own network, because its labels carry Plex user names, device names and the titles being played. [How plex-exporter works](how-it-works.md#when-each-metric-appears) explains when each series appears. [Metrics reference](metrics.md) lists every metric and label.
+The page is always on, at `/metrics` on port 9594, which `LISTEN_ADDR` changes. It has no login, so keep the port on your own network, and set `ALLOWED_HOSTS` to the names your scraper uses, because its labels carry Plex user names, device names and the titles being played. [How plex-exporter works](how-it-works.md#when-each-metric-appears) explains when each series appears. [Metrics reference](metrics.md) lists every metric and label.
 
 ## Logs
 
@@ -91,9 +91,11 @@ The Libraries not read tile also reads `process_start_time_seconds`, so that lik
 | Route | Method | Port | Login | Answers |
 | --- | --- | --- | --- | --- |
 | `/healthz` | `GET`, `HEAD` | 9594, or the port in `LISTEN_ADDR` | none | `200 {"status":"ok"}`, or `503 {"status":"unhealthy","reasons":[...]}` |
-| `/metrics` | `GET` | the same port | none, so keep the port on your network | Prometheus text format, gzipped when the scraper asks for it |
+| `/metrics` | `GET`, `HEAD` | the same port | none, so keep the port on your network | Prometheus text format, gzipped when the scraper asks for it |
 
 **What healthy means.** `/healthz` is healthy from the moment the exporter's metrics server listens until it starts to shut down. The exporter keeps this verdict in memory, so a read-only root filesystem never makes it unhealthy. Plex being unreachable, a rejected token included, never makes it unhealthy. That shows on `/metrics` as `plex_http_reachable` at `0` and in the log.
+
+**Hosts.** With `ALLOWED_HOSTS` set, a request whose `Host` is not listed gets `403` with the code `host_not_allowed`, and a scrape or an outside prober must use a listed name. A request from the container itself passes, so the Docker health check needs no entry. A malformed entry stops the start and names `ALLOWED_HOSTS`.
 
 **Docker health.** The image checks itself every 30 seconds with `/plex-exporter health`, which asks `/healthz` on the container's loopback, or on the address `LISTEN_ADDR` names. Docker marks the container unhealthy after 3 failures, and allows 15 seconds after a start. Docker's health status notifies nobody on its own, and Docker does not restart an unhealthy container.
 
